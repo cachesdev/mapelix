@@ -13,6 +13,10 @@ importers:
         version: 2.10.3
 
   apps/visual-check:
+    dependencies:
+      '@mapelix/core':
+        specifier: workspace:*
+        version: link:../../packages/mapelix
     devDependencies:
       '@playwright/test':
         specifier: 1.60.0
