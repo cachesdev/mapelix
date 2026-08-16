@@ -46,9 +46,24 @@ describe("createBedrockWorld", () => {
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
 
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([92, 142, 63, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([91, 145, 60, 255]);
     expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: 0, maxZ: 256 });
     expect(Array.from(tile.png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
+  });
+
+  it("applies a legacy Data2D biome to the matching chunk columns", async () => {
+    const data2DKey = new Uint8Array([...int32(-1), ...int32(0), 0x2d]);
+    const data2D = new Uint8Array(768);
+    data2D[512] = 6;
+    const world = createBedrockWorld([
+      singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block"),
+      { key: data2DKey, value: data2D },
+    ]);
+
+    const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
+    const pixelOffset = 240 * 4;
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([107, 114, 54, 255]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SUBCHUNK_TAG, classifyChunkKey } from "./chunk-key.js";
+import { DATA_2D_TAG, SUBCHUNK_TAG, classifyChunkKey, classifyData2DKey } from "./chunk-key.js";
 
 function subchunkKey(x: number, z: number, y: number, dimension?: number): Uint8Array {
   const key = new Uint8Array(dimension === undefined ? 10 : 14);
@@ -43,5 +43,27 @@ describe("classifyChunkKey", () => {
 
     expect(classifyChunkKey(notSubchunk)).toBeUndefined();
     expect(classifyChunkKey(new Uint8Array(11))).toBeUndefined();
+  });
+});
+
+describe("classifyData2DKey", () => {
+  it("decodes overworld and dimensioned biome keys", () => {
+    const overworld = subchunkKey(-4, 9, 0).slice(0, 9);
+    overworld[8] = DATA_2D_TAG;
+    expect(classifyData2DKey(overworld)).toEqual({
+      tag: DATA_2D_TAG,
+      x: -4,
+      z: 9,
+      dimension: 0,
+    });
+
+    const dimensioned = subchunkKey(2, 3, 0, 7).slice(0, 13);
+    dimensioned[12] = DATA_2D_TAG;
+    expect(classifyData2DKey(dimensioned)).toEqual({
+      tag: DATA_2D_TAG,
+      x: 2,
+      z: 3,
+      dimension: 7,
+    });
   });
 });

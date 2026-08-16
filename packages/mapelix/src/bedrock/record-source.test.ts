@@ -211,4 +211,17 @@ describe("createLevelDbRecordIndex", () => {
     ]);
     expect("value" in records[0]!).toBe(false);
   });
+
+  it("drains records without retaining a second index", () => {
+    const index = createLevelDbRecordIndex();
+    index.addFile({
+      name: "000004.ldb",
+      bytes: table([internalRecord("first", [1], 1n), internalRecord("second", [2], 2n)]),
+    });
+
+    expect([...index.drainRecords()].map((record) => new TextDecoder().decode(record.key))).toEqual(
+      ["first", "second"],
+    );
+    expect(index.records()).toEqual([]);
+  });
 });

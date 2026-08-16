@@ -38,6 +38,8 @@ interface VersionedIndexEntry extends LevelDbRecordIndexEntry {
 
 export interface LevelDbRecordIndex {
   addFile(file: NamedLevelDbFile): void;
+  /** Removes and yields records so callers can transform large indexes without a duplicate peak. */
+  drainRecords(): IterableIterator<LevelDbRecordIndexEntry>;
   records(): LevelDbRecordIndexEntry[];
 }
 
@@ -146,6 +148,14 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
   return {
     addFile(file): void {
       parseFile(file, add);
+    },
+    *drainRecords(): IterableIterator<LevelDbRecordIndexEntry> {
+      for (const [encodedKey, record] of latest) {
+        latest.delete(encodedKey);
+        if (!record.deleted) {
+          yield record;
+        }
+      }
     },
     records(): LevelDbRecordIndexEntry[] {
       return [...latest.values()]

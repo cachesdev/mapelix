@@ -1,28 +1,32 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { classifyChunkKey } from "./bedrock/chunk-key.js";
+import { SUBCHUNK_TAG, classifyMapRecordKey, isMapRecordKey } from "./bedrock/chunk-key.js";
+import { createLevelDbRecordIndex, type LevelDbRecordIndexEntry } from "./bedrock/record-source.js";
 import {
-  createLevelDbRecordIndex,
-  readLevelDbRecords,
-  type LevelDbRecordIndexEntry,
-  type NamedLevelDbFile,
-} from "./bedrock/record-source.js";
+  renderIndexedTile,
+  type IndexedTileRenderJob,
+  type IndexedTileSource,
+  type PackedKeyGroup,
+} from "./node-tile-render.js";
+import { TileRenderWorkerPool } from "./node-worker-pool.js";
 import type { RenderSurfaceOptions } from "./render.js";
 import { floorDiv, type Dimension, type RenderedTile, type TileCoordinates } from "./tile.js";
-import {
-  createBedrockWorld,
-  type BedrockWorld,
-  type EffectiveBedrockRecord,
-  type TileCoverage,
-} from "./world.js";
+import type { BedrockWorld, TileCoverage } from "./world.js";
 
 export interface BedrockWorldDirectory {
   readonly directory: string;
+  /** Maximum number of tiles rendered in parallel. One renders in the main process. */
+  readonly renderConcurrency?: number;
 }
 
 interface IndexedTile {
-  readonly sources: Map<string, Set<string>>;
+  readonly sources: readonly IndexedTileSource[];
+  subchunkCount: number;
+}
+
+interface BuildingTile {
+  readonly sources: Map<string, Map<number, PackedKeyBuilder>>;
   subchunkCount: number;
 }
 
@@ -35,24 +39,46 @@ const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
 class IndexedBedrockWorld implements BedrockWorld {
   readonly tiles = new Map<string, IndexedTile>();
   readonly databaseDirectory: string;
+  private readonly workerPool: TileRenderWorkerPool | undefined;
   private renderQueue: Promise<void> = Promise.resolve();
 
-  constructor(databaseDirectory: string, records: Iterable<LevelDbRecordIndexEntry>) {
+  constructor(
+    databaseDirectory: string,
+    records: Iterable<LevelDbRecordIndexEntry>,
+    renderConcurrency: number,
+  ) {
     this.databaseDirectory = databaseDirectory;
+    this.workerPool =
+      renderConcurrency > 1 ? new TileRenderWorkerPool(renderConcurrency) : undefined;
+    const buildingTiles = new Map<string, BuildingTile>();
     for (const record of records) {
-      const key = classifyChunkKey(record.key);
-      if (key === undefined) {
+      const location = classifyMapRecordKey(record.key);
+      if (location === undefined) {
         continue;
       }
-      const tileX = floorDiv(key.x, 16);
-      const tileY = floorDiv(key.z, 16);
-      const tileKey = indexTileKey(key.dimension, tileX, tileY);
-      const tile = this.tiles.get(tileKey) ?? { sources: new Map(), subchunkCount: 0 };
-      const keys = tile.sources.get(record.source) ?? new Set<string>();
-      keys.add(hex(record.key));
-      tile.sources.set(record.source, keys);
-      tile.subchunkCount += 1;
-      this.tiles.set(tileKey, tile);
+      const tileX = floorDiv(location.x, 16);
+      const tileY = floorDiv(location.z, 16);
+      const tileKey = indexTileKey(location.dimension, tileX, tileY);
+      const tile = buildingTiles.get(tileKey) ?? { sources: new Map(), subchunkCount: 0 };
+      const source = tile.sources.get(record.source) ?? new Map<number, PackedKeyBuilder>();
+      const keys = source.get(record.key.byteLength) ?? new PackedKeyBuilder(record.key.byteLength);
+      keys.add(record.key);
+      source.set(record.key.byteLength, keys);
+      tile.sources.set(record.source, source);
+      if (location.tag === SUBCHUNK_TAG) {
+        tile.subchunkCount += 1;
+      }
+      buildingTiles.set(tileKey, tile);
+    }
+
+    for (const [tileKey, tile] of buildingTiles) {
+      this.tiles.set(tileKey, {
+        sources: [...tile.sources].map(([name, groups]) => ({
+          name,
+          keyGroups: [...groups.values()].map((group) => group.finish()),
+        })),
+        subchunkCount: tile.subchunkCount,
+      });
     }
   }
 
@@ -60,7 +86,12 @@ class IndexedBedrockWorld implements BedrockWorld {
     coordinates: TileCoordinates,
     options: RenderSurfaceOptions = {},
   ): Promise<RenderedTile> {
-    const pending = this.renderQueue.then(() => this.renderTileNow(coordinates, options));
+    const job = this.createRenderJob(coordinates);
+    if (this.workerPool !== undefined && options.resolveBlockStyle === undefined) {
+      return this.workerPool.render(job);
+    }
+
+    const pending = this.renderQueue.then(() => renderIndexedTile(job, options));
     this.renderQueue = pending.then(
       () => undefined,
       () => undefined,
@@ -85,27 +116,14 @@ class IndexedBedrockWorld implements BedrockWorld {
     return coverage;
   }
 
-  private async renderTileNow(
-    coordinates: TileCoordinates,
-    options: RenderSurfaceOptions,
-  ): Promise<RenderedTile> {
+  private createRenderJob(coordinates: TileCoordinates): IndexedTileRenderJob {
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const tile = this.tiles.get(indexTileKey(dimension, coordinates.x, coordinates.y));
-    const records: EffectiveBedrockRecord[] = [];
-
-    for (const [source, keys] of tile?.sources ?? []) {
-      const file: NamedLevelDbFile = {
-        name: source,
-        bytes: await readFile(join(this.databaseDirectory, source)),
-      };
-      records.push(
-        ...readLevelDbRecords([file], {
-          includeKey: (key) => keys.has(hex(key)),
-        }),
-      );
-    }
-
-    return createBedrockWorld(records).renderTile(coordinates, options);
+    return {
+      coordinates,
+      databaseDirectory: this.databaseDirectory,
+      sources: tile?.sources ?? [],
+    };
   }
 }
 
@@ -117,6 +135,12 @@ class IndexedBedrockWorld implements BedrockWorld {
  * the temporary memory used by concurrent HTTP requests.
  */
 export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<BedrockWorld> {
+  const renderConcurrency = input.renderConcurrency ?? 1;
+  if (!Number.isSafeInteger(renderConcurrency) || renderConcurrency < 1) {
+    throw new RangeError(
+      `renderConcurrency must be a positive integer, received ${renderConcurrency}`,
+    );
+  }
   const databaseDirectory = join(input.directory, "db");
   const entries = await readdir(databaseDirectory, { withFileTypes: true });
   const databaseFiles = entries
@@ -127,9 +151,7 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     )
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  const index = createLevelDbRecordIndex({
-    includeKey: (key) => classifyChunkKey(key) !== undefined,
-  });
+  const index = createLevelDbRecordIndex({ includeKey: isMapRecordKey });
   for (const entry of databaseFiles) {
     index.addFile({
       name: entry.name,
@@ -137,13 +159,38 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     });
   }
 
-  return new IndexedBedrockWorld(databaseDirectory, index.records());
+  return new IndexedBedrockWorld(databaseDirectory, index.drainRecords(), renderConcurrency);
 }
 
 function indexTileKey(dimension: number, x: number, y: number): string {
   return `${dimension}/${x}/${y}`;
 }
 
-function hex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+class PackedKeyBuilder {
+  readonly keyLength: number;
+  private bytes: Uint8Array;
+  private count = 0;
+
+  constructor(keyLength: number) {
+    this.keyLength = keyLength;
+    this.bytes = new Uint8Array(keyLength * 4);
+  }
+
+  add(key: Uint8Array): void {
+    const requiredLength = (this.count + 1) * this.keyLength;
+    if (requiredLength > this.bytes.byteLength) {
+      const expanded = new Uint8Array(Math.max(requiredLength, this.bytes.byteLength * 2));
+      expanded.set(this.bytes);
+      this.bytes = expanded;
+    }
+    this.bytes.set(key, this.count * this.keyLength);
+    this.count += 1;
+  }
+
+  finish(): PackedKeyGroup {
+    return {
+      bytes: this.bytes.slice(0, this.count * this.keyLength),
+      keyLength: this.keyLength,
+    };
+  }
 }

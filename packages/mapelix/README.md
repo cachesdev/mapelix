@@ -7,7 +7,10 @@ The Node interface is small:
 ```ts
 import { openBedrockWorld, writeLeafletTile } from "@mapelix/core";
 
-const world = await openBedrockWorld({ directory: "/srv/amelix/world" });
+const world = await openBedrockWorld({
+  directory: "/srv/amelix/world",
+  renderConcurrency: 2,
+});
 const tile = await world.renderTile({ dimension: "overworld", z: 0, x: 0, y: 0 });
 await writeLeafletTile(tile, { root: "generated-tiles" });
 ```
@@ -22,8 +25,9 @@ For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file a
 
 - Reads Bedrock LevelDB `.ldb`, `.sst`, and `.log` files, including tombstones and sequence ordering.
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.
-- Uses the primary block storage layer. It does not render waterlogging overlays, biomes, entities, structures, or texture packs.
-- Uses a compact built-in color resolver with relief shading. Callers can inject a `BlockStyleResolver`.
+- Uses the primary block storage layer. It does not render waterlogging overlays, entities, structures, or texture packs.
+- Reads legacy Data2D biome IDs used by the Stratos world. Modern Data3D biome palettes are not implemented yet.
+- Uses biome-aware grass, foliage, and water colors, water-depth compositing, elevation shading, and bounded cast shadows. Callers can inject a `BlockStyleResolver`.
 - Does not validate LevelDB checksums yet.
-- Loads all matching table and log files into memory before tile filtering. Large Stratos-scale worlds need a streaming record source in the next pass.
+- Builds the index one database file at a time and retains only packed subchunk and Data2D keys. Tile values load on demand. More workers increase throughput and temporary memory use.
 - Does not interpret `CURRENT` or `MANIFEST` yet. Point it at a clean world snapshot without orphaned LevelDB files.

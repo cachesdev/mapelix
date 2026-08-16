@@ -2,6 +2,11 @@
   "$schema": "https://turbo.build/schema.json",
   "globalPassThroughEnv": ["CI"],
   "tasks": {
+    "benchmark": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    },
     "transit": {
       "dependsOn": ["^transit"]
     },
@@ -51,4 +56,3 @@
     }
   }
 }
-

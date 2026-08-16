@@ -28,6 +28,12 @@ export interface RenderedTile {
 export interface SurfaceBlock {
   readonly name: string;
   readonly y: number;
+  /** Numeric Bedrock biome identifier when the world stores a compatible biome record. */
+  readonly biomeId?: number;
+  /** Number of visible water blocks above the first non-water block. */
+  readonly fluidDepth?: number;
+  /** First non-water block below a water surface, used for visual compositing. */
+  readonly underwaterName?: string;
 }
 
 export type SurfaceSamples = ReadonlyArray<SurfaceBlock | undefined>;

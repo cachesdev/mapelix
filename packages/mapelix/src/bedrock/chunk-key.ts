@@ -1,5 +1,7 @@
 /** Bedrock LevelDB record tag used for a subchunk value. */
 export const SUBCHUNK_TAG = 0x2f;
+/** Bedrock LevelDB record tag used for legacy height and two-dimensional biome data. */
+export const DATA_2D_TAG = 0x2d;
 
 /** A subchunk key decoded from a Bedrock LevelDB key. */
 export interface BedrockSubchunkKey {
@@ -12,9 +14,39 @@ export interface BedrockSubchunkKey {
   readonly y: number;
 }
 
-function readInt32LittleEndian(bytes: Uint8Array, offset: number): number {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return view.getInt32(offset, true);
+export interface BedrockData2DKey {
+  readonly tag: typeof DATA_2D_TAG;
+  readonly x: number;
+  readonly z: number;
+  readonly dimension: number;
+}
+
+export type BedrockMapKey = BedrockSubchunkKey | BedrockData2DKey;
+
+/** Cheap filter for LevelDB scans. It does not allocate or decode coordinates. */
+export function isMapRecordKey(key: Uint8Array): boolean {
+  const tagOffset = key.byteLength === 9 || key.byteLength === 10 ? 8 : 12;
+  const tag = key[tagOffset];
+  return (
+    ((key.byteLength === 10 || key.byteLength === 14) && tag === SUBCHUNK_TAG) ||
+    ((key.byteLength === 9 || key.byteLength === 13) && tag === DATA_2D_TAG)
+  );
+}
+
+/** Decodes either supported map record with one coordinate view allocation. */
+export function classifyMapRecordKey(key: Uint8Array): BedrockMapKey | undefined {
+  if (!isMapRecordKey(key)) return undefined;
+  const tagOffset = key.byteLength === 9 || key.byteLength === 10 ? 8 : 12;
+  const tag = key[tagOffset];
+  const view = new DataView(key.buffer, key.byteOffset, key.byteLength);
+  const location = {
+    x: view.getInt32(0, true),
+    z: view.getInt32(4, true),
+    dimension: tagOffset === 8 ? 0 : view.getInt32(8, true),
+  };
+  if (tag === DATA_2D_TAG) return { tag, ...location };
+  const y = key[tagOffset + 1]!;
+  return { tag: SUBCHUNK_TAG, ...location, y: y >= 0x80 ? y - 0x100 : y };
 }
 
 /**
@@ -24,28 +56,12 @@ function readInt32LittleEndian(bytes: Uint8Array, offset: number): number {
  * keys, as well as explicitly written overworld keys, include it.
  */
 export function classifyChunkKey(key: Uint8Array): BedrockSubchunkKey | undefined {
-  const overworldKeyLength = 10;
-  const dimensionedKeyLength = 14;
+  const decoded = classifyMapRecordKey(key);
+  return decoded?.tag === SUBCHUNK_TAG ? decoded : undefined;
+}
 
-  if (key.byteLength !== overworldKeyLength && key.byteLength !== dimensionedKeyLength) {
-    return undefined;
-  }
-
-  const tagOffset = key.byteLength === overworldKeyLength ? 8 : 12;
-  if (key[tagOffset] !== SUBCHUNK_TAG) {
-    return undefined;
-  }
-
-  const y = key[tagOffset + 1];
-  if (y === undefined) {
-    return undefined;
-  }
-
-  return {
-    tag: SUBCHUNK_TAG,
-    x: readInt32LittleEndian(key, 0),
-    z: readInt32LittleEndian(key, 4),
-    dimension: tagOffset === 8 ? 0 : readInt32LittleEndian(key, 8),
-    y: y >= 0x80 ? y - 0x100 : y,
-  };
+/** Classifies the legacy Data2D height and biome record for a chunk. */
+export function classifyData2DKey(key: Uint8Array): BedrockData2DKey | undefined {
+  const decoded = classifyMapRecordKey(key);
+  return decoded?.tag === DATA_2D_TAG ? decoded : undefined;
 }

@@ -1,4 +1,10 @@
-import { classifyChunkKey } from "./bedrock/chunk-key.js";
+import {
+  DATA_2D_TAG,
+  SUBCHUNK_TAG,
+  classifyChunkKey,
+  classifyMapRecordKey,
+} from "./bedrock/chunk-key.js";
+import { data2DBiomeAt, decodeData2D, type DecodedData2D } from "./bedrock/data-2d.js";
 import type { LevelDbRecord } from "./bedrock/record-source.js";
 import { decodeSubchunk, type DecodedSubchunk } from "./bedrock/subchunk.js";
 import { encodePng } from "./png.js";
@@ -37,13 +43,13 @@ class RecordBedrockWorld implements BedrockWorld {
 
   constructor(records: Iterable<EffectiveBedrockRecord>) {
     for (const record of records) {
-      const key = classifyChunkKey(record.key);
-      if (key === undefined) {
+      const location = classifyMapRecordKey(record.key);
+      if (location === undefined) {
         continue;
       }
-      const tileX = floorDiv(key.x, 16);
-      const tileY = floorDiv(key.z, 16);
-      const tileKey = tileRecordKey(key.dimension, tileX, tileY);
+      const tileX = floorDiv(location.x, 16);
+      const tileY = floorDiv(location.z, 16);
+      const tileKey = tileRecordKey(location.dimension, tileX, tileY);
       const group = this.tileRecords.get(tileKey) ?? [];
       group.push(record);
       this.tileRecords.set(tileKey, group);
@@ -57,10 +63,21 @@ class RecordBedrockWorld implements BedrockWorld {
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
+    const biomeChunks = new Map<string, DecodedData2D>();
     const records = this.tileRecords.get(tileRecordKey(dimension, coordinates.x, coordinates.y));
 
     for (const record of records ?? []) {
-      const key = classifyChunkKey(record.key);
+      const mapKey = classifyMapRecordKey(record.key);
+      if (mapKey?.tag === DATA_2D_TAG) {
+        if (mapKey.dimension === dimension) {
+          const data = decodeData2D(record.key, record.value);
+          if (data !== undefined) {
+            biomeChunks.set(`${mapKey.x},${mapKey.z}`, data);
+          }
+        }
+        continue;
+      }
+      const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
       if (
         key === undefined ||
         key.dimension !== dimension ||
@@ -92,7 +109,15 @@ class RecordBedrockWorld implements BedrockWorld {
       if (key === undefined) {
         continue;
       }
-      writeChunkSurface(samples, bounds.minX, bounds.minZ, key.x, key.z, subchunks);
+      writeChunkSurface(
+        samples,
+        bounds.minX,
+        bounds.minZ,
+        key.x,
+        key.z,
+        subchunks,
+        biomeChunks.get(`${key.x},${key.z}`),
+      );
     }
 
     const rgba = renderSurface(samples, options);
@@ -118,7 +143,10 @@ class RecordBedrockWorld implements BedrockWorld {
       coverage.push({
         x: Number(tileX),
         y: Number(tileY),
-        subchunkCount: records.length,
+        subchunkCount: records.reduce(
+          (count, record) => count + (classifyChunkKey(record.key) === undefined ? 0 : 1),
+          0,
+        ),
       });
     }
     return coverage;
@@ -142,6 +170,7 @@ function writeChunkSurface(
   chunkX: number,
   chunkZ: number,
   subchunks: readonly DecodedSubchunk[],
+  biomes: DecodedData2D | undefined,
 ): void {
   for (let localZ = 0; localZ < 16; localZ += 1) {
     for (let localX = 0; localX < 16; localX += 1) {
@@ -151,7 +180,9 @@ function writeChunkSurface(
       }
       const pixelX = chunkX * 16 + localX - tileMinX;
       const pixelZ = chunkZ * 16 + localZ - tileMinZ;
-      samples[pixelZ * TILE_SIZE + pixelX] = surface;
+      const biomeId = biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ);
+      samples[pixelZ * TILE_SIZE + pixelX] =
+        biomeId === undefined ? surface : { ...surface, biomeId };
     }
   }
 }
@@ -161,17 +192,29 @@ function findSurfaceBlock(
   localX: number,
   localZ: number,
 ): SurfaceBlock | undefined {
+  let waterSurface: SurfaceBlock | undefined;
+  let fluidDepth = 0;
   for (const subchunk of subchunks) {
     for (let localY = 15; localY >= 0; localY -= 1) {
       const blockIndex = localX * 256 + localZ * 16 + localY;
       const paletteIndex = subchunk.primary.indexes[blockIndex];
       const name = paletteIndex === undefined ? undefined : subchunk.primary.palette[paletteIndex];
       if (name !== undefined && !isAir(name)) {
-        return { name, y: subchunk.y * 16 + localY };
+        if (waterSurface === undefined) {
+          if (!isWater(name)) {
+            return { name, y: subchunk.y * 16 + localY };
+          }
+          waterSurface = { name, y: subchunk.y * 16 + localY };
+          fluidDepth = 1;
+        } else if (isWater(name)) {
+          fluidDepth += 1;
+        } else {
+          return { ...waterSurface, fluidDepth, underwaterName: name };
+        }
       }
     }
   }
-  return undefined;
+  return waterSurface === undefined ? undefined : { ...waterSurface, fluidDepth };
 }
 
 function isAir(name: string): boolean {
@@ -181,6 +224,10 @@ function isAir(name: string): boolean {
     name === "minecraft:void_air" ||
     name === "minecraft:structure_void"
   );
+}
+
+function isWater(name: string): boolean {
+  return name === "minecraft:water" || name === "minecraft:flowing_water";
 }
 
 function tileRecordKey(dimension: number, tileX: number, tileY: number): string {
