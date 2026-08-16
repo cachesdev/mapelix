@@ -1,0 +1,44 @@
+{
+  "name": "@mapelix/core",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "check": "tsc --noEmit --project tsconfig.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --type-aware --type-check .",
+    "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "transit": "node -e \"\""
+  },
+  "dependencies": {
+    "pako": "2.1.0",
+    "pngjs": "7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "@types/pako": "2.0.4",
+    "@types/pngjs": "6.0.5",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2",
+    "vitest": "4.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "mapelix-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "pnpm": "11.21.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "build:affected": "turbo run build --affected",
+    "check": "turbo run check",
+    "check:affected": "turbo run check --affected",
+    "dev": "turbo run dev",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "lint": "turbo run lint",
+    "lint:affected": "turbo run lint --affected",
+    "quality": "turbo run quality",
+    "quality:affected": "turbo run quality --affected",
+    "test": "turbo run test",
+    "test:affected": "turbo run test --affected",
+    "test:e2e": "turbo run test:e2e",
+    "test:unit": "turbo run test:unit"
+  },
+  "devDependencies": {
+    "turbo": "2.10.3"
+  }
+}
+

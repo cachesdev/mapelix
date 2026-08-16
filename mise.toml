@@ -1,0 +1,17 @@
+min_version = "2026.7.16"
+monorepo_root = true
+
+[monorepo]
+config_roots = ["apps/*", "packages/*"]
+lockfile = false
+
+[tool_alias]
+pnpm = "npm:pnpm"
+
+[settings]
+disable_tools = ["turbo"]
+
+[tools]
+node = "24.14.1"
+pnpm = "11.21.0"
+
