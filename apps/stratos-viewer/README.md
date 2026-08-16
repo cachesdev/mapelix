@@ -5,7 +5,16 @@
 The default world is the temporary Linux-side copy at `/tmp/mapelix-stratos-tmbcraft-pruned-v2`. Override it when needed:
 
 ```sh
-STRATOS_WORLD_DIRECTORY=/path/to/world pnpm --filter @mapelix/stratos-viewer dev
+STRATOS_WORLD_DIRECTORY=/path/to/world \
+STRATOS_RENDER_WORKERS=2 \
+pnpm --filter @mapelix/stratos-viewer dev
 ```
 
-The server opens the world once, indexes its z0 tile coverage, and renders visible PNG tiles on demand. Leaflet magnifies or reduces those native tiles for interactive zooming.
+The server renders visible PNG tiles on demand. It stores metadata and generated tiles under
+`/tmp/mapelix-stratos-viewer-cache` by default. A warm restart can return cached tiles without
+opening the world database. Set `STRATOS_CACHE_DIRECTORY` to change the cache location.
+
+`STRATOS_RENDER_WORKERS` controls the number of tile worker threads. The default is two. Each
+response includes `x-mapelix-cache: memory`, `disk`, or `render` and a `server-timing` duration so
+the cache path is easy to measure. Leaflet magnifies or reduces the native z0 tiles for interactive
+zooming.

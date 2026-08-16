@@ -4,17 +4,23 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["build/**", ".svelte-kit/**", "!.svelte-kit/cache/**"],
-      "env": ["STRATOS_WORLD_DIRECTORY"]
+      "env": ["STRATOS_CACHE_DIRECTORY", "STRATOS_RENDER_WORKERS", "STRATOS_WORLD_DIRECTORY"]
     },
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["STRATOS_WORLD_DIRECTORY"]
+      "env": ["STRATOS_CACHE_DIRECTORY", "STRATOS_RENDER_WORKERS", "STRATOS_WORLD_DIRECTORY"]
     },
     "preview": {
       "cache": false,
       "persistent": true,
-      "env": ["HOST", "PORT", "STRATOS_WORLD_DIRECTORY"]
+      "env": [
+        "HOST",
+        "PORT",
+        "STRATOS_CACHE_DIRECTORY",
+        "STRATOS_RENDER_WORKERS",
+        "STRATOS_WORLD_DIRECTORY"
+      ]
     },
     "test:e2e": {
       "dependsOn": ["build"],
