@@ -49,5 +49,6 @@ describe("createBedrockWorld", () => {
     expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([92, 142, 63, 255]);
     expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: 0, maxZ: 256 });
     expect(Array.from(tile.png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
   });
 });

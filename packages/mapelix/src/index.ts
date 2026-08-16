@@ -11,7 +11,12 @@ export {
   type SurfaceBlock,
   type TileCoordinates,
 } from "./tile.js";
-export { createBedrockWorld, type BedrockWorld, type EffectiveBedrockRecord } from "./world.js";
+export {
+  createBedrockWorld,
+  type BedrockWorld,
+  type EffectiveBedrockRecord,
+  type TileCoverage,
+} from "./world.js";
 
 /** The prototype package version. */
 export const prototypeVersion = "0.0.0";

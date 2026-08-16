@@ -1,7 +1,7 @@
 import { deflateRaw } from "pako";
 import { describe, expect, it } from "vitest";
 
-import { readLevelDbRecords } from "./record-source.js";
+import { createLevelDbRecordIndex, readLevelDbRecords } from "./record-source.js";
 
 function varint(value: number): number[] {
   const bytes: number[] = [];
@@ -162,5 +162,53 @@ describe("readLevelDbRecords", () => {
       ["snappy", [7]],
       ["deflate", [9]],
     ]);
+  });
+
+  it("filters records before values are retained", () => {
+    const records = readLevelDbRecords(
+      [
+        {
+          name: "000004.ldb",
+          bytes: table([
+            internalRecord("keep", [1, 2, 3], 2n),
+            internalRecord("discard", [4, 5, 6], 3n),
+          ]),
+        },
+      ],
+      { includeKey: (key) => new TextDecoder().decode(key) === "keep" },
+    );
+
+    expect(records).toHaveLength(1);
+    expect(new TextDecoder().decode(records[0]?.key)).toBe("keep");
+  });
+});
+
+describe("createLevelDbRecordIndex", () => {
+  it("applies sequences and tombstones across files without retaining values", () => {
+    const index = createLevelDbRecordIndex({
+      includeKey: (key) => new TextDecoder().decode(key) !== "discard",
+    });
+    index.addFile({
+      name: "000004.ldb",
+      bytes: table([
+        internalRecord("live", [1, 2, 3], 2n),
+        internalRecord("gone", [4, 5, 6], 3n),
+        internalRecord("discard", [7, 8, 9], 4n),
+      ]),
+    });
+    index.addFile({
+      name: "000005.log",
+      bytes: log(10n, [{ key: "live", value: [10] }, { key: "gone" }]),
+    });
+
+    const records = index.records();
+    expect(records).toEqual([
+      {
+        key: new Uint8Array(bytes("live")),
+        sequence: 10n,
+        source: "000005.log",
+      },
+    ]);
+    expect("value" in records[0]!).toBe(false);
   });
 });

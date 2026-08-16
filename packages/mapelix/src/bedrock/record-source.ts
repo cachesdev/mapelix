@@ -14,9 +14,31 @@ export interface LevelDbRecord {
   source: string;
 }
 
+/** Controls which LevelDB keys are retained by a reader. */
+export interface LevelDbRecordOptions {
+  readonly includeKey?: (key: Uint8Array) => boolean;
+}
+
+/** A live record location without its potentially large value. */
+export interface LevelDbRecordIndexEntry {
+  readonly key: Uint8Array;
+  readonly sequence: bigint;
+  readonly source: string;
+}
+
 interface VersionedRecord extends LevelDbRecord {
   deleted: boolean;
   order: number;
+}
+
+interface VersionedIndexEntry extends LevelDbRecordIndexEntry {
+  deleted: boolean;
+  order: number;
+}
+
+export interface LevelDbRecordIndex {
+  addFile(file: NamedLevelDbFile): void;
+  records(): LevelDbRecordIndexEntry[];
 }
 
 interface BlockHandle {
@@ -34,7 +56,10 @@ const LDB_MAGIC = [0x57, 0xfb, 0x80, 0x8b, 0x24, 0x75, 0x47, 0xdb];
  * value for its key. Files with other names (for example CURRENT and MANIFEST)
  * are ignored because they do not contain world records.
  */
-export function readLevelDbRecords(files: Iterable<NamedLevelDbFile>): LevelDbRecord[] {
+export function readLevelDbRecords(
+  files: Iterable<NamedLevelDbFile>,
+  options: LevelDbRecordOptions = {},
+): LevelDbRecord[] {
   const latest = new Map<string, VersionedRecord>();
   let order = 0;
 
@@ -44,6 +69,9 @@ export function readLevelDbRecords(files: Iterable<NamedLevelDbFile>): LevelDbRe
     sequence: bigint,
     source: string,
   ): void => {
+    if (options.includeKey !== undefined && !options.includeKey(key)) {
+      return;
+    }
     const encodedKey = hex(key);
     const previous = latest.get(encodedKey);
     const deleted = value === undefined;
@@ -68,17 +96,75 @@ export function readLevelDbRecords(files: Iterable<NamedLevelDbFile>): LevelDbRe
   };
 
   for (const file of [...files].sort((left, right) => left.name.localeCompare(right.name))) {
-    const lowerName = file.name.toLowerCase();
-    if (lowerName.endsWith(".log")) {
-      parseLog(file.bytes, file.name, add);
-    } else if (lowerName.endsWith(".ldb") || lowerName.endsWith(".sst")) {
-      parseTable(file.bytes, file.name, add);
-    }
+    parseFile(file, add);
   }
 
   return [...latest.values()]
     .filter((record) => !record.deleted)
     .map(({ deleted: _deleted, order: _order, ...record }) => record);
+}
+
+/**
+ * Creates an incremental key-only index.
+ *
+ * Values are discarded while each file is parsed. This keeps memory use tied
+ * to the number of selected keys instead of the total size of world values.
+ */
+export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): LevelDbRecordIndex {
+  const latest = new Map<string, VersionedIndexEntry>();
+  let order = 0;
+
+  const add = (
+    key: Uint8Array,
+    value: Uint8Array | undefined,
+    sequence: bigint,
+    source: string,
+  ): void => {
+    if (options.includeKey !== undefined && !options.includeKey(key)) {
+      return;
+    }
+    const encodedKey = hex(key);
+    const previous = latest.get(encodedKey);
+    const candidate: VersionedIndexEntry = {
+      key: key.slice(),
+      sequence,
+      source,
+      deleted: value === undefined,
+      order,
+    };
+
+    if (
+      !previous ||
+      sequence > previous.sequence ||
+      (sequence === previous.sequence && order > previous.order)
+    ) {
+      latest.set(encodedKey, candidate);
+    }
+    order++;
+  };
+
+  return {
+    addFile(file): void {
+      parseFile(file, add);
+    },
+    records(): LevelDbRecordIndexEntry[] {
+      return [...latest.values()]
+        .filter((record) => !record.deleted)
+        .map(({ deleted: _deleted, order: _order, ...record }) => record);
+    },
+  };
+}
+
+function parseFile(
+  file: NamedLevelDbFile,
+  add: (key: Uint8Array, value: Uint8Array | undefined, sequence: bigint, source: string) => void,
+): void {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".log")) {
+    parseLog(file.bytes, file.name, add);
+  } else if (lowerName.endsWith(".ldb") || lowerName.endsWith(".sst")) {
+    parseTable(file.bytes, file.name, add);
+  }
 }
 
 function parseLog(
@@ -106,7 +192,7 @@ function parseLog(
     if (length > bytes.length - offset || length > remaining - 7) {
       throw new Error(`${source}: invalid LevelDB log record length`);
     }
-    const payload = bytes.slice(offset, offset + length);
+    const payload = bytes.subarray(offset, offset + length);
     offset += length;
 
     if (type === 0) {
@@ -200,7 +286,7 @@ function parseTable(
       const tag = fixed64(record.key, record.key.length - 8);
       const type = Number(tag & 0xffn);
       const sequence = tag >> 8n;
-      const key = record.key.slice(0, -8);
+      const key = record.key.subarray(0, record.key.length - 8);
       if (type === 1) add(key, record.value, sequence, source);
       else if (type === 0) add(key, undefined, sequence, source);
       else throw new Error(`${source}: unknown LevelDB internal key type ${type}`);
@@ -212,7 +298,7 @@ function readBlock(bytes: Uint8Array, handle: BlockHandle, source: string): Uint
   if (handle.offset < 0 || handle.size < 0 || handle.offset + handle.size > bytes.length - 48) {
     throw new Error(`${source}: LevelDB block handle is outside the table`);
   }
-  const raw = bytes.slice(handle.offset, handle.offset + handle.size);
+  const raw = bytes.subarray(handle.offset, handle.offset + handle.size);
   const compression =
     handle.offset + handle.size + 5 <= bytes.length
       ? bytes[handle.offset + handle.size]
@@ -272,7 +358,7 @@ function parseBlock(
     const key = new Uint8Array(shared.value + unshared.value);
     key.set(previousKey.subarray(0, shared.value));
     key.set(block.subarray(value.next, value.next + unshared.value), shared.value);
-    const entryValue = block.slice(
+    const entryValue = block.subarray(
       value.next + unshared.value,
       value.next + unshared.value + value.value,
     );
@@ -356,7 +442,7 @@ function readLengthPrefixed(
   if (length.value > bytes.length - length.next)
     throw new Error(`${source}: truncated LevelDB length-prefixed value`);
   return {
-    value: bytes.slice(length.next, length.next + length.value),
+    value: bytes.subarray(length.next, length.next + length.value),
     next: length.next + length.value,
   };
 }

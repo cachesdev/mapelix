@@ -5,6 +5,7 @@ import { encodePng } from "./png.js";
 import { renderSurface, type RenderSurfaceOptions } from "./render.js";
 import {
   TILE_SIZE,
+  floorDiv,
   tileBounds,
   type Dimension,
   type RenderedTile,
@@ -16,6 +17,13 @@ export type EffectiveBedrockRecord = Pick<LevelDbRecord, "key" | "value">;
 
 export interface BedrockWorld {
   renderTile(coordinates: TileCoordinates, options?: RenderSurfaceOptions): Promise<RenderedTile>;
+  getTileCoverage(dimension: Dimension): readonly TileCoverage[];
+}
+
+export interface TileCoverage {
+  readonly x: number;
+  readonly y: number;
+  readonly subchunkCount: number;
 }
 
 const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
@@ -25,10 +33,21 @@ const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
 };
 
 class RecordBedrockWorld implements BedrockWorld {
-  readonly records: readonly EffectiveBedrockRecord[];
+  readonly tileRecords = new Map<string, EffectiveBedrockRecord[]>();
 
   constructor(records: Iterable<EffectiveBedrockRecord>) {
-    this.records = [...records];
+    for (const record of records) {
+      const key = classifyChunkKey(record.key);
+      if (key === undefined) {
+        continue;
+      }
+      const tileX = floorDiv(key.x, 16);
+      const tileY = floorDiv(key.z, 16);
+      const tileKey = tileRecordKey(key.dimension, tileX, tileY);
+      const group = this.tileRecords.get(tileKey) ?? [];
+      group.push(record);
+      this.tileRecords.set(tileKey, group);
+    }
   }
 
   async renderTile(
@@ -38,8 +57,9 @@ class RecordBedrockWorld implements BedrockWorld {
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
+    const records = this.tileRecords.get(tileRecordKey(dimension, coordinates.x, coordinates.y));
 
-    for (const record of this.records) {
+    for (const record of records ?? []) {
       const key = classifyChunkKey(record.key);
       if (
         key === undefined ||
@@ -84,6 +104,24 @@ class RecordBedrockWorld implements BedrockWorld {
       rgba,
       png: encodePng(rgba, TILE_SIZE, TILE_SIZE),
     };
+  }
+
+  getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
+    const dimensionId = DIMENSION_IDS[dimension];
+    const prefix = `${dimensionId}/`;
+    const coverage: TileCoverage[] = [];
+    for (const [key, records] of this.tileRecords) {
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+      const [, tileX, tileY] = key.split("/");
+      coverage.push({
+        x: Number(tileX),
+        y: Number(tileY),
+        subchunkCount: records.length,
+      });
+    }
+    return coverage;
   }
 }
 
@@ -143,4 +181,8 @@ function isAir(name: string): boolean {
     name === "minecraft:void_air" ||
     name === "minecraft:structure_void"
   );
+}
+
+function tileRecordKey(dimension: number, tileX: number, tileY: number): string {
+  return `${dimension}/${tileX}/${tileY}`;
 }
