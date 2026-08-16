@@ -20,8 +20,8 @@
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware --type-check .",
     "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
-    "test": "vitest run",
-    "test:unit": "vitest run",
+    "test": "vitest run src",
+    "test:unit": "vitest run src",
     "transit": "node -e \"\""
   },
   "dependencies": {
