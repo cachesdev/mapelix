@@ -33,6 +33,11 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
 
+## Runtime scaling observations
+
+- Eight viewer workers on a Ryzen 5 5500X3D (6 cores, 12 logical processors) reached 93% total CPU during a cold Stratos run. The world HDD was at 16% and the system SSD was at 9%, so this render phase was CPU-bound rather than storage-bound.
+- Windows Task Manager showed 27.0 of 31.9 GB total system memory in use (85%), leaving about 4.9 GB of system headroom. This is a whole-system measurement, not Mapelix process RSS. Capture process-level RSS before selecting eight workers as a production default.
+
 ## Experiments in progress
 
 | Experiment | Prediction | Result |
