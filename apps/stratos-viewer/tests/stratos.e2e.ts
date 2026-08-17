@@ -4,7 +4,7 @@ test("renders the real Stratos world", async ({ page }) => {
   const expectColdCache = process.env.MAPELIX_EXPECT_COLD_CACHE === "1";
   const initialTileCacheStatuses: string[] = [];
   page.on("response", (response) => {
-    if (/\/tiles\/0\/-?\d+\/-?\d+\.png$/.test(response.url())) {
+    if (/\/tiles\/0\/-?\d+\/-?\d+\.png\?revision=[^&]+$/.test(response.url())) {
       const status = response.headers()["x-mapelix-cache"];
       if (status !== undefined) initialTileCacheStatuses.push(status);
     }
@@ -34,7 +34,7 @@ test("renders the real Stratos world", async ({ page }) => {
   });
 
   const detailedTile = page.waitForResponse(
-    (response) => /\/tiles\/2\/-?\d+\/-?\d+\.png$/.test(response.url()),
+    (response) => /\/tiles\/2\/-?\d+\/-?\d+\.png\?revision=[^&]+$/.test(response.url()),
     { timeout: 120_000 },
   );
   await page.locator(".leaflet-control-zoom-in").click();
@@ -49,7 +49,7 @@ test("renders the real Stratos world", async ({ page }) => {
   });
 
   const maximumDetailTile = page.waitForResponse(
-    (response) => /\/tiles\/3\/-?\d+\/-?\d+\.png$/.test(response.url()),
+    (response) => /\/tiles\/3\/-?\d+\/-?\d+\.png\?revision=[^&]+$/.test(response.url()),
     { timeout: 120_000 },
   );
   await page.locator(".leaflet-control-zoom-in").click();
@@ -62,7 +62,7 @@ test("renders the real Stratos world", async ({ page }) => {
   });
 
   const flatLightingTile = page.waitForResponse(
-    (response) => response.url().endsWith("/tiles/3/-93/-83.png"),
+    (response) => response.url().includes("/tiles/3/-93/-83.png?revision="),
     { timeout: 120_000 },
   );
   await page.getByLabel("X", { exact: true }).fill("-2950");

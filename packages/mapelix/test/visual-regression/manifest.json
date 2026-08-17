@@ -78,6 +78,19 @@
       "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
     },
     {
+      "id": "highland-legacy-grass",
+      "x": -45,
+      "y": 1,
+      "purpose": "High-altitude legacy grass cover and the ground elevation overlay.",
+      "minimum": {
+        "edgeF1": 0.95,
+        "tolerantEdgeF1": 0.97,
+        "shadowF1": 0.95,
+        "shadowCorrelation": 0.95
+      },
+      "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
+    },
+    {
       "id": "dry-biome-boundary",
       "x": -14,
       "y": -22,

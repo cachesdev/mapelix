@@ -9,6 +9,7 @@
 
   interface WorldMetadata {
     readonly name: string;
+    readonly tileRevision: string;
     readonly tileCount: number;
     readonly subchunkCount: number;
     readonly bounds: {
@@ -68,7 +69,7 @@
           [-world.bounds.minZ, world.bounds.maxX],
         ];
         layer = leaflet
-          .tileLayer("/tiles/{z}/{x}/{y}.png", {
+          .tileLayer(`/tiles/{z}/{x}/{y}.png?revision=${encodeURIComponent(world.tileRevision)}`, {
             bounds,
             tileSize: 256,
             minZoom: -4,

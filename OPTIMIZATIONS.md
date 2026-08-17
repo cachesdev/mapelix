@@ -127,10 +127,15 @@ edge F1 rose from 0.434 to 0.677; one-pixel-tolerant F1 rose from 0.701 to
 misplaced structure. The remaining reference-only edges cluster around cast
 shadows and small material features.
 
-The committed seven-scene lossless suite also checks snow, coast, dense canopy,
-flat grass, a dry biome boundary, and a technical block array. Its oracle,
-prototype baseline, surface manifests, and thresholds are in
+The committed eight-scene lossless suite also checks snow, coast, dense canopy,
+flat grass, highland legacy grass, a dry biome boundary, and a technical block
+array. Its oracle, prototype baseline, surface manifests, and thresholds are in
 `packages/mapelix/test/visual-regression`.
+The highland scene caught a Bedrock naming edge case: uNmINeD applies its
+ground elevation overlay to legacy `minecraft:grass`, but not modern
+`short_grass` or `tall_grass`. Classifying the legacy name separately reduced
+mean perceptual error across its 502 affected blocks from `11.60` to `0.33`,
+and reduced whole-tile mean error from `1.79` to `0.41`.
 Its shadowless block-color comparison has mean perceptual error `0.180`; 99%
 of blocks are exact at the median and 99.44% are within error 6. Its normal
 image has mean channel error `1.61`, luminance correlation `0.947`, and best

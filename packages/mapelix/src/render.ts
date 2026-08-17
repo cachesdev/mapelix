@@ -566,7 +566,7 @@ function applyElevationGradient(
   sample: NonNullable<SurfaceSamples[number]>,
 ): RgbaColor {
   if (!isElevationStyledGround(sample.name) || isWater(sample.name)) return base;
-  const height = terrainHeight(sample);
+  const height = sample.name === "minecraft:grass" ? sample.y : terrainHeight(sample);
   if (isDirtPath(sample.name)) return darken(base, elevationLightness(height));
   const mountainOpacity = usesGroundElevationColor(sample) ? clamp((height - 62) / 50, 0, 1) : 0;
   const elevationColor = blend(base, mountainColor(sample.name), mountainOpacity);
@@ -685,7 +685,7 @@ function isDirtPath(name: string): boolean {
 }
 
 function usesGroundElevationColor(sample: NonNullable<SurfaceSamples[number]>): boolean {
-  if (!/grass_block|mycelium/.test(sample.name)) return false;
+  if (!/grass_block|mycelium/.test(sample.name) && sample.name !== "minecraft:grass") return false;
   if (sample.biomeId === undefined) return true;
   const biomeId = canonicalBiomeId(sample.biomeId);
   return ![5, 6, 19, 29, 30, 31, 32, 33, 35, 36, 191].includes(biomeId);
@@ -707,6 +707,7 @@ function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
 
 function isElevationStyledGround(name: string): boolean {
   if (isDirtPath(name)) return true;
+  if (name === "minecraft:grass") return true;
   if (/mossy_cobblestone/.test(name)) return false;
   if (
     /stone_bricks?|planks|stairs|slab|wall|fence|door|trapdoor|button|pressure_plate/.test(name)

@@ -5,7 +5,7 @@ import { TILE_SIZE, type SurfaceBlock } from "./tile.js";
 
 describe("renderSurface", () => {
   it.each([
-    ["minecraft:grass", [124, 162, 99, 255]],
+    ["minecraft:grass", [123, 160, 96, 255]],
     ["minecraft:bush", [127, 166, 78, 255]],
   ] as const)("applies biome grass tint to %s", (name, expected) => {
     const samples = Array.from(
@@ -269,6 +269,24 @@ describe("renderSurface", () => {
     );
     expect(rgba[highIndex * 4 + 1]).toBeLessThan(rgba[lowIndex * 4 + 1] ?? 0);
     expect(rgba[highIndex * 4 + 2]).toBeLessThan(rgba[lowIndex * 4 + 2] ?? 0);
+  });
+
+  it("applies the ground elevation overlay to legacy minecraft:grass", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const index = 100 * TILE_SIZE + 100;
+    samples[index] = {
+      name: "minecraft:grass",
+      y: 90,
+      supportY: 89,
+      biomeId: 1,
+    };
+
+    const rgba = renderSurface(samples, { shadows: false });
+
+    expect(Array.from(rgba.slice(index * 4, index * 4 + 4))).toEqual([131, 117, 37, 255]);
   });
 
   it("applies the cartographic sea-to-mountain elevation style only to ground", () => {

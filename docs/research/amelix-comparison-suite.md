@@ -28,7 +28,7 @@ Amelix updater](https://github.com/ForestOfLight/AmelixSMPViewer/blob/80763d20d7
 
 ## Selected tiles
 
-All seven candidates were visually verified by native-detail, lossless
+All eight candidates were visually verified by native-detail, lossless
 uNmINeD renders from the recovered copy.  Tile `y` is Minecraft Z, not height.
 Bounds have an inclusive lower edge and exclusive upper edge.
 
@@ -39,16 +39,17 @@ Bounds have an inclusive lower edge and exclusive upper edge.
 | `forest-coast` | `(-18, -23)` | `[-1152, -1088)`, `[-1472, -1408)` | Dense green coast with sand and open water. Tests shoreline placement, shallow/deep water transition, and tree-to-water boundaries. |
 | `dark-canopy` | `(-56, -15)` | `[-3584, -3520)`, `[-960, -896)` | Dense, layered canopy beside water. Tests high-frequency occlusion, canopy edges, and whether shadow treatment leaks into flat interiors. |
 | `flat-grass-shore` | `(-42, -8)` | `[-2688, -2624)`, `[-512, -448)` | Low-relief green terrain and shore. Negative control for false contouring or an unwanted global block grid; also checks water-edge height changes. |
+| `highland-legacy-grass` | `(-45, 1)` | `[-2880, -2816)`, `[64, 128)` | Highland terrain with legacy `minecraft:grass` cover. Tests that the old grass name receives uNmINeD's ground elevation overlay without changing modern short/tall grass. |
 | `dry-biome-boundary` | `(-14, -22)` | `[-896, -832)`, `[-1408, -1344)` | Mostly flat dry/yellow terrain with sparse trees, a small build, and water. Broadens material/biome coverage while keeping the relief low. |
 | `technical-array` | `(-21, -10)` | `[-1344, -1280)`, `[-640, -576)` | Repeated dark-framed, coloured rectangular structures. A strong constructed-detail test for per-block models, regular edges, and narrow cast shadows. |
 
-The first four are the minimum high-value run.  Keep the last three in routine
+The first four are the minimum high-value run. Keep the last four in routine
 regression runs: they expose regressions which can hide in a village-only
 comparison.
 
 ## Automated package test
 
-Run the seven committed prototype comparisons:
+Run the eight committed prototype comparisons:
 
 ```sh
 pnpm --filter @mapelix/core test:visual
@@ -107,7 +108,7 @@ ones should still decide renderer changes.
 
 1. **Registration:** record the best translation returned by
    `diagnose:compare`.  It should stay at or very close to `(0, 0)` for all
-   seven tiles.  A common non-zero offset is a coordinate or raster-origin
+   eight tiles. A common non-zero offset is a coordinate or raster-origin
    issue, not a lighting result.
 2. **Edges:** record exact and one-pixel-tolerant Sobel precision/recall, plus
    the overlay.  Split the summary by scene category so a canopy improvement
@@ -129,4 +130,4 @@ ones should still decide renderer changes.
 For each candidate change, inspect `village-roofs`, `technical-array`, and
 `flat-grass-shore` first.  That gives one positive roof case, one regular
 non-terrain construction case, and one low-detail negative control before the
-full seven-tile run.
+full eight-tile run.

@@ -84,7 +84,7 @@ recall, F1, loss correlation, and the worst receiver XYZ/subpixel samples.
 
 ## Visual regression suite
 
-The package owns seven lossless Amelix/uNmINeD comparison scenes under
+The package owns eight lossless Amelix/uNmINeD comparison scenes under
 `test/visual-regression`. They preserve structure, per-block color, shadow,
 alignment, and XYZ diagnostics for the renderer rewrite:
 

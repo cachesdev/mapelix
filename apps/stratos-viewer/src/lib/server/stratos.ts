@@ -19,11 +19,12 @@ const cacheDirectory =
 const renderConcurrency = positiveInteger(
   process.env.MAPELIX_RENDER_WORKERS ?? process.env.STRATOS_RENDER_WORKERS ?? "2",
 );
-const cacheFormat = "unmined-shadow-halo-v9";
+const cacheFormat = "unmined-shadow-halo-v10";
 
 let worldPromise: Promise<BedrockWorld> | undefined;
 let metadataPromise: Promise<StratosMetadataResult> | undefined;
 let cacheNamespacePromise: Promise<string> | undefined;
+let tileRevisionPromise: Promise<string> | undefined;
 const tileCache = new Map<string, Promise<StratosTileResult>>();
 const maxCachedTiles = 128;
 
@@ -41,6 +42,7 @@ export interface StratosMetadataResult {
 
 export interface StratosMetadata {
   readonly name: string;
+  readonly tileRevision: string;
   readonly tileCount: number;
   readonly subchunkCount: number;
   readonly bounds: {
@@ -129,6 +131,7 @@ async function loadMetadata(): Promise<StratosMetadataResult> {
 
   const metadata: StratosMetadata = {
     name: rawName.trim(),
+    tileRevision: await getTileRevision(),
     tileCount: coverage.length,
     subchunkCount: coverage.reduce((total, tile) => total + tile.subchunkCount, 0),
     bounds: coverageBounds(coverage),
@@ -164,10 +167,13 @@ async function persistentTilePath(z: number, x: number, y: number): Promise<stri
 }
 
 async function getCacheNamespace(): Promise<string> {
-  cacheNamespacePromise ??= fingerprintWorld().then((fingerprint) =>
-    join(cacheDirectory, `${cacheFormat}-${fingerprint}`),
-  );
+  cacheNamespacePromise ??= getTileRevision().then((revision) => join(cacheDirectory, revision));
   return cacheNamespacePromise;
+}
+
+function getTileRevision(): Promise<string> {
+  tileRevisionPromise ??= fingerprintWorld().then((fingerprint) => `${cacheFormat}-${fingerprint}`);
+  return tileRevisionPromise;
 }
 
 async function fingerprintWorld(): Promise<string> {
