@@ -47,8 +47,37 @@ pnpm --filter @mapelix/core diagnose:color \
 The command samples the 3×3 interior of each native 4×4 block cell, away from
 the north and west contour pixels. It reports RGB and perceptual error
 percentiles, worst world coordinates, and repeated candidate-to-reference
-color pairs. Transparent cells and the uNmINeD export background are excluded.
+color pairs. It also ranks material names by total perceptual error and records
+the worst XYZ sample for each material. Transparent cells and the uNmINeD
+export background are excluded.
 Use shadowless images for palette work; keep normal `3do` images for the
 separate shadow comparison. When given a surface manifest from
 `renderTile(..., { includeSurface: true })`, each outlier includes world XYZ,
 block name, biome ID, and supporting terrain Y.
+Water samples also include visible depth and the first block below the water.
+
+Render normal and shadowless diagnostic tiles plus complete surface manifests
+with one world-index scan:
+
+```sh
+MAPELIX_DIAGNOSTIC_WORLD=/path/to/world \
+MAPELIX_DIAGNOSTIC_OUTPUT=/tmp/mapelix-diagnostics \
+MAPELIX_DIAGNOSTIC_LABEL=palette-v10 \
+MAPELIX_DIAGNOSTIC_TILES='[{"z":2,"x":-32,"y":-49}]' \
+pnpm --filter @mapelix/core diagnose:render
+```
+
+Pass more coordinate objects in the JSON array to reuse the same in-memory
+index. The command reports index time, tile time, process memory, and peak RSS.
+
+Compare cast shadows independently from block colors and local contours:
+
+```sh
+pnpm --filter @mapelix/core diagnose:shadows \
+  mapelix.png mapelix-shadowless.png unmined.png unmined-shadowless.png \
+  /tmp/shadow-overlay.png 4 -32 -49 /tmp/shadow-report.json /tmp/surface.json
+```
+
+The command accepts lossless PNG files only. It derives per-pixel shadow loss
+from each renderer's normal and shadowless pair, then reports mask precision,
+recall, F1, loss correlation, and the worst receiver XYZ/subpixel samples.

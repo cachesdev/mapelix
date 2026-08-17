@@ -78,6 +78,8 @@ for (let blockZ = 0; blockZ < blocksHigh; blockZ += 1) {
             blockName: surfaceBlock.name,
             biomeId: surfaceBlock.biomeId,
             supportY: surfaceBlock.supportY,
+            fluidDepth: surfaceBlock.fluidDepth,
+            underwaterName: surfaceBlock.underwaterName,
           }),
       candidateRgb: candidateCell.rgb,
       referenceRgb: referenceCell.rgb,
@@ -114,6 +116,7 @@ for (let blockZ = 0; blockZ < blocksHigh; blockZ += 1) {
 
 const valid = cells.filter((cell) => !cell.ignored);
 const quiet = valid.filter((cell) => cell.quiet);
+const materialGroups = groupByMaterial(valid);
 const worst = [...valid]
   .sort((left, right) => right.perceptualError - left.perceptualError)
   .slice(0, 24)
@@ -143,6 +146,7 @@ const result = {
   cells: { total: cells.length, compared: valid.length, quiet: quiet.length },
   allBlocks: summarize(valid),
   quietBlocks: summarize(quiet),
+  materials: materialGroups,
   worst,
   systematicPairs,
   heatmap: heatmapOutput,
@@ -221,12 +225,38 @@ function compactCell(cell) {
     ...(cell.blockName === undefined ? {} : { blockName: cell.blockName }),
     ...(cell.biomeId === undefined ? {} : { biomeId: cell.biomeId }),
     ...(cell.supportY === undefined ? {} : { supportY: cell.supportY }),
+    ...(cell.fluidDepth === undefined ? {} : { fluidDepth: cell.fluidDepth }),
+    ...(cell.underwaterName === undefined ? {} : { underwaterName: cell.underwaterName }),
     candidateRgb: cell.candidateRgb,
     referenceRgb: cell.referenceRgb,
     rgbError: cell.rgbError,
     perceptualError: cell.perceptualError,
     quiet: cell.quiet,
   };
+}
+
+function groupByMaterial(cellsToGroup) {
+  const groups = new Map();
+  for (const cell of cellsToGroup) {
+    if (cell.blockName === undefined) continue;
+    const group = groups.get(cell.blockName) ?? [];
+    group.push(cell);
+    groups.set(cell.blockName, group);
+  }
+  return [...groups]
+    .map(([blockName, cells]) => {
+      const summary = summarize(cells);
+      const worst = [...cells].sort(
+        (left, right) => right.perceptualError - left.perceptualError,
+      )[0];
+      return {
+        blockName,
+        ...summary,
+        perceptualImpact: summary.meanPerceptualError * summary.count,
+        worst: worst === undefined ? undefined : compactCell(worst),
+      };
+    })
+    .sort((left, right) => right.perceptualImpact - left.perceptualImpact);
 }
 
 function quantize(rgb) {
