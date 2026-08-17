@@ -31,8 +31,8 @@ current 1.2 GB Amelix SMP backup.
 
 ## Similarity to uNmINeD
 
-The committed visual suite compares Mapelix with lossless uNmINeD renders across ten Amelix
-scenes. It checks structure, block color, shadows, and tile alignment.
+The committed visual suite compares Mapelix candidate renders with lossless uNmINeD reference
+renders across ten Amelix scenes. It checks structure, block color, shadows, and tile alignment.
 
 | Signal                     |               Baseline |
 | -------------------------- | ---------------------: |
@@ -50,7 +50,7 @@ pnpm test:visual
 ```
 
 See the [visual regression suite](packages/mapelix-prototype/test/visual-regression/README.md) for
-the oracle, input contract, and generated reports.
+the reference and candidate input format and the generated reports.
 
 ## Package API
 
