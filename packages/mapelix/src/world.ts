@@ -20,6 +20,7 @@ import {
   type RenderedTile,
   type ShadowOpacityRun,
   type SurfaceBlock,
+  type SurfaceColorLayer,
   type TileCoordinates,
 } from "./tile.js";
 
@@ -261,6 +262,8 @@ function findSurfaceBlock(
   let waterSurface: SurfaceBlock | undefined;
   let surface: SurfaceBlock | undefined;
   let fluidDepth = 0;
+  const colorLayers: SurfaceColorLayer[] = [];
+  let translucentTopY: number | undefined;
   const shadowRuns: ShadowOpacityRun[] = [];
   for (const subchunk of subchunks) {
     for (let localY = 15; localY >= 0; localY -= 1) {
@@ -271,6 +274,23 @@ function findSurfaceBlock(
         const y = subchunk.y * 16 + localY;
         addShadowVoxel(shadowRuns, y, blockShadowOpacity(name));
         if (surface !== undefined) continue;
+        if (
+          decorativeCover === undefined &&
+          waterSurface === undefined &&
+          isTranslucentGlass(name)
+        ) {
+          translucentTopY ??= y;
+          addColorLayer(colorLayers, name);
+          continue;
+        }
+        if (waterSurface !== undefined) {
+          if (isWater(name)) {
+            fluidDepth += 1;
+          } else {
+            surface = { ...waterSurface, fluidDepth, underwaterName: name };
+          }
+          continue;
+        }
         if (decorativeCover !== undefined) {
           if (isDecorativeCover(name)) continue;
           surface = { ...decorativeCover, supportY: y };
@@ -280,24 +300,43 @@ function findSurfaceBlock(
           decorativeCover = { name, y };
           continue;
         }
-        if (waterSurface === undefined) {
-          if (!isWater(name)) {
-            surface = { name, y };
-            continue;
-          }
-          waterSurface = { name, y };
-          fluidDepth = 1;
-        } else if (isWater(name)) {
-          fluidDepth += 1;
-        } else {
-          surface = { ...waterSurface, fluidDepth, underwaterName: name };
+        if (!isWater(name)) {
+          surface = { name, y };
+          continue;
         }
+        waterSurface = { name, y };
+        fluidDepth = 1;
       }
     }
   }
   surface ??=
     decorativeCover ?? (waterSurface === undefined ? undefined : { ...waterSurface, fluidDepth });
+  if (colorLayers.length > 0) {
+    if (surface !== undefined) {
+      colorLayers.push({
+        name: surface.name,
+        count: 1,
+        ...(surface.fluidDepth === undefined ? {} : { fluidDepth: surface.fluidDepth }),
+        ...(surface.underwaterName === undefined ? {} : { underwaterName: surface.underwaterName }),
+      });
+    }
+    const top = colorLayers[0]!;
+    surface = {
+      name: top.name,
+      y: translucentTopY!,
+      colorLayers,
+    };
+  }
   return surface === undefined ? undefined : { ...surface, shadowRuns };
+}
+
+function addColorLayer(layers: SurfaceColorLayer[], name: string): void {
+  const previous = layers.at(-1);
+  if (previous?.name === name && previous.fluidDepth === undefined) {
+    layers[layers.length - 1] = { name, count: previous.count + 1 };
+    return;
+  }
+  layers.push({ name, count: 1 });
 }
 
 function addShadowVoxel(runs: ShadowOpacityRun[], y: number, opacity: number): void {
@@ -317,6 +356,10 @@ function blockShadowOpacity(name: string): number {
   return 1;
 }
 
+function isTranslucentGlass(name: string): boolean {
+  return /(?:^|:)(?:[a-z_]+_stained_)?glass(?:_pane)?$/.test(name);
+}
+
 function isDecorativeCover(name: string): boolean {
   const separator = name.indexOf(":");
   const block = separator === -1 ? name : name.slice(separator + 1);
@@ -324,6 +367,11 @@ function isDecorativeCover(name: string): boolean {
     block === "short_grass" ||
     block === "tall_grass" ||
     block === "tallgrass" ||
+    block === "grass" ||
+    block === "bush" ||
+    block === "double_plant" ||
+    block === "seagrass" ||
+    block === "reeds" ||
     block === "fern" ||
     block === "large_fern" ||
     block === "deadbush" ||

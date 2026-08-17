@@ -60,6 +60,8 @@ const LEGACY_MUTATION_BASES = new Map<number, number>([
 const CLASSIC_STYLES = new Map<number, BiomeStyle>([
   [5, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
   [6, solidStyle([94, 99, 53], [100, 107, 45], [60, 65, 21])],
+  [7, DEFAULT_STYLE],
+  [16, PLAINS_STYLE],
   [19, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
   [29, solidStyle([70, 107, 45], [93, 142, 61], [50, 106, 26])],
   [30, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],

@@ -16,7 +16,7 @@ const cacheDirectory =
 const renderConcurrency = positiveInteger(
   process.env.MAPELIX_RENDER_WORKERS ?? process.env.STRATOS_RENDER_WORKERS ?? "2",
 );
-const cacheFormat = "unmined-data3d-v7";
+const cacheFormat = "unmined-glass-v8";
 
 let worldPromise: Promise<BedrockWorld> | undefined;
 let metadataPromise: Promise<StratosMetadataResult> | undefined;

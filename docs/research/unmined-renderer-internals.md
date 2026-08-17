@@ -699,6 +699,14 @@ the biome read for the top voxel of its block-state run. Block state does not
 change the numeric-ID mapping, although state-sensitive style selectors can
 still change the final material style.
 
+The presence of a `Data3D` record switches the whole chunk to the section-
+palette layout before its payload is decoded. A missing biome palette on the
+section that contains the requested Y therefore returns no biome. It does not
+fall back to the already loaded legacy `Data2D` bytes. If the chunk has no
+`Data3D` record, a valid `Data2D` record keeps the `FlatZxLegacy` layout and is
+used normally. This distinction can make one material use a biome-independent
+style even when the chunk also contains usable legacy biome data.
+
 More exactly, the accepted Overworld section-Y window is fixed at `-4..19`,
 and the first 512 bytes of the `Data3D` value are skipped before biome storage
 is read. This implementation does not independently loop over 24 Y numbers.
@@ -1120,6 +1128,310 @@ Sources: the bundled MIT `default.blocktags.minecraft.js` and
 `default.stylesheet.minecraft.js`, `SliceGeneratorBlockStateSettingsProvider`,
 `TerrainRendererState.GetTerrainBlockColor`, and
 `TerrainRendererState.AlphaBlend`.
+
+### Exact gray concrete/glass column and background boundary
+
+**Fact for the default Bedrock, block-color path.** `gray_concrete` and
+`gray_stained_glass` both become artificial, blocking, and gray. The concrete
+selector supplies the material tags. The `*:gray_*` selector supplies the dye
+tag. The later enabled gray-dye style replaces the earlier neutral artificial
+base with `mc.gray`, HSL `(0, 0%, 35%)`. The HSL converter truncates
+`0.35 * 255`, so both blocks start with RGB `(89,89,89)`. Neither block gets a
+biome tint or an elevation color/lightness curve.
+
+The two blocks differ after style lookup:
+
+- gray concrete stays `(89,89,89,255)`;
+- `**glass` also matches `gray_stained_glass`, so its visible alpha is replaced
+  by `floor(GlassOpacity / 100 * 255)`. The published default is 50%, which
+  gives `(89,89,89,127)` before column composition.
+
+The models-off renderer composites visible **slice runs**, from the top down.
+A contiguous run of one block state is one slice item even if its count is
+greater than one. Thus a three-block-tall uninterrupted stained-glass run gets
+the 50% operation once, not three times. A second stained-glass run below it,
+separated by skipped air, is a second operation. A different translucent state
+also makes a separate operation while the accumulated alpha remains below 255.
+
+For accumulated foreground `F` and the next lower run `B`, each byte-channel
+operation uses integer truncation:
+
+```text
+if F.a == 0:   result = B
+if B.a == 0:   result = F
+if F.a == 255: result = F
+
+out.a = F.a + B.a - floor(F.a * B.a / 255)
+out.c = floor(F.c * F.a / 255)
+      + floor(floor(B.c * B.a * (255 - F.a) / 255) / 255)
+```
+
+The accumulated value remains the foreground for the next lower run. This is
+the exact byte-space operation; it is not linear-light blending. It also does
+not renormalize a partially transparent result before reusing it. Consecutive
+partial layers can therefore darken more than conventional straight-alpha
+source-over. The renderer stops when the accumulated alpha is 255 or no lower
+slice remains, then unconditionally sets the stored output alpha to 255.
+
+For exact pre-shading checks:
+
+| Column slice runs, top to bottom | Stored RGBA |
+| --- | --- |
+| gray concrete | `(89,89,89,255)` |
+| one gray stained-glass run, then gray concrete | `(88,88,88,255)` |
+| two distinct gray stained-glass runs, then gray concrete | `(71,71,71,255)` |
+| one gray stained-glass run, then no lower visible run | `(89,89,89,255)` |
+
+The export background is outside this column algorithm. The published
+overworld option and generated map metadata use `#78a7ff`, or opaque
+`(120,167,255,255)`. `TerrainRendererState.RenderBlock` never receives that
+color. It composites only slice runs and forces a rendered column opaque. The
+web exporter uses the background when it creates outer tile canvases and
+zoom-out canvases; it does not use the background as the lower layer beneath
+glass. For example, explicitly blending one default gray-glass layer over
+`#78a7ff` with the formula above would produce `(104,127,172,255)`, but that is
+not the renderer result for a glass-only world column. Such a column stores
+`(89,89,89,255)` before contour and cast-shadow shading.
+
+Clean-room acceptance checks:
+
+1. Resolve the two names through the default tags and stylesheet. Require the
+   base bytes above and require `IsGlass` only to replace the stained-glass
+   alpha with 127.
+2. Feed synthetic slice-run lists directly to the column compositor. Check all
+   four rows in the table, including the distinction between a run count and a
+   second run.
+3. Fill the export canvas with `#78a7ff`, render a glass-only column, and verify
+   that the column is gray and opaque rather than blue-gray. Test the untouched
+   canvas area separately for the background value.
+4. Apply local contour, cast-shadow, and JPEG stages only after these tests.
+   Their output must not be used as the base-style oracle.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js` (`addGlasses`,
+`addOtherArtificial`, and `addColors`) and `default.stylesheet.minecraft.js`
+(`addMinecraftColors` and the dye styles); `NameMatcher`; `HslColorConverter`;
+`TerrainDbBlocksToSliceBlocksConverter`; `TerrainRendererOptions`;
+`TerrainRendererState.GetTerrainBlockColor`, `RenderBlock`, and `AlphaBlend`;
+`TerrainRenderRequest`; `WebMapExport`; and the local captured generated
+`unmined.map.properties.js`.
+
+### Technical-array black glass, null-biome water, and bamboo sign
+
+**Fact.** The captured shadowless zoom-2 oracle and the supplied surface
+manifest isolate two adjacent technical-array columns. The tile starts at
+world `(-1344,-640)`, so the glass at world `(-1328,68,-640)` is local block
+`(16,0)`. Its manifest entry has one `black_stained_glass` run over one
+`gray_concrete` run.
+
+The black-glass style follows this sequence:
+
+1. the glass patterns make it artificial, blocking, and glass;
+2. the black-name pattern adds `#black`;
+3. the later enabled dye style replaces the neutral artificial color with
+   `mc.black`, HSL `(0,0%,10%)`, which truncates to RGB `(25,25,25)`;
+4. `GetTerrainBlockColor` replaces its alpha with the default 50% glass byte,
+   `floor(0.50 * 255) = 127`.
+
+The lower gray concrete is opaque `(89,89,89,255)`. The exact byte composition
+is therefore, independently for each channel:
+
+```text
+floor(25 * 127 / 255) + floor(89 * 128 / 255)
+= 12 + 44
+= 56
+```
+
+The oracle's unshaded block interior is exactly `(56,56,56,255)`. Its complete
+4 x 4 grayscale block is:
+
+```text
+93 72 72 72
+72 56 56 56
+72 56 56 56
+72 56 56 56
+```
+
+The nonuniform edge is the later local-relief pass, not a different glass
+color. A full positive contour has gain 1.3. Byte truncation gives
+`floor(56 * 1.3) = 72` on the north and west edges, then
+`floor(72 * 1.3) = 93` where those edges meet.
+
+The adjacent local block `(17,1)` is one water block over gray concrete. Its
+manifest entry has no biome. A null biome excludes every biome-dependent
+stylesheet rule, including the classic `minecraft:*` water override. It keeps
+the earlier biome-independent `map.water`, HSL `(216,90%,40%)`, which converts
+to `(10,83,193)`. At depth one there is no RGB darkening and the water alpha is
+179. Composition over gray concrete is:
+
+```text
+R = floor( 10 * 179 / 255) + floor(89 * 76 / 255) =   7 + 26 =  33
+G = floor( 83 * 179 / 255) + floor(89 * 76 / 255) =  58 + 26 =  84
+B = floor(193 * 179 / 255) + floor(89 * 76 / 255) = 135 + 26 = 161
+```
+
+The oracle's unshaded interior is exactly `(33,84,161,255)`. Do not substitute
+the ordinary-biome classic water `(25,107,229)` when the slice biome is null.
+The supplied manifest establishes that this sample's biome is null; it does
+not, by itself, establish why the source chunk produced that null.
+
+Depth one changes only the later water-contour magnitude. It does not darken
+the base water RGB. The default 50% water shading strength and the 12-block
+depth fade reduce a full `0.3` negative contour to:
+
+```text
+magnitude = 0.3 * 0.50 * (12 - 1) / 12 = 0.1375
+gain = 1 / (1 + 0.1375) = 0.879120879...
+```
+
+Applying that gain once to `(33,84,161)` gives the oracle north or west edge
+`(29,73,141)`. Applying it a second time at the corner gives
+`(25,64,123)`. These byte truncations explain the whole observed 4 x 4 block;
+they are separate from its null-biome base color.
+
+**Fact.** `bamboo_wall_sign` matches the nonblocking artificial sign rule. Its
+name also matches both the bamboo material pattern and the wooden-product
+pattern. The generic `#artificial` style first assigns neutral gray, but the
+later `#bamboo #artificial` wood style replaces it with `map.wood.bamboo`, HSL
+`(48,50%,40%)`. The exact models-off base RGB is `(153,132,50)`. It has no
+biome tint or elevation color/lightness curve. Do not use the natural bamboo
+style `map.bamboo` or the generic wood color for this sign.
+
+Clean-room checks for these cases are:
+
+1. resolve black glass and gray concrete separately, then require the composed
+   base `(56,56,56,255)` before local relief;
+2. preserve a null biome through the slice and require depth-one water over
+   gray concrete to produce `(33,84,161,255)`;
+3. resolve `bamboo_wall_sign` through all matching tags in source order and
+   require `(153,132,50,255)`;
+4. test the optional contour stage separately from all three base colors.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js` (`addProducts`,
+`addGlasses`, `addOtherArtificial`, and `addColors`) and
+`default.stylesheet.minecraft.js` (`addMinecraftColors`, `addTerrainColors`,
+`addDefaultStyles`, and `addWoodStyles`); `StylesheetBuilder.Color`;
+`StylesheetCompilationContext`; `HslColorConverter`;
+`BiomeFilteringCompiledStyleProvider`; `TerrainRendererBlockStylesGenerator`;
+`TerrainRendererState.GetBlockColor`, `GetTerrainBlockColor`, `RenderBlock`,
+and `AlphaBlend`; `TerrainShader.ApplyShadingOnPixel`;
+`BedrockChunkExtractor.Load2DBiomes`, `Load3DBiomes`, and
+`Load3DBiomesFromData`; `FlattenedWorldChunk.GetBiomeIndex`; the supplied
+surface manifest; and the captured shadowless PNG oracle.
+
+### Technical-array glass over deep water and seagrass
+
+**Fact.** Two supplied manifest entries isolate the deep-water glass result
+without scanning the world. Local block `(8,0)` is red stained glass at Y 62
+over 26 water blocks, with seagrass named as the first underwater block. Local
+block `(3,16)` is black stained glass at Y 62 over 24 water blocks, again with
+seagrass named underwater. Both use Bedrock biome ID 43,
+`minecraft:deep_lukewarm_ocean`.
+
+The models-off slice converter does not generically skip nonblocking plants.
+Air runs are skipped, but seagrass is emitted as its own nonblocking,
+waterlogged slice when iteration reaches it. The ordinary terrain-render reset
+also passes `waterloggedBlocksAsWater: false`; only the separate shadow path
+requests replacement of waterlogged blocks with water. The `skipShadeless` and
+`skipShadowless` flags are also false for the terrain render. Thus the
+seagrass tags do not remove it from the color-slice sequence.
+
+The seagrass does not affect these two pixels because composition stops first:
+
+1. the initial slice is glass, so `RenderBlock` records `isWater = false` and
+   processes the next water slice rather than using its consecutive-water skip;
+2. each contiguous water run stores its full depth, 26 or 24;
+3. `min(D, WaterVisibilityRange)` is 12, but 12 is not the full slice depth, so
+   `GetTerrainBlockColor` leaves the water alpha at 255;
+4. blending glass over that water makes the accumulated color opaque, and the
+   loop stops before it advances to seagrass or any block below seagrass.
+
+Kelp follows the same boundary as seagrass. Both are nonblocking,
+waterlogged, shadeless, and shadowless, but none of those tags makes the
+terrain-color iterator skip the plant. Deep opaque water simply ends
+composition before the later kelp or seagrass slice is requested.
+
+Consecutive identical block states are one slice run. The converter increments
+the run's `Count` instead of emitting another `SliceBlock`, while models-off
+`RenderBlock` calls `GetBlockColor` once for that whole slice. Glass opacity is
+therefore applied once per run, not once per voxel. In the supplied v13
+manifest, local block `(22,16)` has a two-block red-stained-glass run over
+depth-26 biome-43 water. It still resolves to the single-glass composite
+`(97,65,115)`, not a second red-glass blend. A state change or an intervening
+air gap creates another slice and therefore another opacity operation.
+
+For shallow water whose full depth is at most 12, the water remains partially
+transparent. In that case a later non-water slice can contribute. If that
+slice is seagrass, its ordinary style is opaque and it then stops composition;
+if the first lower slice is the bed, the bed contributes instead. A deeper bed
+below opaque seagrass cannot contribute.
+
+ID 43 selects the later lukewarm-ocean water rule. Its pre-depth color is
+`map.water.lukewarm`, HSL `(213,80%,50%)`, or RGB `(25,117,229)`. Both target
+water depths clip to 12, so the depth-darkening gain is:
+
+```text
+gain = 1 - 0.50 * (12 - 6 - 1) / 22
+     = 0.886363636...
+dark water = floor((25,117,229) * gain)
+           = (22,103,202,255)
+```
+
+Red stained glass is `mc.red` `(173,30,30,127)`. The integer foreground blend
+over the opaque dark water is:
+
+```text
+R = floor(173 * 127 / 255) + floor( 22 * 128 / 255) = 86 + 11 =  97
+G = floor( 30 * 127 / 255) + floor(103 * 128 / 255) = 14 + 51 =  65
+B = floor( 30 * 127 / 255) + floor(202 * 128 / 255) = 14 + 101 = 115
+```
+
+Black stained glass is `mc.black` `(25,25,25,127)`, giving:
+
+```text
+R = floor(25 * 127 / 255) + floor( 22 * 128 / 255) = 12 + 11 =  23
+G = floor(25 * 127 / 255) + floor(103 * 128 / 255) = 12 + 51 =  63
+B = floor(25 * 127 / 255) + floor(202 * 128 / 255) = 12 + 101 = 113
+```
+
+The shadowless oracle interiors are exactly red `(97,65,115,255)` and black
+`(23,63,113,255)`. Directly placing glass over the seagrass style
+`map.seagrass` `(105,169,8,255)` would instead give red `(138,98,18,255)` and
+black `(64,96,16,255)`. Those rejected values are a focused check that an
+implementation did not bypass the intervening deep-water slice.
+
+**Fact.** The lightning-rod colors also follow source-order tags. Bare
+`lightning_rod` matches `#circuit`, but it does not match the regular-copper
+name pattern `copper_*`; its final color is therefore `map.circuit`, HSL
+`(0,70%,50%)`, or `(216,38,38)`. `weathered_lightning_rod` and
+`oxidized_lightning_rod` do match their explicit copper-state tags. The later
+copper styles give them `(89,165,108)` and `(82,172,139)`, respectively. These
+are the exact unshaded block-interior
+bytes in the supplied oracle; the brighter north and west rows are the later
+1.3 local-contour gain.
+
+Clean-room checks for these columns are:
+
+1. preserve water depths 26 and 24 beneath glass, clip their water calculations
+   to 12, and require opaque dark water `(22,103,202,255)`;
+2. require the two glass composites `(97,65,115,255)` and
+   `(23,63,113,255)` before local relief;
+3. keep waterlogged seagrass as a possible later slice, but verify that the
+   opaque deep-water result stops iteration before it;
+4. require one glass-opacity operation for both count-1 and count-2 contiguous
+   same-state glass runs, and a second operation only after a slice boundary;
+5. repeat the deep-water stop check with kelp as the first underwater block;
+6. resolve bare, weathered, and oxidized lightning rods through all matching
+   styles in source order.
+
+Sources: the bundled MIT `vanilla.biomenumbers.bedrock.txt`,
+`default.blocktags.minecraft.js` (`addFlora`, `addProducts`, `addCircuit`, and
+`addColors`), and `default.stylesheet.minecraft.js` (`addMinecraftColors`,
+`addTerrainColors`, `addDefaultStyles`, and `addCopperStyles`);
+`HslColorConverter`; `RgbExtensions.AdjustLightness`;
+`SliceGeneratorBlockStateSettingsProvider.GenerateBlockStateSettings`;
+`TerrainDbBlocksToSliceBlocksConverter.GetSliceBlock`;
+`TerrainRendererState.GetTerrainBlockColor`, `RenderBlock`, and `AlphaBlend`;
+the supplied surface manifest; and the captured shadowless PNG oracle.
 
 ## Why dirt paths remain distinct
 

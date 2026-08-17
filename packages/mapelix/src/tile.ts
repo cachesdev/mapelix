@@ -44,8 +44,17 @@ export interface SurfaceBlock {
   readonly fluidDepth?: number;
   /** First non-water block below a water surface, used for visual compositing. */
   readonly underwaterName?: string;
+  /** Top-down visible color runs when translucent blocks expose lower materials. */
+  readonly colorLayers?: readonly SurfaceColorLayer[];
   /** Exact vertical opacity runs for 3D shadows. Omit to use the surface-height fallback. */
   readonly shadowRuns?: readonly ShadowOpacityRun[];
+}
+
+export interface SurfaceColorLayer {
+  readonly name: string;
+  readonly count: number;
+  readonly fluidDepth?: number;
+  readonly underwaterName?: string;
 }
 
 export interface ShadowOpacityRun {

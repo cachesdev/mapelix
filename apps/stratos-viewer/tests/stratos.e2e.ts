@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 test("renders the real Stratos world", async ({ page }) => {
+  const expectColdCache = process.env.MAPELIX_EXPECT_COLD_CACHE === "1";
+  const initialTileCacheStatuses: string[] = [];
+  page.on("response", (response) => {
+    if (/\/tiles\/0\/-?\d+\/-?\d+\.png$/.test(response.url())) {
+      const status = response.headers()["x-mapelix-cache"];
+      if (status !== undefined) initialTileCacheStatuses.push(status);
+    }
+  });
   const metadataResponse = page.waitForResponse((response) =>
     response.url().endsWith("/world.json"),
   );
@@ -8,10 +16,15 @@ test("renders the real Stratos world", async ({ page }) => {
 
   const metadata = await metadataResponse;
   expect(metadata.ok()).toBe(true);
-  expect(["disk", "index", "memory"]).toContain(metadata.headers()["x-mapelix-cache"]);
+  if (expectColdCache) {
+    expect(metadata.headers()["x-mapelix-cache"]).toBe("index");
+  } else {
+    expect(["disk", "index", "memory"]).toContain(metadata.headers()["x-mapelix-cache"]);
+  }
 
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
   await expect(page.locator(".leaflet-tile-loaded").first()).toBeVisible();
+  if (expectColdCache) expect(initialTileCacheStatuses).toContain("render");
   const cachedTile = await page.request.get("/tiles/0/-13/-12.png");
   expect(cachedTile.ok()).toBe(true);
   expect(cachedTile.headers()["x-mapelix-cache"]).toBe("memory");

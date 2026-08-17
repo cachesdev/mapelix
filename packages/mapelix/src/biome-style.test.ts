@@ -21,6 +21,22 @@ describe("legacyBiomeStyle", () => {
     });
   });
 
+  it("uses ocean-family land tint for legacy rivers", () => {
+    expect(legacyBiomeStyle(7)).toMatchObject({
+      groundGrass: { red: 124, green: 162, blue: 99 },
+      grass: { red: 124, green: 162, blue: 99 },
+      foliage: { red: 63, green: 94, blue: 43 },
+    });
+  });
+
+  it("uses plains-family land tint for legacy beaches", () => {
+    expect(legacyBiomeStyle(16)).toMatchObject({
+      groundGrass: { red: 127, green: 166, blue: 78 },
+      grass: { red: 127, green: 166, blue: 78 },
+      foliage: { red: 67, green: 96, blue: 26 },
+    });
+  });
+
   it.each([
     [0, [25, 86, 229]],
     [40, [25, 127, 229]],

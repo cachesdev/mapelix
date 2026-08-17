@@ -105,13 +105,54 @@ function flatGroundSubchunk(withCover: boolean): { key: Uint8Array; value: Uint8
   };
 }
 
+function stackedSubchunk(
+  blockNames: readonly string[] = ["minecraft:red_stained_glass", "minecraft:white_wool"],
+): { key: Uint8Array; value: Uint8Array } {
+  const subchunkY = 4;
+  const words = new Uint8Array(Math.ceil(4096 / 8) * 4);
+  const view = new DataView(words.buffer);
+  const setIndex = (localY: number, paletteIndex: number) => {
+    const blockIndex = localY;
+    const wordIndex = Math.floor(blockIndex / 8);
+    const shift = (blockIndex % 8) * 4;
+    const word = view.getUint32(wordIndex * 4, true);
+    view.setUint32(wordIndex * 4, word | (paletteIndex << shift), true);
+  };
+  blockNames.forEach((_, index) => setIndex(15 - index, index + 1));
+
+  const paletteEntries = blockNames.flatMap((name) => [10, 0, 0, ...nbtString("name", name), 0]);
+  const palette = new Uint8Array([
+    10,
+    0,
+    0,
+    ...nbtString("name", "minecraft:air"),
+    0,
+    ...paletteEntries,
+  ]);
+  return {
+    key: new Uint8Array([...int32(0), ...int32(0), 0x2f, subchunkY]),
+    value: new Uint8Array([
+      9,
+      1,
+      subchunkY,
+      8,
+      ...words,
+      blockNames.length + 1,
+      0,
+      0,
+      0,
+      ...palette,
+    ]),
+  };
+}
+
 describe("createBedrockWorld", () => {
   it("renders a decoded surface at the correct negative tile coordinate", async () => {
     const world = createBedrockWorld([singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block")]);
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
 
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([107, 121, 43, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([107, 120, 42, 255]);
     expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: 0, maxZ: 256 });
     expect(Array.from(tile.png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
@@ -125,7 +166,7 @@ describe("createBedrockWorld", () => {
 
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([92, 96, 52, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([91, 96, 51, 255]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
   });
 
@@ -138,7 +179,7 @@ describe("createBedrockWorld", () => {
 
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([68, 104, 44, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([68, 104, 43, 255]);
   });
 
   it("can include decoded XYZ-ready surface metadata for diagnostics", async () => {
@@ -203,5 +244,105 @@ describe("createBedrockWorld", () => {
     expect(Array.from(coveredTile.rgba.slice(neighborOffset, neighborOffset + 4))).toEqual(
       Array.from(plainTile.rgba.slice(neighborOffset, neighborOffset + 4)),
     );
+  });
+
+  it("composites stained glass over the visible block below it", async () => {
+    const world = createBedrockWorld([stackedSubchunk()]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: 0, y: 0 },
+      { includeSurface: true, shadows: false },
+    );
+
+    expect(Array.from(tile.rgba.slice(0, 4))).toEqual([200, 128, 128, 255]);
+    expect(tile.surface?.samples[0]).toMatchObject({
+      name: "minecraft:red_stained_glass",
+      y: 79,
+      colorLayers: [
+        { name: "minecraft:red_stained_glass", count: 1 },
+        { name: "minecraft:white_wool", count: 1 },
+      ],
+    });
+  });
+
+  it("uses the dye palette for concrete below stained glass", async () => {
+    const world = createBedrockWorld([
+      stackedSubchunk(["minecraft:black_stained_glass", "minecraft:gray_concrete"]),
+    ]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: 0, y: 0 },
+      { shadows: false },
+    );
+
+    expect(Array.from(tile.rgba.slice(0, 4))).toEqual([56, 56, 56, 255]);
+  });
+
+  it("uses the biome-independent water color when biome data is absent", async () => {
+    const world = createBedrockWorld([
+      stackedSubchunk(["minecraft:water", "minecraft:gray_concrete"]),
+    ]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: 0, y: 0 },
+      { shadows: false },
+    );
+
+    expect(Array.from(tile.rgba.slice(0, 4))).toEqual([33, 84, 161, 255]);
+  });
+
+  it("composites shallow water over nonblocking cover below glass", async () => {
+    const world = createBedrockWorld([
+      stackedSubchunk([
+        "minecraft:red_stained_glass",
+        "minecraft:water",
+        "minecraft:seagrass",
+        "minecraft:sand",
+      ]),
+      data2DChunk(0, 0, 43),
+    ]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: 0, y: 0 },
+      { includeSurface: true, shadows: false },
+    );
+
+    expect(Array.from(tile.rgba.slice(0, 4))).toEqual([110, 80, 95, 255]);
+    expect(tile.surface?.samples[0]?.colorLayers).toEqual([
+      { name: "minecraft:red_stained_glass", count: 1 },
+      {
+        name: "minecraft:water",
+        count: 1,
+        fluidDepth: 1,
+        underwaterName: "minecraft:seagrass",
+      },
+    ]);
+  });
+
+  it("colors a consecutive glass run once", async () => {
+    const deepWater = Array.from({ length: 13 }, () => "minecraft:water");
+    const single = createBedrockWorld([
+      stackedSubchunk(["minecraft:red_stained_glass", ...deepWater, "minecraft:sand"]),
+      data2DChunk(0, 0, 43),
+    ]);
+    const double = createBedrockWorld([
+      stackedSubchunk([
+        "minecraft:red_stained_glass",
+        "minecraft:red_stained_glass",
+        ...deepWater,
+        "minecraft:sand",
+      ]),
+      data2DChunk(0, 0, 43),
+    ]);
+
+    const [singleTile, doubleTile] = await Promise.all([
+      single.renderTile({ dimension: "overworld", z: 0, x: 0, y: 0 }, { shadows: false }),
+      double.renderTile({ dimension: "overworld", z: 0, x: 0, y: 0 }, { shadows: false }),
+    ]);
+
+    expect(Array.from(doubleTile.rgba.slice(0, 4))).toEqual(
+      Array.from(singleTile.rgba.slice(0, 4)),
+    );
+    expect(Array.from(singleTile.rgba.slice(0, 4))).toEqual([97, 65, 115, 255]);
   });
 });

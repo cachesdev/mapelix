@@ -12,6 +12,7 @@ export {
   type RenderedSurface,
   type ShadowOpacityRun,
   type SurfaceBlock,
+  type SurfaceColorLayer,
   type TileCoordinates,
 } from "./tile.js";
 export {

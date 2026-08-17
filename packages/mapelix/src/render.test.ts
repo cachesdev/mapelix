@@ -4,6 +4,18 @@ import { renderSurface } from "./render.js";
 import { TILE_SIZE, type SurfaceBlock } from "./tile.js";
 
 describe("renderSurface", () => {
+  it.each([
+    ["minecraft:grass", [124, 162, 99, 255]],
+    ["minecraft:bush", [127, 166, 78, 255]],
+  ] as const)("applies biome grass tint to %s", (name, expected) => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name, y: 63, biomeId: name === "minecraft:grass" ? 7 : 1 }),
+    );
+
+    expect(Array.from(renderSurface(samples, { shadows: false }).slice(0, 4))).toEqual(expected);
+  });
+
   it.each([256, 128, 64, 32])(
     "keeps a uniform flat grass field uniform at sample size %i",
     (sampleSize) => {
@@ -128,7 +140,7 @@ describe("renderSurface", () => {
     samples[1] = { name: "minecraft:grass_block", y: 72 };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([100, 150, 65, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([99, 148, 64, 255]);
     expect(rgba[4]).toBeGreaterThan(rgba[0] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -148,7 +160,7 @@ describe("renderSurface", () => {
     };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([68, 71, 38, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([67, 71, 37, 255]);
     expect(rgba[4]).toBeLessThan(rgba[5] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -172,9 +184,9 @@ describe("renderSurface", () => {
     const colors = indexes.map((index) => Array.from(rgba.slice(index * 4, index * 4 + 4)));
 
     expect(colors).toEqual([
-      [54, 111, 195, 255],
-      [24, 95, 200, 255],
-      [22, 95, 203, 255],
+      [44, 94, 170, 255],
+      [10, 73, 169, 255],
+      [8, 73, 171, 255],
     ]);
   });
 
@@ -214,8 +226,8 @@ describe("renderSurface", () => {
     const outputZ = 20 * pixelsPerBlock + 2;
     const redAt = (x: number) => rgba[(outputZ * TILE_SIZE + x) * 4]!;
 
-    expect(redAt(boundaryX)).toBe(61);
-    expect(redAt(boundaryX + 1)).toBe(54);
+    expect(redAt(boundaryX)).toBe(50);
+    expect(redAt(boundaryX + 1)).toBe(44);
   });
 
   it("keeps biome tint boundaries discrete", () => {
@@ -235,8 +247,8 @@ describe("renderSurface", () => {
     });
 
     expect(new Set(colors).size).toBe(2);
-    expect(colors[0]).toBe("128,163,75");
-    expect(colors.at(-1)).toBe("94,99,53");
+    expect(colors[0]).toBe("127,162,74");
+    expect(colors.at(-1)).toBe("93,98,52");
     expect(colors.slice(0, 3)).toEqual(Array.from({ length: 3 }, () => colors[0]));
     expect(colors.slice(3)).toEqual(Array.from({ length: 3 }, () => colors[5]));
   });
@@ -296,13 +308,13 @@ describe("renderSurface", () => {
 
       const rgba = renderSurface(samples);
 
-      expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 78, 35, 255]);
+      expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 77, 35, 255]);
     },
   );
 
   it.each([
-    ["minecraft:dirt", [131, 117, 56, 255]],
-    ["minecraft:gravel", [120, 117, 115, 255]],
+    ["minecraft:dirt", [131, 116, 56, 255]],
+    ["minecraft:gravel", [120, 116, 114, 255]],
   ] as const)("keeps %s material color and applies only elevation lightness", (name, expected) => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },

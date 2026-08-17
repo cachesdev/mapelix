@@ -94,6 +94,8 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 | Reconstructed comparison-only LevelDB manifest | 6.85 s official uNmINeD open and render | One lossless 4× tile | Not measured | 379 MiB | A classic manifest over all 556 valid tables lets the official CLI render lossless PNG from an isolated copy. This removes JPEG noise from palette and shadow evaluation. The source world hashes remained unchanged; reconstructed table precedence is comparison-only and not a Minecraft repair. |
 | Exact models-off receiver origin and sparse shadow sampling | 93.78 s | 4× 0.83 s | Not measured | 1.81 GiB | Reproduce uNmINeD's elevated shadow receiver and its corner/edge/interior sampling gates. On the lossless Amelix forest-town pair, shadow-mask F1 rose from 0.600 to 0.995, shadow-loss correlation rose from 0.597 to 0.994, and mean shadow loss became 0.03773 versus 0.03785. Full-image edge F1 reached 0.993 with 0.999 one-pixel-tolerant F1. Keep the physically correct receiver behind `correctReferenceBugs: true`; parity remains the default. |
 | Lossless per-block color oracle | Same indexed world | 4× shadowless tile | Not measured | Same scan | Against a local lossless uNmINeD PNG, 99.83% of 4,096 blocks are within perceptual error 3 and all are within 6. Mean perceptual error is 0.346. The seven large residuals are shallow water at world Z `-3104`, exactly on a chunk boundary, which is consistent with comparison-world precedence rather than a general palette error. |
+| Visible slice-run color composition | 92.85 s | 4× normal + shadowless in 0.90 s | Not measured | 1.77 GiB | Preserve glass and water as visible vertical runs, apply translucent color once per run, and select biome style from every visible layer. On the technical-array oracle, mean block perceptual error fell from 6.49 to 0.18; 97.78% of blocks are within error 3 and 99.44% are within 6. Normal-image mean channel error fell from 18.01 to 1.61. The XYZ report isolated the original glass-over-seagrass mistake at world `(-1336,62,-640)`. |
+| Final eight-worker renderer check | 45.64 s | 4.17 s for all eight | 3.39 s for all eight | 3.63 GiB | The full 3D-opacity renderer sustained 1.92 cold and 2.36 repeated tiles/s with 8.68–8.70 effective CPU cores. Peak renderer RSS stayed below 4 GiB with `--max-old-space-size=1536`. A fresh-cache Playwright run passed in 1.2 minutes after visual-baseline approval; the same disk cache passed in 12.3 seconds. |
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
 
@@ -123,6 +125,15 @@ edge F1 rose from 0.434 to 0.677; one-pixel-tolerant F1 rose from 0.701 to
 0.885. This confirms that missing local structure was more important than
 misplaced structure. The remaining reference-only edges cluster around cast
 shadows and small material features.
+
+The seven-scene lossless suite also checks snow, coast, dense canopy, flat
+grass, a dry biome boundary, and a technical block array. The technical-array
+milestone is in `/home/caches/Repos/.mapelix-comparisons/amelix/suite-v15`.
+Its shadowless block-color comparison has mean perceptual error `0.180`; 99%
+of blocks are exact at the median and 99.44% are within error 6. Its normal
+image has mean channel error `1.61`, luminance correlation `0.947`, and best
+alignment `(0,0)`. Shadow-mask F1 is `0.884`; the remaining mismatch is mostly
+missing shadow coverage, not misplaced material color or terrain noise.
 
 The official uNmINeD 0.20.1 Linux CLI is usable as a local oracle. The original
 backup manifest references missing table `32439120`, so the CLI rejects it.

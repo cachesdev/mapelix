@@ -55,7 +55,7 @@ describe("openBedrockWorld", () => {
       }
 
       expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: -192, maxZ: 64 });
-      expect(colors).toEqual(new Set(["107,121,43,255"]));
+      expect(colors).toEqual(new Set(["107,120,42,255"]));
     } finally {
       await rm(worldDirectory, { recursive: true, force: true });
     }

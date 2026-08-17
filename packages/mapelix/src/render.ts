@@ -1,7 +1,7 @@
 import { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
 import { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
 import { sampleShadowPixels } from "./shadow-sampling.js";
-import { TILE_SIZE, type SurfaceSamples } from "./tile.js";
+import { TILE_SIZE, type SurfaceColorLayer, type SurfaceSamples } from "./tile.js";
 
 export interface RenderSurfaceOptions {
   readonly resolveBlockStyle?: BlockStyleResolver;
@@ -374,20 +374,37 @@ function resolveSurfaceColor(
   if (sample === undefined) {
     return { red: 0, green: 0, blue: 0, alpha: 0 };
   }
-  if (isWater(sample.name)) {
-    const water = biome?.water ?? resolve(sample.name);
-    const depth = sample.fluidDepth ?? 1;
+  if (sample.colorLayers !== undefined) {
+    let result: RgbaColor | undefined;
+    for (let index = sample.colorLayers.length - 1; index >= 0; index -= 1) {
+      const layer = sample.colorLayers[index]!;
+      const foreground = resolveColorLayer(layer, resolve, biome);
+      result = result === undefined ? foreground : compositeRgba(result, foreground);
+    }
+    if (result !== undefined) return result;
+  }
+  return resolveColorLayer(sample, resolve, biome);
+}
+
+function resolveColorLayer(
+  layer: Pick<SurfaceColorLayer, "name" | "fluidDepth" | "underwaterName">,
+  resolve: BlockStyleResolver,
+  biome: BiomeStyle | undefined,
+): RgbaColor {
+  if (isWater(layer.name)) {
+    const water = biome?.water ?? resolve(layer.name);
+    const depth = layer.fluidDepth ?? 1;
     const visibleDepth = Math.min(depth, 12);
     const alpha = depth > 12 ? 255 : Math.floor(179 + (Math.min(depth - 1, 12) / 12) * 76);
     const darkening = 1 - (0.5 * Math.min(Math.max(0, visibleDepth - 7), 22)) / 22;
     const shadedWater = darken(water, darkening);
-    if (sample.underwaterName === undefined) {
+    if (layer.underwaterName === undefined) {
       return { ...shadedWater, alpha };
     }
-    const floor = tintBiome(resolve(sample.underwaterName), sample.underwaterName, biome);
+    const floor = tintBiome(resolve(layer.underwaterName), layer.underwaterName, biome);
     return compositeBytes(floor, shadedWater, alpha);
   }
-  return tintBiome(resolve(sample.name), sample.name, biome);
+  return tintBiome(resolve(layer.name), layer.name, biome);
 }
 
 function createBiomeTintField(
@@ -556,7 +573,7 @@ function tintBiome(
 ): RgbaColor {
   if (biome === undefined) return base;
   if (/grass_block/.test(name)) return { ...biome.groundGrass, alpha: base.alpha };
-  if (/(?:^|:)(?:short_grass|tall_grass|tallgrass|fern|large_fern)$/.test(name)) {
+  if (/(?:^|:)(?:grass|short_grass|tall_grass|tallgrass|fern|large_fern|bush)$/.test(name)) {
     return { ...biome.grass, alpha: base.alpha };
   }
   if (/leaves|vine/.test(name)) return { ...biome.foliage, alpha: base.alpha };
@@ -588,11 +605,32 @@ function compositeBytes(background: RgbaColor, foreground: RgbaColor, alpha: num
   };
 }
 
+function compositeRgba(background: RgbaColor, foreground: RgbaColor): RgbaColor {
+  if (foreground.alpha === 255 || background.alpha === 0) return foreground;
+  if (foreground.alpha === 0) return background;
+  if (background.alpha === 255) return compositeBytes(background, foreground, foreground.alpha);
+
+  const inverse = 255 - foreground.alpha;
+  const alpha = foreground.alpha + Math.floor((background.alpha * inverse) / 255);
+  const channel = (backgroundChannel: number, foregroundChannel: number) =>
+    Math.floor(
+      (foregroundChannel * foreground.alpha +
+        (backgroundChannel * background.alpha * inverse) / 255) /
+        alpha,
+    );
+  return {
+    red: channel(background.red, foreground.red),
+    green: channel(background.green, foreground.green),
+    blue: channel(background.blue, foreground.blue),
+    alpha,
+  };
+}
+
 function darken(value: RgbaColor, factor: number): RgbaColor {
   return {
-    red: Math.round(value.red * factor),
-    green: Math.round(value.green * factor),
-    blue: Math.round(value.blue * factor),
+    red: Math.floor(value.red * factor),
+    green: Math.floor(value.green * factor),
+    blue: Math.floor(value.blue * factor),
     alpha: value.alpha,
   };
 }
@@ -613,14 +651,16 @@ function usesGroundElevationColor(sample: NonNullable<SurfaceSamples[number]>): 
 }
 
 function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
-  return (
-    sample.biomeId !== undefined &&
-    !isDirtPath(sample.name) &&
-    sample.name !== "minecraft:cherry_leaves" &&
-    (isWater(sample.name) ||
-      /grass_block|(?:^|:)(?:short_grass|tall_grass|tallgrass|fern|large_fern)$|leaves|vine/.test(
-        sample.name,
-      ))
+  if (sample.biomeId === undefined) return false;
+  const names = sample.colorLayers?.map((layer) => layer.name) ?? [sample.name];
+  return names.some(
+    (name) =>
+      !isDirtPath(name) &&
+      name !== "minecraft:cherry_leaves" &&
+      (isWater(name) ||
+        /grass_block|(?:^|:)(?:grass|short_grass|tall_grass|tallgrass|fern|large_fern|bush)$|leaves|vine/.test(
+          name,
+        )),
   );
 }
 
