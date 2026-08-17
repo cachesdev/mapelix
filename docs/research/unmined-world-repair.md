@@ -11,7 +11,7 @@ tile as a lossless PNG after a classic LevelDB manifest reconstruction.
 Output:
 
 ```text
-/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/
+.local/tools/unmined-world-repair-20260817/
   unmined-classic-z2-x-32-y-49.png
 ```
 
@@ -32,8 +32,8 @@ chunk processor.  PNG output selects lossless output from the file extension.
 
 ```sh
 unmined-cli image render \
-  --world=/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/world-classic \
-  --output=/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/unmined-classic-z2-x-32-y-49.png \
+  --world=.local/tools/unmined-world-repair-20260817/world-classic \
+  --output=.local/tools/unmined-world-repair-20260817/unmined-classic-z2-x-32-y-49.png \
   --area='b(-2048,-3136,64,64)' \
   --zoom=2 \
   --shadows=3do \
@@ -70,7 +70,7 @@ tables can still be read.
 
 1. Made a physical copy of `db`, `level.dat`, `level.dat_old`, and
    `levelname.txt` at
-   `/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/world-classic`.
+   `.local/tools/unmined-world-repair-20260817/world-classic`.
    The original source hashes above were rechecked after the experiment.
 2. Tested `rocksdb_repair_db` from uNmINeD's bundled RocksDB 11.1 library.
    It completed in 0.19 seconds and 35,756 KB RSS, but its new manifest made
@@ -78,7 +78,7 @@ tables can still be read.
    mismatch: uNmINeD's Bedrock LevelDB reader accepts classic LevelDB
    VersionEdit tags, not newer RocksDB manifest records.
 3. Built a replacement *classic LevelDB* manifest in the copy.  The script is
-   `/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/rebuild-classic-manifest.mjs`.
+   `.local/tools/unmined-world-repair-20260817/rebuild-classic-manifest.mjs`.
    It scans each valid table footer and index, gets its smallest and largest
    internal keys, writes one full LevelDB log record with the comparator,
    current log number, next file number, and 556 level-0 `NewFile` entries,
@@ -107,9 +107,9 @@ The existing structural comparison command was:
 
 ```sh
 pnpm --filter @mapelix/core diagnose:compare \
-  /home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/unmined-classic-z2-x-32-y-49.png \
-  /home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/published-z2-x-32-y-49.jpeg \
-  /home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/repaired-vs-published-edges.png \
+  .local/tools/unmined-world-repair-20260817/unmined-classic-z2-x-32-y-49.png \
+  .local/tools/unmined-world-repair-20260817/published-z2-x-32-y-49.jpeg \
+  .local/tools/unmined-world-repair-20260817/repaired-vs-published-edges.png \
   4
 ```
 
@@ -125,7 +125,7 @@ reconstructed manifest has only an approximate record-precedence order.
 If the temporary copy is removed, repeat the physical copy then run:
 
 ```sh
-node /home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/rebuild-classic-manifest.mjs \
+node .local/tools/unmined-world-repair-20260817/rebuild-classic-manifest.mjs \
   /path/to/copied-world/db
 ```
 

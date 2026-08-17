@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "pixelsPerBlock": 4,
+  "oracle": {
+    "renderer": "uNmINeD 0.20.1-dev",
+    "format": "lossless PNG",
+    "settings": {
+      "zoom": 2,
+      "shadows": "3do",
+      "background": "#78a7ff",
+      "blockModels": false
+    }
+  },
+  "scenes": [
+    {
+      "id": "village-roofs",
+      "x": -32,
+      "y": -49,
+      "purpose": "Roof overhangs, paths, tree opacity, and village materials.",
+      "minimum": {
+        "edgeF1": 0.97,
+        "tolerantEdgeF1": 0.98,
+        "shadowF1": 0.96,
+        "shadowCorrelation": 0.96
+      },
+      "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
+    },
+    {
+      "id": "snow-mountain",
+      "x": -33,
+      "y": -58,
+      "purpose": "Steep elevation contours, snow, stone, and long terrain shadows.",
+      "minimum": {
+        "edgeF1": 0.95,
+        "tolerantEdgeF1": 0.97,
+        "shadowF1": 0.96,
+        "shadowCorrelation": 0.96
+      },
+      "maximum": { "meanPerceptualColorError": 1.8, "alignmentPixels": 1 }
+    },
+    {
+      "id": "forest-coast",
+      "x": -18,
+      "y": -23,
+      "purpose": "Dense foliage, shoreline placement, and water depth.",
+      "minimum": {
+        "edgeF1": 0.93,
+        "tolerantEdgeF1": 0.97,
+        "shadowF1": 0.96,
+        "shadowCorrelation": 0.95
+      },
+      "maximum": { "meanPerceptualColorError": 1.9, "alignmentPixels": 1 }
+    },
+    {
+      "id": "dark-canopy",
+      "x": -56,
+      "y": -15,
+      "purpose": "Layered canopy, foliage transmission, and high-frequency edges.",
+      "minimum": {
+        "edgeF1": 0.9,
+        "tolerantEdgeF1": 0.96,
+        "shadowF1": 0.94,
+        "shadowCorrelation": 0.94
+      },
+      "maximum": { "meanPerceptualColorError": 2.1, "alignmentPixels": 1 }
+    },
+    {
+      "id": "flat-grass-shore",
+      "x": -42,
+      "y": -8,
+      "purpose": "Negative control for false grids, with a small shoreline.",
+      "minimum": {
+        "edgeF1": 0.84,
+        "tolerantEdgeF1": 0.87,
+        "shadowF1": 0.84,
+        "shadowCorrelation": 0.85
+      },
+      "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
+    },
+    {
+      "id": "dry-biome-boundary",
+      "x": -14,
+      "y": -22,
+      "purpose": "Low-relief biome colors and sparse constructed blocks.",
+      "minimum": {
+        "edgeF1": 0.87,
+        "tolerantEdgeF1": 0.92,
+        "shadowF1": 0.9,
+        "shadowCorrelation": 0.9
+      },
+      "maximum": { "meanPerceptualColorError": 0.5, "alignmentPixels": 1 }
+    },
+    {
+      "id": "technical-array",
+      "x": -21,
+      "y": -10,
+      "purpose": "Repeated technical blocks, glass composition, and narrow shadows.",
+      "minimum": {
+        "edgeF1": 0.84,
+        "tolerantEdgeF1": 0.86,
+        "shadowF1": 0.97,
+        "shadowCorrelation": 0.97
+      },
+      "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
+    }
+  ]
+}

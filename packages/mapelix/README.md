@@ -81,3 +81,18 @@ pnpm --filter @mapelix/core diagnose:shadows \
 The command accepts lossless PNG files only. It derives per-pixel shadow loss
 from each renderer's normal and shadowless pair, then reports mask precision,
 recall, F1, loss correlation, and the worst receiver XYZ/subpixel samples.
+
+## Visual regression suite
+
+The package owns seven lossless Amelix/uNmINeD comparison scenes under
+`test/visual-regression`. They preserve structure, per-block color, shadow,
+alignment, and XYZ diagnostics for the renderer rewrite:
+
+```sh
+pnpm --filter @mapelix/core test:visual
+```
+
+The default run verifies the committed final prototype baseline. Set
+`MAPELIX_VISUAL_WORLD` to render the current package from a Bedrock world before
+running the same checks. See `test/visual-regression/README.md` for the input
+contract and generated report layout.

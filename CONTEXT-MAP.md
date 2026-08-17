@@ -5,6 +5,7 @@
 Mapelix converts Bedrock world records into visual map tiles.
 
 - `packages/mapelix` owns Bedrock record decoding, subchunk decoding, surface selection, pixel rendering, PNG encoding, and Node file adapters.
+- `packages/mapelix/test/visual-regression` owns the lossless uNmINeD oracle, final prototype baseline, scene thresholds, and XYZ-aware computer-vision acceptance suite. Large worlds and third-party tools stay under ignored `.local/` storage.
 - `apps/visual-check` is a disposable Playwright harness. It is not a viewer and is not part of the library interface.
 - `apps/stratos-viewer` is a disposable SvelteKit and Leaflet consumer. It owns the persistent PNG cache and selects the core render-worker count.
 - A future Canopy adapter can supply changed records without changing the renderer.

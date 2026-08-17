@@ -3,7 +3,7 @@
 > Prototype app: browse a large local Bedrock world through Mapelix-generated tiles.
 
 The local prototype defaults to the copied current Amelix SMP world at
-`/home/caches/Repos/.mapelix-worlds/Amelix-8-12-26/Amelix SMP`. Override it
+`.local/worlds/Amelix-8-12-26/Amelix SMP` from the monorepo root. Override it
 when needed:
 
 ```sh

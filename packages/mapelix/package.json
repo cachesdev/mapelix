@@ -29,6 +29,7 @@
     "lint": "oxlint --type-aware --type-check .",
     "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
     "test": "vitest run src",
+    "test:visual": "node scripts/run-visual-regression.mjs",
     "test:unit": "vitest run src",
     "transit": "node -e \"\""
   },

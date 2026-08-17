@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 
-const [candidateInput, referenceInput, overlayOutput, pixelsPerBlockText = "4"] =
+const [candidateInput, referenceInput, overlayOutput, pixelsPerBlockText = "4", reportOutput] =
   process.argv.slice(2);
 
 if (candidateInput === undefined || referenceInput === undefined) {
@@ -107,6 +107,7 @@ const result = {
     ),
   },
   overlay: overlayOutput,
+  report: reportOutput,
 };
 
 if (overlayOutput !== undefined) {
@@ -123,7 +124,12 @@ if (overlayOutput !== undefined) {
   await writeFile(overlayOutput, PNG.sync.write(overlay));
 }
 
-console.log(JSON.stringify(result, undefined, 2));
+const report = JSON.stringify(result, undefined, 2);
+if (reportOutput !== undefined) {
+  await mkdir(dirname(reportOutput), { recursive: true });
+  await writeFile(reportOutput, `${report}\n`);
+}
+console.log(report);
 
 async function loadImage(input) {
   const bytes = await loadBytes(input);

@@ -1,10 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { openBedrockWorld, type BedrockWorld, type TileCoverage } from "@mapelix/core";
 
-const defaultWorldDirectory = "/home/caches/Repos/.mapelix-worlds/Amelix-8-12-26/Amelix SMP";
+const defaultWorldDirectory = resolve(
+  process.cwd(),
+  "../../.local/worlds/Amelix-8-12-26/Amelix SMP",
+);
 const worldDirectory =
   process.env.MAPELIX_WORLD_DIRECTORY ??
   process.env.STRATOS_WORLD_DIRECTORY ??

@@ -46,6 +46,17 @@
       "cache": false,
       "outputs": []
     },
+    "test:visual": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": [],
+      "env": [
+        "MAPELIX_VISUAL_CANDIDATES",
+        "MAPELIX_VISUAL_OUTPUT",
+        "MAPELIX_VISUAL_WORKERS",
+        "MAPELIX_VISUAL_WORLD"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true

@@ -1,17 +1,16 @@
 # Amelix renderer comparison suite
 
-**Selected:** 2026-08-17.  This is a coordinate-only, repeatable suite for
-comparing Mapelix with uNmINeD across more than Forest's Town.  It intentionally
-does not add private-world images to Git.
+**Selected:** 2026-08-17. This repeatable suite compares Mapelix with uNmINeD
+across more than Forest's Town. Its lossless oracle, final prototype baseline,
+surface manifests, thresholds, and runner live in
+`packages/mapelix/test/visual-regression`.
 
 ## Baseline and alignment
 
-Use the repaired disposable world copy at
-`/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/world-classic`
-as the uNmINeD oracle.  It produces lossless PNG output and is currently the
-best comparison base; the recovery constraints are documented in
-[unmined-world-repair.md](unmined-world-repair.md).  Do not use it as a
-Minecraft world or overwrite the original backup.
+The committed `unmined*.png` files are the stable oracle. They came from a
+repaired disposable world copy and lossless uNmINeD output. The recovery
+constraints are documented in [unmined-world-repair.md](unmined-world-repair.md).
+Do not treat the reconstructed manifest as a Minecraft world repair.
 
 At native uNmINeD `zoom=2`, a 256-pixel image covers exactly 64 by 64 Minecraft
 blocks, at four pixels per block.  For Minecraft `(X, Z)`, select the tile with
@@ -47,16 +46,38 @@ The first four are the minimum high-value run.  Keep the last three in routine
 regression runs: they expose regressions which can hide in a village-only
 comparison.
 
-## Reproducible oracle render
+## Automated package test
 
-Replace `<X>`, `<Z>`, and `<ID>` with a table row's lower bounds and ID.  Keep
-the resulting PNG under `/tmp` or `.mapelix-tools`; both are outside the
-Mapelix Git worktree.
+Run the seven committed prototype comparisons:
 
 ```sh
-/home/caches/Repos/.mapelix-tools/unmined-0.20.1/unmined-cli_0.20.1-dev_linux-x64/unmined-cli \
+pnpm --filter @mapelix/core test:visual
+```
+
+To evaluate a new implementation from the private Amelix world, set
+`MAPELIX_VISUAL_WORLD`. The runner indexes once, renders every scene, then
+applies the same structure, per-block color, shadow, alignment, and XYZ checks:
+
+```sh
+MAPELIX_VISUAL_WORLD='/path/to/Amelix SMP' \
+MAPELIX_VISUAL_OUTPUT=/tmp/mapelix-visual-regression \
+pnpm --filter @mapelix/core test:visual
+```
+
+The large world, uNmINeD binary, decompiler, and reconstructed database remain
+external inputs. The small lossless oracle and prototype baseline are committed
+because they are the durable acceptance signal for the rewrite.
+
+## Reproduce the oracle
+
+Replace `<X>`, `<Z>`, and `<ID>` with a table row's lower bounds and ID. Use the
+external uNmINeD installation only for an intentional oracle refresh. Review
+the new image before it replaces a committed oracle.
+
+```sh
+.local/tools/unmined-0.20.1/unmined-cli_0.20.1-dev_linux-x64/unmined-cli \
   image render \
-  --world=/home/caches/Repos/.mapelix-tools/unmined-world-repair-20260817/world-classic \
+  --world=.local/tools/unmined-world-repair-20260817/world-classic \
   --output=/tmp/amelix-<ID>-unmined-z2.png \
   --area='b(<X>,<Z>,64,64)' \
   --zoom=2 \
