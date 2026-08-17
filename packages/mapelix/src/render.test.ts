@@ -20,7 +20,7 @@ describe("renderSurface", () => {
     samples[1] = { name: "minecraft:grass_block", y: 72 };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([91, 145, 60, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([99, 158, 66, 255]);
     expect(rgba[4]).toBeGreaterThan(rgba[0] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -40,9 +40,72 @@ describe("renderSurface", () => {
     };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([107, 114, 54, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([105, 111, 53, 255]);
     expect(rgba[4]).toBeLessThan(rgba[5] ?? 0);
     expect(rgba[7]).toBe(255);
+  });
+
+  it("blends adjacent biome tints across a narrow transition", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (_, index): SurfaceBlock => ({
+        name: "minecraft:grass_block",
+        y: 64,
+        biomeId: index % TILE_SIZE < 128 ? 1 : 6,
+      }),
+    );
+
+    const rgba = renderSurface(samples);
+    const colors = Array.from({ length: 9 }, (_, offset) => {
+      const pixel = (100 * TILE_SIZE + 124 + offset) * 4;
+      return `${rgba[pixel]},${rgba[pixel + 1]},${rgba[pixel + 2]}`;
+    });
+
+    expect(new Set(colors).size).toBeGreaterThan(2);
+    expect(colors[0]).toBe("145,193,85");
+    expect(colors.at(-1)).toBe("107,114,54");
+  });
+
+  it("shifts natural terrain from green toward ochre with altitude", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const lowIndex = 10 * TILE_SIZE + 10;
+    const highIndex = 200 * TILE_SIZE + 200;
+    samples[lowIndex] = { name: "minecraft:grass_block", y: 64, biomeId: 1 };
+    samples[highIndex] = { name: "minecraft:grass_block", y: 160, biomeId: 1 };
+
+    const rgba = renderSurface(samples);
+    expect(rgba[highIndex * 4]).toBeGreaterThan(rgba[lowIndex * 4] ?? 0);
+    expect(rgba[highIndex * 4 + 1]).toBeLessThan(rgba[lowIndex * 4 + 1] ?? 0);
+    expect(rgba[highIndex * 4 + 2]).toBeLessThan(rgba[lowIndex * 4 + 2] ?? 0);
+  });
+
+  it("lights terrain from a four-neighbor surface normal", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const flatIndex = 30 * TILE_SIZE + 30;
+    const slopeIndex = 80 * TILE_SIZE + 80;
+    for (const [x, z] of [
+      [30, 30],
+      [29, 30],
+      [31, 30],
+      [30, 29],
+      [30, 31],
+      [80, 80],
+      [79, 80],
+      [80, 79],
+      [80, 81],
+    ]) {
+      samples[z! * TILE_SIZE + x!] = { name: "minecraft:stone", y: 64 };
+    }
+    samples[80 * TILE_SIZE + 81] = { name: "minecraft:stone", y: 80 };
+
+    const rgba = renderSurface(samples);
+    expect(rgba[slopeIndex * 4]).toBeGreaterThan(rgba[flatIndex * 4] ?? 0);
   });
 
   it("casts a bounded shadow southeast of raised terrain", () => {
@@ -60,5 +123,24 @@ describe("renderSurface", () => {
     const shadowedRgba = renderSurface(shadowed);
     expect(shadowedRgba[targetIndex * 4]).toBeLessThan(exposedRgba[targetIndex * 4] ?? 0);
     expect(shadowedRgba[targetIndex * 4 + 3]).toBe(255);
+  });
+
+  it("casts a softer shadow through foliage than through solid terrain", () => {
+    const targetIndex = 3 * TILE_SIZE + 3;
+    const renderShadow = (sourceName: string | undefined) => {
+      const samples = Array.from(
+        { length: TILE_SIZE * TILE_SIZE },
+        (): SurfaceBlock | undefined => undefined,
+      );
+      samples[targetIndex] = { name: "minecraft:stone", y: 64 };
+      if (sourceName !== undefined) samples[0] = { name: sourceName, y: 84 };
+      return renderSurface(samples)[targetIndex * 4]!;
+    };
+
+    const exposed = renderShadow(undefined);
+    const foliage = renderShadow("minecraft:oak_leaves");
+    const solid = renderShadow("minecraft:stone");
+    expect(solid).toBeLessThan(foliage);
+    expect(foliage).toBeLessThan(exposed);
   });
 });

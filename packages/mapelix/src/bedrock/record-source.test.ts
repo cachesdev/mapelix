@@ -224,4 +224,26 @@ describe("createLevelDbRecordIndex", () => {
     );
     expect(index.records()).toEqual([]);
   });
+
+  it("retains values only for explicitly selected compact records", () => {
+    const index = createLevelDbRecordIndex({
+      retainValue: (key, value) =>
+        new TextDecoder().decode(key) === "biome" ? value.slice(1) : undefined,
+    });
+    index.addFile({
+      name: "000004.ldb",
+      bytes: table([
+        internalRecord("biome", [1, 2, 3], 1n),
+        internalRecord("subchunk", [4, 5, 6], 2n),
+      ]),
+    });
+
+    const records = index.records();
+    expect(
+      records.find((record) => new TextDecoder().decode(record.key) === "biome")?.value,
+    ).toEqual(new Uint8Array([2, 3]));
+    expect(
+      records.find((record) => new TextDecoder().decode(record.key) === "subchunk")?.value,
+    ).toBeUndefined();
+  });
 });

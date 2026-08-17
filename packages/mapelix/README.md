@@ -27,7 +27,8 @@ For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file a
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.
 - Uses the primary block storage layer. It does not render waterlogging overlays, entities, structures, or texture packs.
 - Reads legacy Data2D biome IDs used by the Stratos world. Modern Data3D biome palettes are not implemented yet.
-- Uses biome-aware grass, foliage, and water colors, water-depth compositing, elevation shading, and bounded cast shadows. Callers can inject a `BlockStyleResolver`.
+- Uses biome-aware grass, foliage, and water colors. A seam-safe five-block blend softens biome boundaries without hiding their shape.
+- Uses water-depth compositing, a sea-level-relative elevation gradient, four-neighbor hill shading, and bounded cast shadows. Foliage transmits part of the shadow light. Callers can inject a `BlockStyleResolver`.
 - Does not validate LevelDB checksums yet.
-- Builds the index one database file at a time and retains only packed subchunk and Data2D keys. Tile values load on demand. More workers increase throughput and temporary memory use.
+- Builds the index one database file at a time. It retains packed subchunk keys and only the 256/512-byte biome payload from Data2D records. Block values load on demand. More workers increase throughput and temporary memory use.
 - Does not interpret `CURRENT` or `MANIFEST` yet. Point it at a clean world snapshot without orphaned LevelDB files.

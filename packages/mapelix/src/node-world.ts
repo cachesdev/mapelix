@@ -1,7 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { SUBCHUNK_TAG, classifyMapRecordKey, isMapRecordKey } from "./bedrock/chunk-key.js";
+import {
+  DATA_2D_TAG,
+  SUBCHUNK_TAG,
+  classifyMapRecordKey,
+  isMapRecordKey,
+} from "./bedrock/chunk-key.js";
 import { createLevelDbRecordIndex, type LevelDbRecordIndexEntry } from "./bedrock/record-source.js";
 import {
   renderIndexedTile,
@@ -13,6 +18,7 @@ import { TileRenderWorkerPool } from "./node-worker-pool.js";
 import type { RenderSurfaceOptions } from "./render.js";
 import { floorDiv, type Dimension, type RenderedTile, type TileCoordinates } from "./tile.js";
 import type { BedrockWorld, TileCoverage } from "./world.js";
+import type { EffectiveBedrockRecord } from "./world.js";
 
 export interface BedrockWorldDirectory {
   readonly directory: string;
@@ -22,11 +28,13 @@ export interface BedrockWorldDirectory {
 
 interface IndexedTile {
   readonly sources: readonly IndexedTileSource[];
+  readonly biomeRecords: readonly EffectiveBedrockRecord[];
   subchunkCount: number;
 }
 
 interface BuildingTile {
   readonly sources: Map<string, Map<number, PackedKeyBuilder>>;
+  readonly biomeRecords: EffectiveBedrockRecord[];
   subchunkCount: number;
 }
 
@@ -59,7 +67,17 @@ class IndexedBedrockWorld implements BedrockWorld {
       const tileX = floorDiv(location.x, 16);
       const tileY = floorDiv(location.z, 16);
       const tileKey = indexTileKey(location.dimension, tileX, tileY);
-      const tile = buildingTiles.get(tileKey) ?? { sources: new Map(), subchunkCount: 0 };
+      const tile = buildingTiles.get(tileKey) ?? {
+        sources: new Map(),
+        biomeRecords: [] as EffectiveBedrockRecord[],
+        subchunkCount: 0,
+      };
+      if (location.tag === DATA_2D_TAG) {
+        if (record.value !== undefined)
+          tile.biomeRecords.push({ key: record.key, value: record.value });
+        buildingTiles.set(tileKey, tile);
+        continue;
+      }
       const source = tile.sources.get(record.source) ?? new Map<number, PackedKeyBuilder>();
       const keys = source.get(record.key.byteLength) ?? new PackedKeyBuilder(record.key.byteLength);
       keys.add(record.key);
@@ -77,6 +95,7 @@ class IndexedBedrockWorld implements BedrockWorld {
           name,
           keyGroups: [...groups.values()].map((group) => group.finish()),
         })),
+        biomeRecords: tile.biomeRecords,
         subchunkCount: tile.subchunkCount,
       });
     }
@@ -119,10 +138,22 @@ class IndexedBedrockWorld implements BedrockWorld {
   private createRenderJob(coordinates: TileCoordinates): IndexedTileRenderJob {
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const tile = this.tiles.get(indexTileKey(dimension, coordinates.x, coordinates.y));
+    const biomeRecords: EffectiveBedrockRecord[] = [];
+
+    for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+      for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+        const neighbor = this.tiles.get(
+          indexTileKey(dimension, coordinates.x + offsetX, coordinates.y + offsetY),
+        );
+        biomeRecords.push(...(neighbor?.biomeRecords ?? []));
+      }
+    }
+
     return {
       coordinates,
       databaseDirectory: this.databaseDirectory,
       sources: tile?.sources ?? [],
+      biomeRecords,
     };
   }
 }
@@ -151,7 +182,15 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     )
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  const index = createLevelDbRecordIndex({ includeKey: isMapRecordKey });
+  const index = createLevelDbRecordIndex({
+    includeKey: isMapRecordKey,
+    retainValue: (key, value) => {
+      const tagOffset = key.byteLength === 9 ? 8 : 12;
+      return (key.byteLength === 9 || key.byteLength === 13) && key[tagOffset] === DATA_2D_TAG
+        ? value.subarray(512)
+        : undefined;
+    },
+  });
   for (const entry of databaseFiles) {
     index.addFile({
       name: entry.name,

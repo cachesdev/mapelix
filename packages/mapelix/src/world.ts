@@ -63,18 +63,26 @@ class RecordBedrockWorld implements BedrockWorld {
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
-    const biomeChunks = new Map<string, DecodedData2D>();
+    const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
     const records = this.tileRecords.get(tileRecordKey(dimension, coordinates.x, coordinates.y));
+
+    for (let tileOffsetY = -1; tileOffsetY <= 1; tileOffsetY += 1) {
+      for (let tileOffsetX = -1; tileOffsetX <= 1; tileOffsetX += 1) {
+        const neighborRecords = this.tileRecords.get(
+          tileRecordKey(dimension, coordinates.x + tileOffsetX, coordinates.y + tileOffsetY),
+        );
+        for (const record of neighborRecords ?? []) {
+          const mapKey = classifyMapRecordKey(record.key);
+          if (mapKey?.tag !== DATA_2D_TAG || mapKey.dimension !== dimension) continue;
+          const data = decodeData2D(record.key, record.value);
+          if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
+        }
+      }
+    }
 
     for (const record of records ?? []) {
       const mapKey = classifyMapRecordKey(record.key);
       if (mapKey?.tag === DATA_2D_TAG) {
-        if (mapKey.dimension === dimension) {
-          const data = decodeData2D(record.key, record.value);
-          if (data !== undefined) {
-            biomeChunks.set(`${mapKey.x},${mapKey.z}`, data);
-          }
-        }
         continue;
       }
       const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
@@ -116,11 +124,13 @@ class RecordBedrockWorld implements BedrockWorld {
         key.x,
         key.z,
         subchunks,
-        biomeChunks.get(`${key.x},${key.z}`),
+        biomeChunks.get(key.x)?.get(key.z),
       );
     }
 
-    const rgba = renderSurface(samples, options);
+    const rgba = renderSurface(samples, options, {
+      biomeAt: (x, z) => biomeAt(biomeChunks, bounds.minX + x, bounds.minZ + z),
+    });
     return {
       coordinates,
       bounds,
@@ -151,6 +161,29 @@ class RecordBedrockWorld implements BedrockWorld {
     }
     return coverage;
   }
+}
+
+function biomeAt(
+  biomeChunks: ReadonlyMap<number, ReadonlyMap<number, DecodedData2D>>,
+  worldX: number,
+  worldZ: number,
+): number | undefined {
+  const chunkX = floorDiv(worldX, 16);
+  const chunkZ = floorDiv(worldZ, 16);
+  const biomes = biomeChunks.get(chunkX)?.get(chunkZ);
+  if (biomes === undefined) return undefined;
+  return data2DBiomeAt(biomes, worldX - chunkX * 16, worldZ - chunkZ * 16);
+}
+
+function setBiomeChunk(
+  biomeChunks: Map<number, Map<number, DecodedData2D>>,
+  chunkX: number,
+  chunkZ: number,
+  data: DecodedData2D,
+): void {
+  const zChunks = biomeChunks.get(chunkX) ?? new Map<number, DecodedData2D>();
+  zChunks.set(chunkZ, data);
+  biomeChunks.set(chunkX, zChunks);
 }
 
 /**

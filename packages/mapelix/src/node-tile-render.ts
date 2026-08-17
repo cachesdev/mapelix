@@ -20,13 +20,18 @@ export interface IndexedTileRenderJob {
   readonly coordinates: TileCoordinates;
   readonly databaseDirectory: string;
   readonly sources: readonly IndexedTileSource[];
+  readonly biomeRecords: readonly EffectiveBedrockRecord[];
 }
 
 export async function renderIndexedTile(
   job: IndexedTileRenderJob,
   options: RenderSurfaceOptions = {},
 ): Promise<RenderedTile> {
-  const records: EffectiveBedrockRecord[] = [];
+  const records: EffectiveBedrockRecord[] = job.biomeRecords.map((record) => {
+    const value = new Uint8Array(512 + record.value.byteLength);
+    value.set(record.value, 512);
+    return { key: record.key, value };
+  });
 
   for (const source of job.sources) {
     const keys = new Set<string>();
