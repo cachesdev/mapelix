@@ -11,7 +11,9 @@ export interface RenderSurfaceContext {
   readonly biomeAt?: (x: number, z: number) => number | undefined;
 }
 
-const BIOME_BLEND_RADIUS = 2;
+const BIOME_BLEND_RADIUS = 1;
+const CAST_SHADOW_DISTANCE = 3;
+const CAST_SHADOW_SHADE = 0.76;
 const BIOME_CHANNELS = 11;
 const BLENDED_CHANNELS = BIOME_CHANNELS - 1;
 
@@ -65,7 +67,7 @@ function calculateShade(samples: SurfaceSamples, x: number, z: number, height: n
   const normalLength = Math.hypot(slopeX, 1, slopeZ);
   const light = (-slopeX * -0.45 + 0.78 + -slopeZ * -0.45) / normalLength;
   const hillShade = 1 + (light - 0.78) * 0.78;
-  const stepRelief = (height - northHeight) * 0.025 + (height - westHeight) * 0.02;
+  const stepRelief = Math.sign(height - northHeight) * 0.05 + Math.sign(height - westHeight) * 0.04;
   const relief = clamp(hillShade + stepRelief, 0.62, 1.34);
   return relief * castShadow(samples, x, z, height);
 }
@@ -77,7 +79,7 @@ function sampleHeight(samples: SurfaceSamples, x: number, z: number, fallback: n
 
 function castShadow(samples: SurfaceSamples, x: number, z: number, height: number): number {
   let shadow = 1;
-  for (let distance = 1; distance <= 7; distance += 1) {
+  for (let distance = 1; distance <= CAST_SHADOW_DISTANCE; distance += 1) {
     const sourceX = x - distance;
     const sourceZ = z - distance;
     if (sourceX < 0 || sourceZ < 0) break;
@@ -85,9 +87,8 @@ function castShadow(samples: SurfaceSamples, x: number, z: number, height: numbe
     if (source !== undefined) {
       const clearance = source.y - height - distance * 0.7;
       if (clearance > 0) {
-        const occluded = clamp(0.88 - clearance * 0.025, 0.58, 0.88);
         const opacity = isFoliage(source.name) ? 0.45 : 1;
-        shadow = Math.min(shadow, 1 - (1 - occluded) * opacity);
+        shadow = Math.min(shadow, 1 - (1 - CAST_SHADOW_SHADE) * opacity);
       }
     }
   }

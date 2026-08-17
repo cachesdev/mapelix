@@ -45,7 +45,7 @@ describe("renderSurface", () => {
     expect(rgba[7]).toBe(255);
   });
 
-  it("blends adjacent biome tints across a narrow transition", () => {
+  it("blends biome tints only at the two blocks touching a boundary", () => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
       (_, index): SurfaceBlock => ({
@@ -56,14 +56,16 @@ describe("renderSurface", () => {
     );
 
     const rgba = renderSurface(samples);
-    const colors = Array.from({ length: 9 }, (_, offset) => {
-      const pixel = (100 * TILE_SIZE + 124 + offset) * 4;
+    const colors = Array.from({ length: 6 }, (_, offset) => {
+      const pixel = (100 * TILE_SIZE + 125 + offset) * 4;
       return `${rgba[pixel]},${rgba[pixel + 1]},${rgba[pixel + 2]}`;
     });
 
-    expect(new Set(colors).size).toBeGreaterThan(2);
+    expect(new Set(colors).size).toBe(4);
     expect(colors[0]).toBe("145,193,85");
     expect(colors.at(-1)).toBe("107,114,54");
+    expect(colors[1]).toBe(colors[0]);
+    expect(colors[4]).toBe(colors[5]);
   });
 
   it("shifts natural terrain from green toward ochre with altitude", () => {
@@ -123,6 +125,47 @@ describe("renderSurface", () => {
     const shadowedRgba = renderSurface(shadowed);
     expect(shadowedRgba[targetIndex * 4]).toBeLessThan(exposedRgba[targetIndex * 4] ?? 0);
     expect(shadowedRgba[targetIndex * 4 + 3]).toBe(255);
+  });
+
+  it("keeps a tall block shadow crisp instead of smearing it seven blocks", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    samples[10 * TILE_SIZE + 10] = { name: "minecraft:stone", y: 84 };
+
+    const rgba = renderSurface(samples);
+    const redAt = (x: number, z: number) => rgba[(z * TILE_SIZE + x) * 4]!;
+
+    expect(redAt(11, 11)).toBeLessThan(redAt(9, 11));
+    expect(redAt(14, 14)).toBe(redAt(13, 14));
+  });
+
+  it("uses a stable shadow tone for one-block and tall height steps", () => {
+    const renderShadow = (sourceHeight: number) => {
+      const samples = Array.from(
+        { length: TILE_SIZE * TILE_SIZE },
+        (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+      );
+      samples[10 * TILE_SIZE + 10] = { name: "minecraft:stone", y: sourceHeight };
+      return renderSurface(samples)[(11 * TILE_SIZE + 11) * 4]!;
+    };
+
+    expect(Math.abs(renderShadow(65) - renderShadow(84))).toBeLessThanOrEqual(2);
+  });
+
+  it("uses a stable edge highlight for one-block and tall height steps", () => {
+    const renderRaisedBlock = (sourceHeight: number) => {
+      const samples = Array.from(
+        { length: TILE_SIZE * TILE_SIZE },
+        (): SurfaceBlock => ({ name: "minecraft:iron_block", y: 64 }),
+      );
+      const sourceIndex = 10 * TILE_SIZE + 10;
+      samples[sourceIndex] = { name: "minecraft:iron_block", y: sourceHeight };
+      return renderSurface(samples)[sourceIndex * 4]!;
+    };
+
+    expect(Math.abs(renderRaisedBlock(65) - renderRaisedBlock(84))).toBeLessThanOrEqual(2);
   });
 
   it("casts a softer shadow through foliage than through solid terrain", () => {
