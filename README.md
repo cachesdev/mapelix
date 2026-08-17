@@ -5,9 +5,9 @@ Mapelix is the bastard child of
 [uNmINeD](https://unmined.net/). It takes Mojang's official tooling for reading maps and combines
 it with an almost-clean-room port reverse-engineered from a uNmINeD 0.20.1-dev binary.
 
-This slop fork essentially brings the look of uNmINeD maps to TypeScript as a low-level,
+This slop-fork essentially brings the look of uNmINeD maps to TypeScript as a low-level,
 programmatic API. This means you can do some fun stuff, such as running the renderer in the browser
-(TODO), dynamically updating the map, or integrating it into web frameworks.
+(TODO), dynamically updating the map, or integrating it into web frameworks without having to call into the .NET uNmINeD CLI.
 
 The first prototype reads a Bedrock world, renders standard 256 by 256 XYZ tiles, and writes PNGs
 that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
@@ -26,8 +26,12 @@ that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
 - Configurable worker concurrency for large worlds
 - A byte-oriented API for future live-world and Canopy integrations
 
-The prototype has been tested with the committed Bedrock fixture, the large Stratos world, and a
-current 1.2 GB Amelix SMP backup.
+The prototype has been tested with the committed Bedrock fixture, a Stratos world backup, and a
+current Amelix SMP backup.
+
+## What (probably) doesn't work
+
+- Other dimensions, didn't even bother to try yet
 
 ## Similarity to uNmINeD
 
@@ -115,7 +119,7 @@ pnpm --filter @mapelix/prototype-viewer dev
 
 The viewer renders visible tiles on demand and keeps a persistent PNG cache. A warm restart can
 serve explored regions without reopening the world database. Set `MAPELIX_CACHE_DIRECTORY` to
-choose another cache location.
+choose another cache location. Set a higher render worker amount if you have the CPU power.
 
 ## More information
 
