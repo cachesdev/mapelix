@@ -6,6 +6,8 @@ export interface RenderSurfaceOptions {
   readonly resolveBlockStyle?: BlockStyleResolver;
   /** Optional artistic extension. The uNmINeD-compatible default is no spatial biome blend. */
   readonly biomeBlendRadius?: number;
+  /** Enables the uNmINeD-compatible 3D-opacity cast-shadow pass. Defaults to true. */
+  readonly shadows?: boolean;
 }
 
 export interface RenderSurfaceContext {
@@ -13,8 +15,10 @@ export interface RenderSurfaceContext {
   readonly biomeAt?: (x: number, z: number) => number | undefined;
 }
 
-const CAST_SHADOW_DISTANCE = 3;
-const CAST_SHADOW_SHADE = 0.76;
+const SHADOW_MINIMUM_LIGHT = 0.6;
+const SHADOW_SUN_X = -0.353_553_390_593_273_8;
+const SHADOW_SUN_Y = 0.707_106_781_186_547_6;
+const SHADOW_SUN_Z = -0.612_372_435_695_794_5;
 const BIOME_CHANNELS = 11;
 const BLENDED_CHANNELS = BIOME_CHANNELS - 1;
 
@@ -42,11 +46,13 @@ export function renderSurface(
 
   const resolveBlockStyle = options.resolveBlockStyle ?? defaultBlockStyle;
   const biomeBlendRadius = options.biomeBlendRadius ?? 0;
+  const castShadows = options.shadows ?? true;
   if (!Number.isSafeInteger(biomeBlendRadius) || biomeBlendRadius < 0) {
     throw new RangeError(`Biome blend radius must be a non-negative integer`);
   }
   const rgba = new Uint8Array(TILE_SIZE * TILE_SIZE * 4);
   const biomeTints = createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
+  const maximumHeight = maximumTerrainHeight(samples);
 
   for (let z = 0; z < sampleSize; z += 1) {
     for (let x = 0; x < sampleSize; x += 1) {
@@ -61,7 +67,17 @@ export function renderSurface(
         resolveSurfaceColor(sample, resolveBlockStyle, biome),
         sample,
       );
-      writeSurfaceBlock(rgba, samples, sampleSize, pixelsPerBlock, x, z, base);
+      writeSurfaceBlock(
+        rgba,
+        samples,
+        sampleSize,
+        pixelsPerBlock,
+        maximumHeight,
+        castShadows,
+        x,
+        z,
+        base,
+      );
     }
   }
   return rgba;
@@ -74,12 +90,18 @@ function calculateOutputShade(
   outputX: number,
   outputZ: number,
   height: number,
+  maximumHeight: number,
+  castShadows: boolean,
 ): number {
   const relief =
     pixelsPerBlock === 1
       ? calculateSinglePixelRelief(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height)
       : calculateHeightContour(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
-  return relief * castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
+  if (!castShadows) return relief;
+  return (
+    relief *
+    castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height, maximumHeight)
+  );
 }
 
 function calculateSinglePixelRelief(
@@ -177,23 +199,99 @@ function castOutputShadow(
   outputX: number,
   outputZ: number,
   height: number,
+  maximumHeight: number,
 ): number {
-  let shadow = 1;
-  const maximumDistance = CAST_SHADOW_DISTANCE * pixelsPerBlock;
-  for (let distance = 1; distance <= maximumDistance; distance += 1) {
-    const sourceX = outputX - distance;
-    const sourceZ = outputZ - distance;
-    if (sourceX < 0 || sourceZ < 0) break;
-    const source = outputSample(samples, sampleSize, pixelsPerBlock, sourceX, sourceZ);
-    if (source !== undefined) {
-      const clearance = terrainHeight(source) - height - (distance / pixelsPerBlock) * 0.7;
-      if (clearance > 0) {
-        const opacity = isFoliage(source.name) ? 0.45 : 1;
-        shadow = Math.min(shadow, 1 - (1 - CAST_SHADOW_SHADE) * opacity);
+  if (height >= maximumHeight) return 1;
+
+  const originX = (outputX + 0.5) / pixelsPerBlock;
+  const originY = height + 255 / 256;
+  const originZ = (outputZ + 0.5) / pixelsPerBlock;
+  let voxelX = Math.floor(originX);
+  let voxelY = Math.floor(originY);
+  let voxelZ = Math.floor(originZ);
+  let nextX = (originX - voxelX) / -SHADOW_SUN_X;
+  let nextY = (voxelY + 1 - originY) / SHADOW_SUN_Y;
+  let nextZ = (originZ - voxelZ) / -SHADOW_SUN_Z;
+  const stepX = 1 / -SHADOW_SUN_X;
+  const stepY = 1 / SHADOW_SUN_Y;
+  const stepZ = 1 / -SHADOW_SUN_Z;
+  let transmission = 1;
+
+  while (voxelY <= maximumHeight && transmission > 0) {
+    const next = Math.min(nextX, nextY, nextZ);
+    const crossX = approximatelyEqual(nextX, next);
+    const crossY = approximatelyEqual(nextY, next);
+    const crossZ = approximatelyEqual(nextZ, next);
+    const crossedAxes = (crossX ? 1 : 0) | (crossY ? 2 : 0) | (crossZ ? 4 : 0);
+    const followingCrossing = Math.min(
+      crossX ? nextX + stepX : nextX,
+      crossY ? nextY + stepY : nextY,
+      crossZ ? nextZ + stepZ : nextZ,
+    );
+    const chordScale = (followingCrossing - next) / Math.SQRT2;
+
+    for (
+      let combination = crossedAxes;
+      combination > 0;
+      combination = (combination - 1) & crossedAxes
+    ) {
+      const candidateX = voxelX - (combination & 1 ? 1 : 0);
+      const candidateY = voxelY + (combination & 2 ? 1 : 0);
+      const candidateZ = voxelZ - (combination & 4 ? 1 : 0);
+      const opacity = shadowOpacityAt(samples, sampleSize, candidateX, candidateY, candidateZ);
+      if (opacity >= 1) return SHADOW_MINIMUM_LIGHT;
+      if (combination === crossedAxes) {
+        transmission *= 1 - opacity * chordScale;
+        if (transmission <= 0) return SHADOW_MINIMUM_LIGHT;
       }
     }
+
+    if (crossX) {
+      voxelX -= 1;
+      nextX += stepX;
+    }
+    if (crossY) {
+      voxelY += 1;
+      nextY += stepY;
+    }
+    if (crossZ) {
+      voxelZ -= 1;
+      nextZ += stepZ;
+    }
+    if (voxelX < 0 || voxelX >= sampleSize || voxelZ < 0 || voxelZ >= sampleSize) break;
   }
-  return shadow;
+
+  return SHADOW_MINIMUM_LIGHT + (1 - SHADOW_MINIMUM_LIGHT) * transmission;
+}
+
+function shadowOpacityAt(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  x: number,
+  y: number,
+  z: number,
+): number {
+  if (x < 0 || x >= sampleSize || z < 0 || z >= sampleSize) return 0;
+  const sample = samples[z * sampleSize + x];
+  if (sample === undefined || y > terrainHeight(sample)) return 0;
+  if (isWater(sample.name)) {
+    const depth = sample.fluidDepth ?? 1;
+    return y >= sample.y - depth + 1 ? 0.1 : 0;
+  }
+  if (isFoliage(sample.name)) return y === sample.y ? 0.6 : 0;
+  return 1;
+}
+
+function maximumTerrainHeight(samples: SurfaceSamples): number {
+  let maximum = Number.NEGATIVE_INFINITY;
+  for (const sample of samples) {
+    if (sample !== undefined) maximum = Math.max(maximum, terrainHeight(sample));
+  }
+  return maximum;
+}
+
+function approximatelyEqual(left: number, right: number): boolean {
+  return Math.abs(left - right) <= 1e-10;
 }
 
 function outputSample(
@@ -427,6 +525,13 @@ function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
 }
 
 function isElevationStyledGround(name: string): boolean {
+  if (
+    /cobblestone|stone_bricks?|planks|stairs|slab|wall|fence|door|trapdoor|button|pressure_plate/.test(
+      name,
+    )
+  ) {
+    return false;
+  }
   return /grass_block|moss_block|dirt|podzol|mycelium|mud|sand|gravel|stone|deepslate|terracotta|clay/.test(
     name,
   );
@@ -441,6 +546,8 @@ function writeSurfaceBlock(
   samples: SurfaceSamples,
   sampleSize: number,
   pixelsPerBlock: number,
+  maximumHeight: number,
+  castShadows: boolean,
   blockX: number,
   blockZ: number,
   base: RgbaColor,
@@ -457,6 +564,8 @@ function writeSurfaceBlock(
         outputX,
         outputZ,
         sample === undefined ? 0 : terrainHeight(sample),
+        maximumHeight,
+        castShadows,
       );
       writeColor(target, (outputZ * TILE_SIZE + outputX) * 4, base, shade);
     }

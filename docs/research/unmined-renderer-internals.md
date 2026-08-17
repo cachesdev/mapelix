@@ -331,6 +331,29 @@ At those default angles, the unit vector toward the sun is approximately:
 (-0.353553, +0.707107, -0.612372)
 ```
 
+The general convention for positive altitude `A` and direction `D` is:
+
+```text
+receiver_to_sun = (
+    cos(A) * cos(D),
+    sin(A),
+   -cos(A) * sin(D)
+)
+```
+
+World `+X` is the output's right direction. World `+Z` is the output's down
+direction because Z selects the image row. Thus direction 0 points toward
+image-right, 90 toward image-up, 180 toward image-left, and 270 toward
+image-down. At the published direction 120, rays travel from a receiver toward
+image-up-left; the cast shadow extends in the opposite direction,
+image-down-right (`+X,+Z`).
+
+Direction and altitude are configurable as `SunDirectionAngle` and
+`SunAltitudeAngle` in a map-settings file. The CLI has no dedicated angle
+flags. Without a map-settings file, as in the published updater, their defaults
+are 120 and 45 degrees. The caster clamps altitude to the inclusive 12-85
+degree range before constructing the vector.
+
 For an `N x N` block image, the horizontal ray origins are pixel centers:
 
 ```text
@@ -363,6 +386,11 @@ If a ray starts exactly on an integer boundary and moves in the negative
 direction, the initial cell is the cell on the negative side. At tied crossings
 the traversal emits all face-, edge-, or corner-touching voxel combinations.
 This supercover behavior prevents light leaks through diagonal contacts.
+
+Runtime traversal can end earlier. It stops when world Y exceeds the composite
+shadow map's maximum occupied elevation, or when X/Z leaves the composite map.
+A per-chunk maximum-height lookup also skips empty high ray segments without
+ending the ray.
 
 For solid-color blocks above zoom 1, the implementation first probes all four
 corners. It probes a top, bottom, left, or right edge only when one of that
@@ -398,9 +426,26 @@ More exactly, the modes test a ray sample as follows:
   to 60%; ordinary blocks carry 100%. Transmission multiplies across hits.
   With default opacity smoothing, each voxel opacity is also multiplied by the
   distance between its DDA entry point and the next emitted entry point,
-  divided by `sqrt(2)`. The final precomputed entry has zero stored length;
-  tied supercover entries can also have zero length because they share one
-  crossing point.
+  divided by `sqrt(2)`. Only entries with a following entry get a nonzero
+  stored length. Tied supercover entries can also have zero length because
+  they share one crossing point.
+
+The exact `3do` accumulation for a nonzero opacity byte `b` is:
+
+```text
+if b == 255:
+    return light = 0 immediately
+
+effective_opacity = (b / 255) * segment_length
+light = light * (1 - effective_opacity)
+if light <= 0:
+    return 0
+```
+
+There is no explicit clamp on `effective_opacity`. Fully opaque solids bypass
+smoothing, so a short chord never turns an opaque block into a partial shadow.
+The default final RGB gain is `0.6 + 0.4 * light`. The shadow-strength setting
+is clamped to 10-90%; the public export uses its default 40%.
 
 **Fact for the published Amelix export.** The repository's update script passes
 `--shadows 3do`, `--zoomin 2`, and `--showgrid false`. This removes the earlier
@@ -411,6 +456,73 @@ fully opaque 3D mode. See the immutable first-party
 Sources: `ShadowCasterPool.GetSunAngle`, `ShadowCaster`,
 `ShadowRayCast.GetIntersectedBlocks`, `TerrainRendererState.ApplyShade`, and
 `ShadowmapChunkProcessorRequest.Prepare`.
+
+### Deterministic zoom-2 shadow acceptance cases
+
+These cases were checked by invoking the inspected build against a synthetic
+shadow-map interface. They isolate cast shadows by disabling local elevation
+shading. The receiver is a full block with top Y=0 at world `(0,0)`. Matrix
+columns are its four output X samples, and rows are its four output Z samples.
+`#` means the ray encounters the stated opaque block.
+
+One opaque block at world `(X=0,Y=1,Z=-1)` gives:
+
+```text
+####
+.###
+.###
+....
+```
+
+One opaque block at `(-1,1,-1)` gives:
+
+```text
+##..
+##..
+##..
+....
+```
+
+Every `#` has ray light 0 and default final RGB gain 0.6. Every dot remains at
+gain 1. These masks also exercise the corner/edge/interior shortcut and match
+the full 16-ray result.
+
+Replacing the north opaque block with foliage opacity byte 153 produces these
+ray-light values before the final 40% shadow-strength mix:
+
+```text
+0.936603  0.636603  0.484259  0.484259
+unhit     0.809808  0.657464  0.657464
+unhit     0.983013  0.830669  0.830669
+unhit     unhit     unhit     unhit
+```
+
+For example, ray light 0.484259 becomes final RGB gain
+`0.6 + 0.4 * 0.484259 = 0.793704` before byte truncation.
+
+### Tile-boundary behavior
+
+Local elevation contours receive a one-block input halo. Cast shadows receive
+a larger independent halo: the render block rectangle is inflated by 256
+blocks in every horizontal direction, then rounded outward to 256-block shadow
+map tiles. Adjacent output requests reuse these shadow-map tiles and compose
+them before shading.
+
+At altitude 45, a ray that rises the full 256-block vertical limit moves at
+most 128 blocks in X and about 221.7 blocks in Z for direction 120. The
+256-block halo therefore covers the full default ray. A receiver translated to
+`(64,0)` with its north occluder translated to `(64,-1)` must reproduce the
+first 4 x 4 mask above even though X=64 starts the next native zoom-2 tile. The
+same translation test at Z=64 checks a row/tile boundary.
+
+At the minimum configurable altitude of 12 degrees, a full-height ray can move
+about 1,204 blocks horizontally. The fixed halo cannot contain that whole ray.
+Leaving the composite map ends traversal and preserves the light accumulated
+so far, so very long low-sun shadows can truncate. This limitation does not
+apply to the published 45-degree default case.
+
+Sources: `TerrainRendererChunkProcessorRequest.CreateShadowmapRequests`,
+`TerrainShaderState`, `CompositeShadowMap`, and `ShadowCaster`.
 
 ## Biomes: no spatial blur in the inspected Bedrock path
 
@@ -531,6 +643,84 @@ used by this published export.
 Source: `TerrainRendererOptions.UseBlockModels`, `CommonRenderOptions`,
 `TerrainRendererState.RenderBlockTextured`, and the first-party export script
 linked above.
+
+## Published models-off village palette
+
+**Fact.** Tag matching chooses a material family, then matching style rules are
+applied in declaration order. A later base-color rule replaces the earlier base
+and clears any elevation-color overlay. It does not clear an already assigned
+elevation-lightness curve. The bundled stylesheet enables wood, stone, and
+masonry coloring by default.
+
+The relevant wood rules first assign generic wood, then let a species-specific
+artificial-material rule win. The exact pre-lighting bytes are produced by the
+renderer's HSL conversion, which truncates each channel rather than rounding:
+
+| Family | Config HSL | Base RGB bytes |
+| --- | --- | --- |
+| generic wood | `(42, 50%, 50%)` | `(191, 153, 63)` |
+| oak | `(36, 40%, 50%)` | `(178, 137, 76)` |
+| spruce | `(30, 45%, 30%)` | `(110, 76, 42)` |
+| dark oak | `(30, 55%, 25%)` | `(98, 63, 28)` |
+
+Planks, stairs, and slabs are tagged artificial and wooden. Names such as
+`oak_*`, `spruce_*`, and `dark_oak_*` select the corresponding species. The
+Bedrock `wood_type` property also selects a species for legacy multi-state
+wood products. Modern species-named logs can receive the species color too.
+Legacy generic Bedrock `log` states are a weaker case: the bundled tag file has
+a TODO for those old names, so they can remain generic wood.
+
+With models off, a species plank, stair, and slab share one solid style color.
+Their vanilla texture and partial shape are absent. Integer height contours and
+3D cast shadows are the only normal reasons for them to differ spatially.
+
+The relevant village masonry values are:
+
+| Family | Config HSL | Base RGB bytes |
+| --- | --- | --- |
+| artificial stone/cobblestone/stone-brick | `(0, 0%, 50%)` | `(127, 127, 127)` |
+| brick masonry | `(12, 50%, 55%)` | `(197, 105, 82)` |
+| earlier generic artificial stone, later overridden | `(0, 0%, 70%)` | `(178, 178, 178)` |
+
+Names such as `cobblestone_*` select the cobblestone masonry family;
+`stone_*` products select stone after sandstone, red-sandstone, and end-stone
+exclusions. Both relevant default families happen to resolve to the same
+50%-gray bytes. Stone-brick products therefore do not get a separate visible
+texture or mortar pattern in this export.
+
+Artificial wood and masonry do not request grass, foliage, or water biome tint
+and do not receive the land elevation color or lightness tables. Their base RGB
+is independent of biome and absolute Y. Natural ground stone is different: it
+matches `#rock`, so a later masonry base color clears its elevation-color
+overlay but leaves the `land.lightness.elevation` multiplier. Local contours
+and cast shadows are applied after all of this color resolution.
+
+The palette operates directly on gamma-encoded byte RGB; there is no
+linear-light shading or explicit ICC transform. The published JFIF JPEG has no
+embedded ICC profile. Its quality-75 quantization and 4:2:0 chroma sampling
+mean the decoded roof pixels will not remain byte-identical to the table.
+
+Candidate aligned tests for the village reference tile at zoom 2:
+
+1. Create a synthetic palette tile with the base bytes above, encode it with
+   the same quality-75 4:2:0 path, and use its decoded colors as comparison
+   centroids. This isolates JPEG shift from palette error.
+2. On quiet, unshadowed 4 x 4 roof blocks, ignore the top row and left column
+   when measuring base color. Those samples can contain the selective height
+   contour even when the interior is flat.
+3. Compare plank, stair, and slab areas of the same species and illumination.
+   Their models-off interiors should share one palette centroid; only the
+   integer elevation and shadow masks should differ.
+4. Compare an artificial gray roof product with natural exposed stone at the
+   same local lighting. Only the natural stone should follow the absolute-Y
+   lightness curve.
+5. Verify material boundaries on 4-pixel block coordinates in decoded luma.
+   Chroma can spill across two output pixels, so raw RGB edge width is not a
+   reliable geometry test.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js` and
+`default.stylesheet.minecraft.js`, `TerrainRendererBlockStylesGenerator.Apply`,
+`HslColorConverter.HslToRgb`, and `TerrainRendererState.GetBlockColor`.
 
 ## Why dirt paths remain distinct
 
@@ -708,13 +898,16 @@ The exact methods that support the main findings are:
 - `TerrainDbBlocksToSliceBlocksConverter.GetSliceBlock`
 - `ShadowCaster.InternalGetLightLevel`
 - `ShadowRayCast.GetIntersectedBlocks`
+- `ShadowCasterPool.GetSunAngle`
 - `ShadowmapChunkProcessorRequest.Prepare`
 - `ShadowMapWithOpacity.Generate`
 - `SliceGeneratorBlockStateSettingsProvider.GenerateBlockStateSettings`
+- `TerrainRendererChunkProcessorRequest<TPixel>.CreateShadowmapRequests`
 - `TerrainRendererChunkProcessorRequest<TPixel>.DoneAsync`
 - `WebMapExport.RenderZoomOutTiles`
 - `ImageSharpSerializer.GetJpegEncoder`
 - `TerrainRendererBlockStylesGenerator.Apply`
+- `HslColorConverter.HslToRgb`
 - `StylesheetCompilationContext.GenerateGradient`
 - `StylesheetCompilationContext.GenerateCurveMapping`
 

@@ -232,6 +232,24 @@ describe("renderSurface", () => {
     expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 78, 35, 255]);
   });
 
+  it.each([
+    ["minecraft:oak_stairs", [178, 137, 76, 255]],
+    ["minecraft:spruce_planks", [110, 76, 42, 255]],
+    ["minecraft:dark_oak_slab", [98, 63, 28, 255]],
+    ["minecraft:stone_bricks", [127, 127, 127, 255]],
+  ] as const)("keeps artificial roof material %s at its style color", (name, expected) => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const index = 100 * TILE_SIZE + 100;
+    samples[index] = { name, y: 112 };
+
+    const rgba = renderSurface(samples, { shadows: false });
+
+    expect(Array.from(rgba.slice(index * 4, index * 4 + 4))).toEqual(expected);
+  });
+
   it("lights terrain from a four-neighbor surface normal", () => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
@@ -258,13 +276,90 @@ describe("renderSurface", () => {
     expect(rgba[slopeIndex * 4]).toBeGreaterThan(rgba[flatIndex * 4] ?? 0);
   });
 
+  it("casts the shadow south-southeast for the published 120-degree sun", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    samples[20 * sampleSize + 20] = { name: "minecraft:stone", y: 68 };
+
+    const rgba = renderSurface(samples);
+    const blockReds = (blockX: number, blockZ: number) =>
+      Array.from({ length: pixelsPerBlock * pixelsPerBlock }, (_, pixel) => {
+        const x = blockX * pixelsPerBlock + (pixel % pixelsPerBlock);
+        const z = blockZ * pixelsPerBlock + Math.floor(pixel / pixelsPerBlock);
+        return rgba[(z * TILE_SIZE + x) * 4]!;
+      });
+    const expectedRay = blockReds(21, 23);
+    const wrongDiagonal = blockReds(22, 21);
+
+    expect(Math.min(...expectedRay)).toBeLessThan(Math.max(...expectedRay));
+    expect(Math.min(...expectedRay)).toBeLessThan(Math.min(...wrongDiagonal));
+  });
+
+  it("matches the native zoom-2 opaque shadow mask", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    const blockX = 20;
+    const blockZ = 20;
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 65 };
+
+    const lit = renderSurface(samples, { shadows: false });
+    const shaded = renderSurface(samples);
+    const mask = Array.from({ length: pixelsPerBlock }, (_, pixelZ) =>
+      Array.from({ length: pixelsPerBlock }, (_, pixelX) => {
+        const x = blockX * pixelsPerBlock + pixelX;
+        const z = blockZ * pixelsPerBlock + pixelZ;
+        const offset = (z * TILE_SIZE + x) * 4;
+        return shaded[offset]! < lit[offset]! ? "#" : ".";
+      }).join(""),
+    );
+
+    expect(mask).toEqual(["####", ".###", ".###", "...."]);
+  });
+
+  it("smooths foliage opacity by each subpixel ray chord", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    const blockX = 20;
+    const blockZ = 20;
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:oak_leaves", y: 65 };
+
+    const lit = renderSurface(samples, { shadows: false });
+    const shaded = renderSurface(samples);
+    const gains = Array.from({ length: pixelsPerBlock }, (_, pixelZ) =>
+      Array.from({ length: pixelsPerBlock }, (_, pixelX) => {
+        const x = blockX * pixelsPerBlock + pixelX;
+        const z = blockZ * pixelsPerBlock + pixelZ;
+        const offset = (z * TILE_SIZE + x) * 4;
+        return shaded[offset]! / lit[offset]!;
+      }),
+    );
+
+    expect(gains[0]?.[0]).toBeCloseTo(0.6 + 0.4 * 0.936_603, 2);
+    expect(gains[0]?.[2]).toBeCloseTo(0.6 + 0.4 * 0.484_259, 2);
+    expect(gains[1]?.[0]).toBeCloseTo(1, 2);
+    expect(gains[2]?.[1]).toBeCloseTo(0.6 + 0.4 * 0.983_013, 2);
+    expect(gains[3]).toEqual([1, 1, 1, 1]);
+  });
+
   it("casts a bounded shadow southeast of raised terrain", () => {
     const exposed = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
       (): SurfaceBlock | undefined => undefined,
     );
     const shadowed = [...exposed];
-    const targetIndex = 3 * TILE_SIZE + 3;
+    const targetIndex = 2 * TILE_SIZE + 1;
     exposed[targetIndex] = { name: "minecraft:stone", y: 64 };
     shadowed[targetIndex] = { name: "minecraft:stone", y: 64 };
     shadowed[0] = { name: "minecraft:stone", y: 84 };
@@ -275,7 +370,7 @@ describe("renderSurface", () => {
     expect(shadowedRgba[targetIndex * 4 + 3]).toBe(255);
   });
 
-  it("keeps a tall block shadow crisp instead of smearing it seven blocks", () => {
+  it("keeps a tall block shadow on the sun axis instead of smearing it diagonally", () => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
       (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
@@ -285,8 +380,8 @@ describe("renderSurface", () => {
     const rgba = renderSurface(samples);
     const redAt = (x: number, z: number) => rgba[(z * TILE_SIZE + x) * 4]!;
 
-    expect(redAt(11, 11)).toBeLessThan(redAt(9, 11));
-    expect(redAt(14, 14)).toBe(redAt(13, 14));
+    expect(redAt(11, 12)).toBeLessThan(redAt(12, 11));
+    expect(redAt(18, 24)).toBeLessThan(redAt(24, 18));
   });
 
   it("uses a stable shadow tone for one-block and tall height steps", () => {
@@ -317,14 +412,14 @@ describe("renderSurface", () => {
   });
 
   it("casts a softer shadow through foliage than through solid terrain", () => {
-    const targetIndex = 3 * TILE_SIZE + 3;
+    const targetIndex = 2 * TILE_SIZE + 1;
     const renderShadow = (sourceName: string | undefined) => {
       const samples = Array.from(
         { length: TILE_SIZE * TILE_SIZE },
         (): SurfaceBlock | undefined => undefined,
       );
       samples[targetIndex] = { name: "minecraft:stone", y: 64 };
-      if (sourceName !== undefined) samples[0] = { name: sourceName, y: 84 };
+      if (sourceName !== undefined) samples[0] = { name: sourceName, y: 66 };
       return renderSurface(samples)[targetIndex * 4]!;
     };
 
