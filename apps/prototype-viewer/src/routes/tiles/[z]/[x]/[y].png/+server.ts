@@ -1,5 +1,5 @@
 import { error } from "@sveltejs/kit";
-import { MAX_NATIVE_ZOOM } from "@mapelix/core";
+import { MAX_NATIVE_ZOOM } from "@mapelix/prototype";
 
 import { renderStratosTile } from "$lib/server/stratos";
 

@@ -106,7 +106,7 @@ ba3ec6a3667a02ea0b1a90ee82418975ae0d3557277a1ca25a0625b3b3d6bb60
 The existing structural comparison command was:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:compare \
+pnpm --filter @mapelix/prototype diagnose:compare \
   .local/tools/unmined-world-repair-20260817/unmined-classic-z2-x-32-y-49.png \
   .local/tools/unmined-world-repair-20260817/published-z2-x-32-y-49.jpeg \
   .local/tools/unmined-world-repair-20260817/repaired-vs-published-edges.png \

@@ -1,11 +1,11 @@
-# `@mapelix/core`
+# `@mapelix/prototype`
 
 This package is the Mapelix prototype module. It is pure TypeScript and has no native image or LevelDB dependency.
 
 The Node interface is small:
 
 ```ts
-import { openBedrockWorld, writeLeafletTile } from "@mapelix/core";
+import { openBedrockWorld, writeLeafletTile } from "@mapelix/prototype";
 
 const world = await openBedrockWorld({
   directory: "/srv/amelix/world",
@@ -39,7 +39,7 @@ For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file a
 Measure aligned per-block material colors against a lossless, shadowless oracle:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:color \
+pnpm --filter @mapelix/prototype diagnose:color \
   path/to/mapelix-shadowless.png path/to/unmined-shadowless.png \
   /tmp/color-error.png 4 -32 -49 /tmp/color-report.json /tmp/surface.json
 ```
@@ -64,7 +64,7 @@ MAPELIX_DIAGNOSTIC_WORLD=/path/to/world \
 MAPELIX_DIAGNOSTIC_OUTPUT=/tmp/mapelix-diagnostics \
 MAPELIX_DIAGNOSTIC_LABEL=palette-v10 \
 MAPELIX_DIAGNOSTIC_TILES='[{"z":2,"x":-32,"y":-49}]' \
-pnpm --filter @mapelix/core diagnose:render
+pnpm --filter @mapelix/prototype diagnose:render
 ```
 
 Pass more coordinate objects in the JSON array to reuse the same in-memory
@@ -73,7 +73,7 @@ index. The command reports index time, tile time, process memory, and peak RSS.
 Compare cast shadows independently from block colors and local contours:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:shadows \
+pnpm --filter @mapelix/prototype diagnose:shadows \
   mapelix.png mapelix-shadowless.png unmined.png unmined-shadowless.png \
   /tmp/shadow-overlay.png 4 -32 -49 /tmp/shadow-report.json /tmp/surface.json
 ```
@@ -84,12 +84,12 @@ recall, F1, loss correlation, and the worst receiver XYZ/subpixel samples.
 
 ## Visual regression suite
 
-The package owns eight lossless Amelix/uNmINeD comparison scenes under
+The package owns ten lossless Amelix/uNmINeD comparison scenes under
 `test/visual-regression`. They preserve structure, per-block color, shadow,
 alignment, and XYZ diagnostics for the renderer rewrite:
 
 ```sh
-pnpm --filter @mapelix/core test:visual
+pnpm --filter @mapelix/prototype test:visual
 ```
 
 The default run verifies the committed final prototype baseline. Set

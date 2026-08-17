@@ -173,7 +173,7 @@ not support applying a global sharpen or block grid.
 Generate the metrics and overlay with:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:compare \
+pnpm --filter @mapelix/prototype diagnose:compare \
   path/to/mapelix.png \
   path/to/unmined.jpeg \
   /tmp/mapelix-unmined-edges.png \

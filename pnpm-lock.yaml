@@ -12,11 +12,11 @@ importers:
         specifier: 2.10.3
         version: 2.10.3
 
-  apps/stratos-viewer:
+  apps/prototype-viewer:
     dependencies:
-      '@mapelix/core':
+      '@mapelix/prototype':
         specifier: workspace:*
-        version: link:../../packages/mapelix
+        version: link:../../packages/mapelix-prototype
       leaflet:
         specifier: 1.9.4
         version: 1.9.4
@@ -58,11 +58,11 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.10.13)
 
-  apps/visual-check:
+  apps/prototype-visual-check:
     dependencies:
-      '@mapelix/core':
+      '@mapelix/prototype':
         specifier: workspace:*
-        version: link:../../packages/mapelix
+        version: link:../../packages/mapelix-prototype
     devDependencies:
       '@playwright/test':
         specifier: 1.60.0
@@ -83,7 +83,7 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/mapelix:
+  packages/mapelix-prototype:
     dependencies:
       pako:
         specifier: 2.1.0

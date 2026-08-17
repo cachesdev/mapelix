@@ -3,7 +3,7 @@
 **Selected:** 2026-08-17. This repeatable suite compares Mapelix with uNmINeD
 across more than Forest's Town. Its lossless oracle, final prototype baseline,
 surface manifests, thresholds, and runner live in
-`packages/mapelix/test/visual-regression`.
+`packages/mapelix-prototype/test/visual-regression`.
 
 ## Baseline and alignment
 
@@ -54,7 +54,7 @@ comparison.
 Run the ten committed prototype comparisons:
 
 ```sh
-pnpm --filter @mapelix/core test:visual
+pnpm --filter @mapelix/prototype test:visual
 ```
 
 To evaluate a new implementation from the private Amelix world, set
@@ -64,7 +64,7 @@ applies the same structure, per-block color, shadow, alignment, and XYZ checks:
 ```sh
 MAPELIX_VISUAL_WORLD='/path/to/Amelix SMP' \
 MAPELIX_VISUAL_OUTPUT=/tmp/mapelix-visual-regression \
-pnpm --filter @mapelix/core test:visual
+pnpm --filter @mapelix/prototype test:visual
 ```
 
 The large world, uNmINeD binary, decompiler, and reconstructed database remain
@@ -94,7 +94,7 @@ Render the identical bounds with Mapelix and compare the two lossless PNGs.
 The normal structural diagnostic is:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:compare \
+pnpm --filter @mapelix/prototype diagnose:compare \
   /tmp/amelix-<ID>-mapelix-z2.png \
   /tmp/amelix-<ID>-unmined-z2.png \
   /tmp/amelix-<ID>-edges.png \

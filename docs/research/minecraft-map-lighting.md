@@ -101,7 +101,7 @@ top-down map: it constructs a separate shaded micro-image for every block.
 per-block noise when `pixelsPerBlock > 1`; `calculateShade()` also contains a
 per-cell `stepRelief` term. Those operations make a regular 8x8 block lattice
 visible even if all samples have equal height. See
-[`render.ts`](../../packages/mapelix/src/render.ts).
+[`render.ts`](../../packages/mapelix-prototype/src/render.ts).
 
 Recommended implementation order:
 

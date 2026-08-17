@@ -16,7 +16,7 @@ Run the tracked benchmark from the repository root:
 MAPELIX_BENCH_WORLD=/tmp/mapelix-stratos-tmbcraft-pruned-v2 \
 MAPELIX_BENCH_WORKERS=1 \
 MAPELIX_BENCH_TILES=1 \
-pnpm turbo run benchmark --filter @mapelix/core
+pnpm turbo run benchmark --filter @mapelix/prototype
 ```
 
 Compare the same hotspot across native zooms with:
@@ -24,26 +24,26 @@ Compare the same hotspot across native zooms with:
 ```sh
 MAPELIX_BENCH_WORLD=/tmp/mapelix-stratos-tmbcraft-pruned-v2 \
 MAPELIX_BENCH_WORKERS=1 \
-pnpm --filter @mapelix/core benchmark:zoom
+pnpm --filter @mapelix/prototype benchmark:zoom
 ```
 
 Measure periodic block-grid contrast in a rendered tile with:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:grid \
+pnpm --filter @mapelix/prototype diagnose:grid \
   http://127.0.0.1:5173/tiles/3/-93/-83.png 8 200 200 16
 ```
 
 Measure Sobel and Laplacian edge energy with:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:sharpness path/to/tile.png
+pnpm --filter @mapelix/prototype diagnose:sharpness path/to/tile.png
 ```
 
 Compare an aligned Mapelix PNG with a PNG or JPEG reference renderer:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:compare \
+pnpm --filter @mapelix/prototype diagnose:compare \
   path/to/mapelix.png path/to/reference.jpeg /tmp/edge-overlay.png 4
 ```
 
@@ -56,7 +56,7 @@ Compare block colors without cast shadows and report the worst world XYZ,
 block name, biome, water depth, and underwater block:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:color \
+pnpm --filter @mapelix/prototype diagnose:color \
   mapelix-shadowless.png unmined-shadowless.png color-error.png \
   4 -32 -49 color-report.json surface.json
 ```
@@ -64,7 +64,7 @@ pnpm --filter @mapelix/core diagnose:color \
 Compare cast shadows independently from material colors and local contours:
 
 ```sh
-pnpm --filter @mapelix/core diagnose:shadows \
+pnpm --filter @mapelix/prototype diagnose:shadows \
   mapelix.png mapelix-shadowless.png unmined.png unmined-shadowless.png \
   shadow-overlay.png 4 -32 -49 shadow-report.json surface.json
 ```
@@ -132,7 +132,7 @@ The committed ten-scene lossless suite also checks snow, coast, dense canopy,
 flat grass, highland legacy grass, a dry biome boundary, a technical block
 array, a redstone array, and a neutral-stone coast. Its oracle, prototype
 baseline, surface manifests, and thresholds are in
-`packages/mapelix/test/visual-regression`.
+`packages/mapelix-prototype/test/visual-regression`.
 The highland scene caught a Bedrock naming edge case: uNmINeD applies its
 ground elevation overlay to legacy `minecraft:grass`, but not modern
 `short_grass` or `tall_grass`. Classifying the legacy name separately reduced
@@ -175,7 +175,7 @@ Record changes here when they fail, regress a metric, or only move cost elsewher
 | Experiment | Observed result | Interpretation |
 | --- | --- | --- |
 | Add legacy Data2D biome keys and richer per-pixel shading | One two-worker run moved from 33.90 s / 1.18 GiB peak to 39.05 s / 1.37 GiB peak. The first pair moved from 1.14 s to 1.53 s; the repeated pair stayed near 1.03 s. | The 712 compact biome records cannot explain the extra allocation by volume. Re-run after specializing key classification and index storage. Keep this as a regression signal, not a conclusion. |
-| Bundle `@mapelix/core` into the SvelteKit server | Worker rendering returned HTTP 500 because Vite rewrote the package-relative worker URL without emitting the worker file. | Keep the Node package external in server builds, or publish an explicit worker asset/entry in production packaging. |
+| Bundle `@mapelix/prototype` into the SvelteKit server | Worker rendering returned HTTP 500 because Vite rewrote the package-relative worker URL without emitting the worker file. | Keep the Node package external in server builds, or publish an explicit worker asset/entry in production packaging. |
 | Replace effective-key `Array.from(...).join("")` hex encoding with repeated lookup-table concatenation | Index time regressed from 38.31 s to 51.73 s and peak RSS grew from 1.34 GiB to 1.55 GiB. | V8's repeated string concatenation retained costly intermediate string representations in this workload. Reverted. A binary or numeric key index is the next useful experiment. |
 | Blend each biome-tinted pixel with a direct 5×5 neighbor loop | Repeated two-tile rendering regressed from 0.98 s to 3.23 s and peak RSS grew from 1.34 GiB to 1.60 GiB. | Correct visual behavior, wrong computation shape. Replace repeated style and string-key lookups with one compact tile field and an integral image. |
 | Narrow biome blending and height-independent contour shadows | Two identical two-worker runs measured 1.40 s and 1.18 s for the repeated pair, or 1.43–1.70 tiles/s, with 1.65–1.66 GiB peak RSS. Cold Playwright took 59.7 s versus 58.8 s for terrain-v2. | Performance is neutral within observed run variance. A two-block biome transition, three-block shadow reach, and fixed contour tones materially improved block readability without a measurable end-to-end cost. |

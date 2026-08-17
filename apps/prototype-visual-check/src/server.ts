@@ -6,11 +6,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { openBedrockWorld, writeLeafletTile } from "@mapelix/core";
+import { openBedrockWorld, writeLeafletTile } from "@mapelix/prototype";
 
 const run = promisify(execFile);
 const fixture = fileURLToPath(
-  new URL("../../../packages/mapelix/test/fixtures/2000world.mcworld", import.meta.url),
+  new URL("../../../packages/mapelix-prototype/test/fixtures/2000world.mcworld", import.meta.url),
 );
 const tileRoot = fileURLToPath(new URL("../../../generated-tiles", import.meta.url));
 const tileUrl = "/tiles/0/-1/0.png";

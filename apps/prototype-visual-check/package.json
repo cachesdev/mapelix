@@ -1,5 +1,5 @@
 {
-  "name": "@mapelix/visual-check",
+  "name": "@mapelix/prototype-visual-check",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "transit": "node -e \"\""
   },
   "dependencies": {
-    "@mapelix/core": "workspace:*"
+    "@mapelix/prototype": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

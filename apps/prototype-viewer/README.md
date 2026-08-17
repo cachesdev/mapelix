@@ -9,7 +9,7 @@ when needed:
 ```sh
 MAPELIX_WORLD_DIRECTORY=/path/to/world \
 MAPELIX_RENDER_WORKERS=2 \
-pnpm --filter @mapelix/stratos-viewer dev
+pnpm --filter @mapelix/prototype-viewer dev
 ```
 
 The server renders visible PNG tiles on demand. It stores metadata and generated tiles under

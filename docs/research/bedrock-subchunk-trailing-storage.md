@@ -30,22 +30,22 @@ reading one NBT value without first reading a count.
 ([source](https://github.com/papyrus-mc/papyruscs/blob/fa55835525537164eb06f7662dd8715f12a45c86/Maploader/World/World.cs#L337-L374))
 
 Mapelix already makes the zero-filled 4,096-entry index array correctly, but
-[`decodeStorage`](../../packages/mapelix/src/bedrock/subchunk.ts#L69) returns
+[`decodeStorage`](../../packages/mapelix-prototype/src/bedrock/subchunk.ts#L69) returns
 immediately for zero bits with an empty palette and leaves the NBT unread. After
 the declared two layers have been visited,
-[`decodeSubchunk`](../../packages/mapelix/src/bedrock/subchunk.ts#L150) sees
+[`decodeSubchunk`](../../packages/mapelix-prototype/src/bedrock/subchunk.ts#L150) sees
 those NBT bytes and reports them as trailing data. Thus the message means “the
 declared layers were counted, but the final layer was under-consumed.”
 
 Data3D cannot be that tail. It is a separate LevelDB record (tag 43), and its
 biome palette grammar is different: zero bits has one little-endian `int32`
 biome ID, not an NBT block entry. Mapelix decodes it separately in
-[`decodeData3D`](../../packages/mapelix/src/bedrock/data-3d.ts#L94).
+[`decodeData3D`](../../packages/mapelix-prototype/src/bedrock/data-3d.ts#L94).
 
 ## Synthetic reproduction
 
 A recommended regression in
-[`subchunk.test.ts`](../../packages/mapelix/src/bedrock/subchunk.test.ts) should
+[`subchunk.test.ts`](../../packages/mapelix-prototype/src/bedrock/subchunk.test.ts) should
 construct only these bytes:
 
 1. v9 prefix with `storageCount = 2`;

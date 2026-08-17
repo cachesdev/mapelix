@@ -1,6 +1,10 @@
 # Mapelix
 
-> Prototype: prove that a pure TypeScript module can turn Minecraft Bedrock world data into useful map tiles.
+> Monorepo for the production Mapelix rewrite and its completed TypeScript reference prototype.
+
+The proven implementation is preserved as `@mapelix/prototype`. The production implementation
+will use `@mapelix/core` in this monorepo. The prototype's lossless visual oracle, benchmarks, and
+failed experiments guide that work. Start with [`REWRITE.md`](REWRITE.md).
 
 The first milestone reads a Bedrock world, renders standard 256 by 256 XYZ tiles, and writes PNGs that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
 
@@ -23,11 +27,11 @@ The real-world tests use the system `unzip` command to expand the committed `.mc
 To run the viewer with another copied Bedrock world:
 
 ```sh
-MAPELIX_WORLD_DIRECTORY=/path/to/world pnpm --filter @mapelix/stratos-viewer dev
+MAPELIX_WORLD_DIRECTORY=/path/to/world pnpm --filter @mapelix/prototype-viewer dev
 ```
 
 The server builds a block-subchunk and compact biome index. It does not retain chest inventories, block entities, actors, or other unrelated LevelDB values. The viewer owns a persistent generated-PNG cache so a warm restart can serve an explored region without rebuilding the world index.
 
-See `packages/mapelix/README.md` for the module interface.
+See `packages/mapelix-prototype/README.md` for the module interface.
 
 See `OPTIMIZATIONS.md` for the Stratos benchmark and the transferable performance findings from this prototype.

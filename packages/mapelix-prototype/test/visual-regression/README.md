@@ -15,7 +15,7 @@ Each scene owns five files:
 Run the committed baseline through all CV checks:
 
 ```sh
-pnpm --filter @mapelix/core test:visual
+pnpm --filter @mapelix/prototype test:visual
 ```
 
 Render and test a new implementation against the same oracle:
@@ -23,7 +23,7 @@ Render and test a new implementation against the same oracle:
 ```sh
 MAPELIX_VISUAL_WORLD=/path/to/Amelix\ SMP \
 MAPELIX_VISUAL_OUTPUT=/tmp/mapelix-visual-regression \
-pnpm --filter @mapelix/core test:visual
+pnpm --filter @mapelix/prototype test:visual
 ```
 
 The runner scans the world once, writes candidates outside the worktree by

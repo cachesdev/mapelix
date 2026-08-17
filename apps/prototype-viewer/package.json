@@ -1,5 +1,5 @@
 {
-  "name": "@mapelix/stratos-viewer",
+  "name": "@mapelix/prototype-viewer",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -21,7 +21,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@mapelix/core": "workspace:*",
+    "@mapelix/prototype": "workspace:*",
     "leaflet": "1.9.4"
   },
   "devDependencies": {

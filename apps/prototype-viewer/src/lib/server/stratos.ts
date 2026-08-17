@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { openBedrockWorld, type BedrockWorld, type TileCoverage } from "@mapelix/core";
+import { openBedrockWorld, type BedrockWorld, type TileCoverage } from "@mapelix/prototype";
 
 const defaultWorldDirectory = resolve(
   process.cwd(),

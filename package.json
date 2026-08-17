@@ -22,7 +22,7 @@
     "test": "turbo run test",
     "test:affected": "turbo run test --affected",
     "test:e2e": "turbo run test:e2e",
-    "test:visual": "turbo run test:visual --filter=@mapelix/core",
+    "test:visual": "turbo run test:visual --filter=@mapelix/prototype",
     "test:unit": "turbo run test:unit"
   },
   "devDependencies": {
