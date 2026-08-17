@@ -71,6 +71,10 @@ function storage(
   return result;
 }
 
+function constantStorage(name: string): Uint8Array {
+  return new Uint8Array([0, ...paletteEntry(name)]);
+}
+
 describe("decodeSubchunk", () => {
   it("decodes v8 primary packed indexes and palette names", () => {
     const indexes = Array.from({ length: blockCount }, () => 0);
@@ -92,12 +96,32 @@ describe("decodeSubchunk", () => {
   });
 
   it("uses v9's signed subchunk Y and accepts an explicit dimension", () => {
-    const value = new Uint8Array([9, 1, 0xfc, 0]);
+    const constant = constantStorage("minecraft:air");
+    const value = new Uint8Array(3 + constant.byteLength);
+    value.set([9, 1, 0xfc]);
+    value.set(constant, 3);
     const decoded = decodeSubchunk(keyFor(-4, 1), value);
 
     expect(decoded).toMatchObject({ version: 9, y: -4, key: { dimension: 1, y: -4 } });
-    expect(decoded?.primary).toMatchObject({ bitsPerBlock: 0, palette: [] });
+    expect(decoded?.primary).toMatchObject({ bitsPerBlock: 0, palette: ["minecraft:air"] });
     expect(decoded?.primary.indexes).toHaveLength(blockCount);
+  });
+
+  it("decodes a zero-bit auxiliary storage's implicit one-entry palette", () => {
+    const primary = storage(2, [], ["minecraft:air"]);
+    const auxiliary = constantStorage("minecraft:water");
+    const value = new Uint8Array(3 + primary.byteLength + auxiliary.byteLength);
+    value.set([9, 2, 0xfc]);
+    value.set(primary, 3);
+    value.set(auxiliary, 3 + primary.byteLength);
+
+    const decoded = decodeSubchunk(keyFor(-4), value);
+
+    expect(decoded?.storages[1]).toMatchObject({
+      bitsPerBlock: 0,
+      palette: ["minecraft:water"],
+    });
+    expect(decoded?.storages[1]?.indexes).toEqual(new Uint16Array(blockCount));
   });
 
   it("reports unsupported versions clearly", () => {

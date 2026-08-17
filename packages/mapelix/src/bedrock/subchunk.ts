@@ -81,10 +81,20 @@ function decodeStorage(
   const bitsPerBlock = header >>> 1;
   const packed = decodeIndexes(bytes, offset + 1, bitsPerBlock);
   if (bitsPerBlock === 0) {
-    return {
-      storage: { bitsPerBlock, palette: [], indexes: packed.indexes },
-      nextOffset: packed.nextOffset,
-    };
+    try {
+      const entry = readLittleEndianNbtCompound(bytes, packed.nextOffset);
+      return {
+        storage: {
+          bitsPerBlock,
+          palette: [blockNameFromPaletteEntry(entry)],
+          indexes: packed.indexes,
+        },
+        nextOffset: entry.nextOffset,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw malformed(`invalid constant palette entry: ${message}`);
+    }
   }
 
   const paletteLength = readUint32LittleEndian(bytes, packed.nextOffset);
