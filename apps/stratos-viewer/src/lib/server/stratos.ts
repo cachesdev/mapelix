@@ -4,10 +4,18 @@ import { dirname, join } from "node:path";
 
 import { openBedrockWorld, type BedrockWorld, type TileCoverage } from "@mapelix/core";
 
-const defaultWorldDirectory = "/tmp/mapelix-stratos-tmbcraft-pruned-v2";
-const worldDirectory = process.env.STRATOS_WORLD_DIRECTORY ?? defaultWorldDirectory;
-const cacheDirectory = process.env.STRATOS_CACHE_DIRECTORY ?? "/tmp/mapelix-stratos-viewer-cache";
-const renderConcurrency = positiveInteger(process.env.STRATOS_RENDER_WORKERS ?? "2");
+const defaultWorldDirectory = "/home/caches/Repos/.mapelix-worlds/Amelix-8-12-26/Amelix SMP";
+const worldDirectory =
+  process.env.MAPELIX_WORLD_DIRECTORY ??
+  process.env.STRATOS_WORLD_DIRECTORY ??
+  defaultWorldDirectory;
+const cacheDirectory =
+  process.env.MAPELIX_CACHE_DIRECTORY ??
+  process.env.STRATOS_CACHE_DIRECTORY ??
+  "/tmp/mapelix-amelix-viewer-cache";
+const renderConcurrency = positiveInteger(
+  process.env.MAPELIX_RENDER_WORKERS ?? process.env.STRATOS_RENDER_WORKERS ?? "2",
+);
 const cacheFormat = "edge-light-v1";
 
 let worldPromise: Promise<BedrockWorld> | undefined;
@@ -211,7 +219,7 @@ function isFileNotFound(cause: unknown): boolean {
 function positiveInteger(raw: string): number {
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1) {
-    throw new RangeError(`STRATOS_RENDER_WORKERS must be a positive integer, received ${raw}`);
+    throw new RangeError(`MAPELIX_RENDER_WORKERS must be a positive integer, received ${raw}`);
   }
   return value;
 }

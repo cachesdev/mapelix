@@ -26,7 +26,7 @@
 
   let map: LeafletMap | undefined;
   let layer: TileLayer | undefined;
-  let status = $state("Indexing Stratos…");
+  let status = $state("Indexing world…");
   let metadata = $state<WorldMetadata>();
   let pointerX = $state(0);
   let pointerZ = $state(0);
@@ -92,7 +92,7 @@
         status = "Rendering visible tiles…";
       })
       .catch((cause: unknown) => {
-        status = cause instanceof Error ? cause.message : "Could not open Stratos";
+        status = cause instanceof Error ? cause.message : "Could not open world";
       });
 
     return () => {
@@ -127,10 +127,10 @@
 </script>
 
 <svelte:head>
-  <title>Stratos · Mapelix</title>
+  <title>Mapelix Viewer</title>
   <meta
     name="description"
-    content="A prototype browser for the Stratos Minecraft Bedrock world, rendered by Mapelix."
+    content="A prototype browser for Minecraft Bedrock worlds rendered by Mapelix."
   />
 </svelte:head>
 
@@ -140,7 +140,7 @@
       <span class="mark" aria-hidden="true"></span>
       <div>
         <p class="eyebrow">MAPELIX / PROTOTYPE</p>
-        <h1>{metadata?.name ?? "STRATOS"}</h1>
+        <h1>{metadata?.name ?? "WORLD"}</h1>
       </div>
     </div>
 
@@ -151,7 +151,7 @@
   </header>
 
   <main>
-    <div class="map" aria-label="Interactive Stratos world map" {@attach attachMap}></div>
+    <div class="map" aria-label="Interactive Bedrock world map" {@attach attachMap}></div>
 
     <aside class="panel">
       <section>
