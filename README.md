@@ -82,13 +82,19 @@ API and its current boundaries.
 
 ## Run it locally
 
-Mapelix uses Node.js 24 and pnpm 11.
+Mapelix uses [Mise](https://mise.jdx.dev/) to install and select Node.js 24 and pnpm 11. After
+installing Mise, run these commands from the repository root:
 
 ```sh
-pnpm install
-pnpm quality
-pnpm test:visual
+mise install
+mise exec -- pnpm install
+mise exec -- pnpm quality
+mise exec -- pnpm test:visual
 ```
+
+If Mise asks you to trust the project configuration, review `mise.toml` and run `mise trust`. If
+Mise is already activated in your shell, you can omit `mise exec --` and run the pnpm commands
+directly.
 
 The real-world tests use the system `unzip` command to expand the committed `.mcworld` fixture
 into a temporary directory.
