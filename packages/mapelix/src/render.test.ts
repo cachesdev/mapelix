@@ -204,7 +204,7 @@ describe("renderSurface", () => {
     const colors = indexes.map((index) => Array.from(rgba.slice(index * 4, index * 4 + 4)));
 
     expect(colors).toEqual([
-      [44, 94, 170, 255],
+      [44, 95, 172, 255],
       [10, 73, 169, 255],
       [8, 73, 171, 255],
     ]);
@@ -225,6 +225,28 @@ describe("renderSurface", () => {
     ]);
     expect(Array.from(renderSurface(natural, { shadows: false }).slice(0, 4))).toEqual([
       120, 120, 120, 255,
+    ]);
+  });
+
+  it("keeps natural stone neutral while applying elevation lightness", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 63, biomeId: 1 }),
+    );
+
+    expect(Array.from(renderSurface(samples, { shadows: false }).slice(0, 4))).toEqual([
+      126, 126, 126, 255,
+    ]);
+  });
+
+  it("does not apply stone elevation lightness to redstone wire", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name: "minecraft:redstone_wire", y: 112, biomeId: 1 }),
+    );
+
+    expect(Array.from(renderSurface(samples, { shadows: false }).slice(0, 4))).toEqual([
+      216, 38, 38, 255,
     ]);
   });
 

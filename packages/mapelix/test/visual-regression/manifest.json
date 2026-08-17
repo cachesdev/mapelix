@@ -91,6 +91,32 @@
       "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
     },
     {
+      "id": "redstone-array",
+      "x": -47,
+      "y": 1,
+      "purpose": "Redstone circuits, lit pumpkins, obsidian columns, and translucent glass layers.",
+      "minimum": {
+        "edgeF1": 0.97,
+        "tolerantEdgeF1": 0.99,
+        "shadowF1": 0.99,
+        "shadowCorrelation": 0.99
+      },
+      "maximum": { "meanPerceptualColorError": 0.75, "alignmentPixels": 1 }
+    },
+    {
+      "id": "stone-coast",
+      "x": -48,
+      "y": 0,
+      "purpose": "Neutral natural stone, birch foliage, water, and low-relief coastline.",
+      "minimum": {
+        "edgeF1": 0.9,
+        "tolerantEdgeF1": 0.97,
+        "shadowF1": 0.93,
+        "shadowCorrelation": 0.92
+      },
+      "maximum": { "meanPerceptualColorError": 0.7, "alignmentPixels": 1 }
+    },
+    {
       "id": "dry-biome-boundary",
       "x": -14,
       "y": -22,

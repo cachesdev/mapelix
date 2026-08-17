@@ -111,9 +111,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -121,7 +120,15 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
+      "shadowRuns": [
+        { "minY": -41, "maxY": 67, "opacity": 1 },
+        { "minY": -64, "maxY": -45, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 66,
       "shadowRuns": [
         { "minY": -41, "maxY": 66, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
@@ -130,8 +137,7 @@
     },
     {
       "name": "minecraft:grass",
-      "y": 66,
-      "supportY": 65,
+      "y": 65,
       "shadowRuns": [
         { "minY": -41, "maxY": 65, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
@@ -140,20 +146,9 @@
     },
     {
       "name": "minecraft:grass",
-      "y": 65,
-      "supportY": 64,
-      "shadowRuns": [
-        { "minY": -41, "maxY": 64, "opacity": 1 },
-        { "minY": -64, "maxY": -45, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -42, "maxY": 63, "opacity": 1 },
+        { "minY": -42, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -161,9 +156,8 @@
     {
       "name": "minecraft:grass",
       "y": 65,
-      "supportY": 64,
       "shadowRuns": [
-        { "minY": -43, "maxY": 64, "opacity": 1 },
+        { "minY": -43, "maxY": 65, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -171,23 +165,20 @@
     {
       "name": "minecraft:grass",
       "y": 66,
-      "supportY": 65,
-      "shadowRuns": [{ "minY": -64, "maxY": 65, "opacity": 1 }],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 67,
-      "supportY": 66,
       "shadowRuns": [{ "minY": -64, "maxY": 66, "opacity": 1 }],
       "biomeId": 32
     },
     {
       "name": "minecraft:grass",
+      "y": 67,
+      "shadowRuns": [{ "minY": -64, "maxY": 67, "opacity": 1 }],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 25, "maxY": 67, "opacity": 1 },
+        { "minY": 25, "maxY": 68, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -199,9 +190,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 68, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 34, "maxY": 43, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
@@ -218,9 +208,8 @@
     {
       "name": "minecraft:grass",
       "y": 69,
-      "supportY": 68,
       "shadowRuns": [
-        { "minY": 49, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 69, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -238,9 +227,8 @@
     {
       "name": "minecraft:grass",
       "y": 69,
-      "supportY": 68,
       "shadowRuns": [
-        { "minY": 49, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 69, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -779,9 +767,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -789,9 +776,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -799,9 +785,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -809,7 +794,15 @@
     {
       "name": "minecraft:grass",
       "y": 65,
-      "supportY": 64,
+      "shadowRuns": [
+        { "minY": -41, "maxY": 65, "opacity": 1 },
+        { "minY": -64, "maxY": -45, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 64,
       "shadowRuns": [
         { "minY": -41, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
@@ -819,19 +812,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -41, "maxY": 63, "opacity": 1 },
-        { "minY": -64, "maxY": -45, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 64,
-      "supportY": 63,
-      "shadowRuns": [
-        { "minY": -42, "maxY": 63, "opacity": 1 },
+        { "minY": -42, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -839,9 +821,8 @@
     {
       "name": "minecraft:grass",
       "y": 65,
-      "supportY": 64,
       "shadowRuns": [
-        { "minY": -43, "maxY": 64, "opacity": 1 },
+        { "minY": -43, "maxY": 65, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -849,16 +830,14 @@
     {
       "name": "minecraft:grass",
       "y": 65,
-      "supportY": 64,
-      "shadowRuns": [{ "minY": -64, "maxY": 64, "opacity": 1 }],
+      "shadowRuns": [{ "minY": -64, "maxY": 65, "opacity": 1 }],
       "biomeId": 32
     },
     {
       "name": "minecraft:grass",
       "y": 66,
-      "supportY": 65,
       "shadowRuns": [
-        { "minY": 34, "maxY": 65, "opacity": 1 },
+        { "minY": 34, "maxY": 66, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -871,9 +850,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 68, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -892,9 +870,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 68, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -1462,9 +1439,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": -41, "maxY": 67, "opacity": 1 },
+        { "minY": -41, "maxY": 68, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1472,9 +1448,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1482,9 +1457,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1492,9 +1466,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1502,9 +1475,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -41, "maxY": 63, "opacity": 1 },
+        { "minY": -41, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1512,9 +1484,8 @@
     {
       "name": "minecraft:grass",
       "y": 63,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": -42, "maxY": 62, "opacity": 1 },
+        { "minY": -42, "maxY": 63, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1522,9 +1493,8 @@
     {
       "name": "minecraft:grass",
       "y": 63,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": -43, "maxY": 62, "opacity": 1 },
+        { "minY": -43, "maxY": 63, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -1532,16 +1502,14 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
-      "shadowRuns": [{ "minY": -64, "maxY": 63, "opacity": 1 }],
+      "shadowRuns": [{ "minY": -64, "maxY": 64, "opacity": 1 }],
       "biomeId": 32
     },
     {
       "name": "minecraft:grass",
       "y": 65,
-      "supportY": 64,
       "shadowRuns": [
-        { "minY": 34, "maxY": 64, "opacity": 1 },
+        { "minY": 34, "maxY": 65, "opacity": 1 },
         { "minY": 26, "maxY": 26, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
@@ -1555,9 +1523,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 65,
       "shadowRuns": [
-        { "minY": 49, "maxY": 65, "opacity": 1 },
+        { "minY": 68, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 66, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -1576,9 +1544,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 68, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -2177,9 +2144,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": -41, "maxY": 67, "opacity": 1 },
+        { "minY": -41, "maxY": 68, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2187,9 +2153,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -41, "maxY": 66, "opacity": 1 },
+        { "minY": -41, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2197,9 +2162,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2207,9 +2171,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2217,9 +2180,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2227,9 +2189,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -41, "maxY": 63, "opacity": 1 },
+        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": -41, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2237,9 +2199,8 @@
     {
       "name": "minecraft:grass",
       "y": 63,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": -43, "maxY": 62, "opacity": 1 },
+        { "minY": -43, "maxY": 63, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2247,9 +2208,8 @@
     {
       "name": "minecraft:grass",
       "y": 63,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": 25, "maxY": 62, "opacity": 1 },
+        { "minY": 25, "maxY": 63, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -2261,9 +2221,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": 34, "maxY": 63, "opacity": 1 },
+        { "minY": 34, "maxY": 64, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -2278,9 +2237,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 64,
       "shadowRuns": [
-        { "minY": 49, "maxY": 64, "opacity": 1 },
+        { "minY": 68, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 65, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -2298,9 +2257,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 49, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 68, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -2888,9 +2847,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 67, "opacity": 1 },
+        { "minY": -40, "maxY": 68, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2898,7 +2856,15 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
+      "shadowRuns": [
+        { "minY": -40, "maxY": 68, "opacity": 1 },
+        { "minY": -64, "maxY": -44, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 67,
       "shadowRuns": [
         { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
@@ -2908,19 +2874,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
-        { "minY": -64, "maxY": -44, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 67,
-      "supportY": 66,
-      "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2928,9 +2883,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2938,10 +2892,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 66, "maxY": 66, "opacity": 1 },
-        { "minY": -42, "maxY": 63, "opacity": 1 },
+        { "minY": 66, "maxY": 67, "opacity": 1 },
+        { "minY": -42, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -45, "opacity": 1 }
       ],
       "biomeId": 32
@@ -2949,9 +2902,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": 25, "maxY": 62, "opacity": 1 },
+        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 25, "maxY": 63, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -2964,9 +2917,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 61,
       "shadowRuns": [
-        { "minY": 34, "maxY": 61, "opacity": 1 },
+        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 34, "maxY": 62, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -2979,9 +2932,8 @@
     {
       "name": "minecraft:grass",
       "y": 62,
-      "supportY": 61,
       "shadowRuns": [
-        { "minY": 49, "maxY": 61, "opacity": 1 },
+        { "minY": 49, "maxY": 62, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -3000,9 +2952,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": 49, "maxY": 63, "opacity": 1 },
+        { "minY": 68, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 64, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -3021,10 +2973,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 67, "maxY": 67, "opacity": 1 },
-        { "minY": 49, "maxY": 64, "opacity": 1 },
+        { "minY": 67, "maxY": 68, "opacity": 1 },
+        { "minY": 49, "maxY": 65, "opacity": 1 },
         { "minY": 38, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 10, "maxY": 10, "opacity": 1 },
@@ -3037,10 +2988,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 67, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 64, "opacity": 1 },
+        { "minY": 67, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 65, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -3600,7 +3550,15 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
+      "shadowRuns": [
+        { "minY": -40, "maxY": 68, "opacity": 1 },
+        { "minY": -64, "maxY": -44, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 67,
       "shadowRuns": [
         { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
@@ -3610,9 +3568,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -3620,9 +3577,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -3630,19 +3586,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
-        { "minY": -64, "maxY": -44, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 67,
-      "supportY": 66,
-      "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -3652,7 +3597,7 @@
       "y": 79,
       "shadowRuns": [
         { "minY": 77, "maxY": 79, "opacity": 0.6 },
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -3660,10 +3605,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 66, "maxY": 66, "opacity": 1 },
-        { "minY": 34, "maxY": 63, "opacity": 1 },
+        { "minY": 66, "maxY": 67, "opacity": 1 },
+        { "minY": 34, "maxY": 64, "opacity": 1 },
         { "minY": 30, "maxY": 30, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
@@ -3678,10 +3622,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 66, "maxY": 66, "opacity": 1 },
-        { "minY": 49, "maxY": 61, "opacity": 1 },
+        { "minY": 66, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 62, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -3700,9 +3643,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 60,
       "shadowRuns": [
-        { "minY": 49, "maxY": 60, "opacity": 1 },
+        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 61, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -3718,9 +3661,8 @@
     {
       "name": "minecraft:grass",
       "y": 62,
-      "supportY": 61,
       "shadowRuns": [
-        { "minY": 49, "maxY": 61, "opacity": 1 },
+        { "minY": 49, "maxY": 62, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -3740,9 +3682,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 62,
       "shadowRuns": [
-        { "minY": 57, "maxY": 62, "opacity": 1 },
+        { "minY": 68, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 63, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 3, "maxY": 3, "opacity": 1 },
@@ -3754,10 +3696,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 67, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 63, "opacity": 1 },
+        { "minY": 67, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 64, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -3768,9 +3709,8 @@
     {
       "name": "minecraft:grass",
       "y": 69,
-      "supportY": 68,
       "shadowRuns": [
-        { "minY": 57, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 69, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 13, "maxY": 13, "opacity": 1 },
@@ -3783,9 +3723,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 70,
-      "supportY": 68,
+      "supportY": 69,
       "shadowRuns": [
-        { "minY": 57, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 69, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 8, "maxY": 13, "opacity": 1 },
@@ -4318,9 +4258,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -4328,9 +4267,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -4338,9 +4276,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -4348,9 +4285,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -4360,7 +4296,7 @@
       "y": 79,
       "shadowRuns": [
         { "minY": 77, "maxY": 79, "opacity": 0.6 },
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -4385,7 +4321,7 @@
       "y": 79,
       "shadowRuns": [
         { "minY": 77, "maxY": 79, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -4404,10 +4340,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 49, "maxY": 62, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 63, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -4425,10 +4360,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 66, "maxY": 66, "opacity": 1 },
-        { "minY": 49, "maxY": 61, "opacity": 1 },
+        { "minY": 66, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 62, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -4447,9 +4381,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 60,
       "shadowRuns": [
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 52, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 49, "maxY": 51, "opacity": 1 },
         { "minY": 38, "maxY": 48, "opacity": 0.09803921568627451 },
@@ -4462,22 +4396,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 61,
       "shadowRuns": [
-        { "minY": 57, "maxY": 61, "opacity": 1 },
-        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
-        { "minY": 37, "maxY": 37, "opacity": 1 },
-        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
-        { "minY": -64, "maxY": -55, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 68,
-      "supportY": 67,
-      "shadowRuns": [
-        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 68, "maxY": 68, "opacity": 1 },
         { "minY": 57, "maxY": 62, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
@@ -4489,10 +4409,22 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
+        { "minY": 67, "maxY": 68, "opacity": 1 },
         { "minY": 57, "maxY": 63, "opacity": 1 },
+        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
+        { "minY": 37, "maxY": 37, "opacity": 1 },
+        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
+        { "minY": -64, "maxY": -55, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 68,
+      "shadowRuns": [
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 64, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 8, "maxY": 8, "opacity": 1 },
@@ -4504,9 +4436,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 8, "maxY": 13, "opacity": 1 },
@@ -4518,9 +4450,8 @@
     {
       "name": "minecraft:grass",
       "y": 69,
-      "supportY": 68,
       "shadowRuns": [
-        { "minY": 57, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 69, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 38, "maxY": 39, "opacity": 1 },
         { "minY": 31, "maxY": 33, "opacity": 1 },
@@ -5027,9 +4958,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5037,9 +4967,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5047,9 +4976,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5057,9 +4985,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5067,9 +4994,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5079,7 +5005,7 @@
       "y": 79,
       "shadowRuns": [
         { "minY": 77, "maxY": 79, "opacity": 0.6 },
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": -2, "maxY": 21, "opacity": 1 },
         { "minY": -5, "maxY": -4, "opacity": 1 },
         { "minY": -40, "maxY": -8, "opacity": 1 },
@@ -5091,9 +5017,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -5110,9 +5035,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -5131,10 +5055,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 49, "maxY": 61, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 49, "maxY": 62, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -5149,24 +5072,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
-      "shadowRuns": [
-        { "minY": 66, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
-        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
-        { "minY": 37, "maxY": 37, "opacity": 1 },
-        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
-        { "minY": -64, "maxY": -55, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 68,
-      "supportY": 67,
       "shadowRuns": [
         { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -5177,10 +5085,22 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 67, "maxY": 67, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
         { "minY": 57, "maxY": 61, "opacity": 1 },
+        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
+        { "minY": 37, "maxY": 37, "opacity": 1 },
+        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
+        { "minY": -64, "maxY": -55, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 68,
+      "shadowRuns": [
+        { "minY": 67, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 62, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -5191,10 +5111,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 62, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 63, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -5205,10 +5124,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 63, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 64, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 13, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -5221,9 +5139,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 41, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 38, "maxY": 40, "opacity": 1 },
         { "minY": 33, "maxY": 35, "opacity": 1 },
@@ -5237,9 +5155,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 47, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 46, "maxY": 46, "opacity": 1 },
         { "minY": 40, "maxY": 45, "opacity": 0.09803921568627451 },
@@ -5756,9 +5673,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -43, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5766,9 +5682,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5776,9 +5691,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5786,9 +5700,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -5796,9 +5710,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 25, "maxY": 66, "opacity": 1 },
+        { "minY": 25, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": -40, "maxY": 8, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
@@ -5808,9 +5721,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -5825,9 +5737,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -5844,9 +5755,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -5865,9 +5775,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 4, "maxY": 4, "opacity": 1 },
@@ -5880,10 +5789,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 61, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 62, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -5894,10 +5802,9 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -5908,10 +5815,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 59, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 60, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -5922,10 +5828,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 61, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 62, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": -54, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -5936,10 +5841,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 62, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 63, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 38, "maxY": 39, "opacity": 1 },
         { "minY": 13, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -5952,9 +5856,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 39, "maxY": 39, "opacity": 1 },
         { "minY": 33, "maxY": 35, "opacity": 1 },
@@ -5968,9 +5872,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 48, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 46, "maxY": 47, "opacity": 1 },
         { "minY": 41, "maxY": 45, "opacity": 0.09803921568627451 },
@@ -6483,9 +6386,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -43, "opacity": 1 }
       ],
       "biomeId": 32
@@ -6493,9 +6395,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -6503,9 +6404,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -6513,9 +6413,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -6525,7 +6425,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 2, "maxY": 21, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
         { "minY": -5, "maxY": -4, "opacity": 1 },
@@ -6540,7 +6440,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 34, "maxY": 43, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
@@ -6559,7 +6459,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -6576,9 +6476,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -6597,9 +6496,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -6610,9 +6508,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -6623,24 +6520,22 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 64, "maxY": 66, "opacity": 1 },
+        { "minY": 64, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
+        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
+        { "minY": 37, "maxY": 37, "opacity": 1 },
+        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
+        { "minY": -64, "maxY": -55, "opacity": 1 }
+      ],
+      "biomeId": 32
+    },
+    {
+      "name": "minecraft:grass",
+      "y": 67,
+      "shadowRuns": [
+        { "minY": 65, "maxY": 67, "opacity": 1 },
         { "minY": 57, "maxY": 60, "opacity": 1 },
-        { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
-        { "minY": 37, "maxY": 37, "opacity": 1 },
-        { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
-        { "minY": -64, "maxY": -55, "opacity": 1 }
-      ],
-      "biomeId": 32
-    },
-    {
-      "name": "minecraft:grass",
-      "y": 67,
-      "supportY": 66,
-      "shadowRuns": [
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 59, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -6651,10 +6546,10 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 59, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 60, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 39, "opacity": 1 },
         { "minY": -54, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -6665,10 +6560,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 55, "maxY": 60, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 55, "maxY": 61, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 38, "maxY": 39, "opacity": 1 },
         { "minY": 13, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -6681,10 +6575,10 @@
     {
       "name": "minecraft:tallgrass",
       "y": 69,
-      "supportY": 67,
+      "supportY": 68,
       "shadowRuns": [
-        { "minY": 65, "maxY": 67, "opacity": 1 },
-        { "minY": 56, "maxY": 62, "opacity": 1 },
+        { "minY": 65, "maxY": 68, "opacity": 1 },
+        { "minY": 56, "maxY": 63, "opacity": 1 },
         { "minY": 48, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 47, "maxY": 47, "opacity": 1 },
         { "minY": 40, "maxY": 46, "opacity": 0.09803921568627451 },
@@ -6700,9 +6594,8 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 68, "opacity": 1 },
         { "minY": 48, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 46, "maxY": 47, "opacity": 1 },
         { "minY": 40, "maxY": 45, "opacity": 0.09803921568627451 },
@@ -7211,9 +7104,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -43, "opacity": 1 }
       ],
       "biomeId": 32
@@ -7221,9 +7113,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -7231,9 +7123,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -7243,7 +7135,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 25, "maxY": 66, "opacity": 1 },
+        { "minY": 25, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -7259,7 +7151,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 34, "maxY": 43, "opacity": 1 },
         { "minY": 31, "maxY": 31, "opacity": 1 },
@@ -7280,7 +7172,7 @@
       "shadowRuns": [
         { "minY": 73, "maxY": 73, "opacity": 0.6 },
         { "minY": 69, "maxY": 71, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -7299,7 +7191,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -7320,7 +7212,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -7335,9 +7227,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -7348,9 +7239,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": -54, "maxY": -54, "opacity": 0.09803921568627451 },
@@ -7363,8 +7253,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 63, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 63, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 11, "maxY": 11, "opacity": 1 },
@@ -7378,8 +7268,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 64, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 59, "opacity": 1 },
+        { "minY": 64, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 60, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 11, "maxY": 11, "opacity": 1 },
@@ -7393,8 +7283,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 54, "maxY": 59, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 54, "maxY": 60, "opacity": 1 },
         { "minY": 40, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 39, "opacity": 1 },
         { "minY": 9, "maxY": 11, "opacity": 1 },
@@ -7408,8 +7298,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 66, "maxY": 67, "opacity": 1 },
-        { "minY": 53, "maxY": 59, "opacity": 1 },
+        { "minY": 66, "maxY": 68, "opacity": 1 },
+        { "minY": 53, "maxY": 60, "opacity": 1 },
         { "minY": 49, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 48, "opacity": 1 },
         { "minY": 39, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -7425,8 +7315,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 65, "maxY": 67, "opacity": 1 },
-        { "minY": 52, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 68, "opacity": 1 },
+        { "minY": 52, "maxY": 61, "opacity": 1 },
         { "minY": 50, "maxY": 51, "opacity": 0.09803921568627451 },
         { "minY": 47, "maxY": 49, "opacity": 1 },
         { "minY": 39, "maxY": 46, "opacity": 0.09803921568627451 },
@@ -7441,10 +7331,9 @@
     {
       "name": "minecraft:grass",
       "y": 68,
-      "supportY": 67,
       "shadowRuns": [
-        { "minY": 65, "maxY": 67, "opacity": 1 },
-        { "minY": 52, "maxY": 61, "opacity": 1 },
+        { "minY": 65, "maxY": 68, "opacity": 1 },
+        { "minY": 52, "maxY": 62, "opacity": 1 },
         { "minY": 49, "maxY": 51, "opacity": 0.09803921568627451 },
         { "minY": 47, "maxY": 48, "opacity": 1 },
         { "minY": 42, "maxY": 46, "opacity": 0.09803921568627451 },
@@ -7962,9 +7851,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -43, "opacity": 1 }
       ],
       "biomeId": 32
@@ -7972,9 +7860,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -44, "opacity": 1 }
       ],
       "biomeId": 32
@@ -7982,9 +7870,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 25, "maxY": 66, "opacity": 1 },
+        { "minY": 25, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -7999,7 +7886,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -8017,7 +7904,7 @@
       "shadowRuns": [
         { "minY": 73, "maxY": 73, "opacity": 0.6 },
         { "minY": 69, "maxY": 71, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -8059,7 +7946,7 @@
       "shadowRuns": [
         { "minY": 73, "maxY": 73, "opacity": 0.6 },
         { "minY": 69, "maxY": 71, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -8076,7 +7963,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 1 },
@@ -8088,9 +7975,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 38, "opacity": 1 },
         { "minY": 7, "maxY": 13, "opacity": 1 },
@@ -8104,7 +7990,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 1 },
@@ -8118,7 +8004,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 39, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 1 },
@@ -8134,8 +8020,8 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 63, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 63, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 53, "maxY": 54, "opacity": 1 },
         { "minY": 39, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 38, "opacity": 1 },
@@ -8152,8 +8038,8 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 64, "maxY": 66, "opacity": 1 },
-        { "minY": 53, "maxY": 59, "opacity": 1 },
+        { "minY": 64, "maxY": 67, "opacity": 1 },
+        { "minY": 53, "maxY": 60, "opacity": 1 },
         { "minY": 39, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 38, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 1 },
@@ -8169,8 +8055,8 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 55, "maxY": 59, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 55, "maxY": 60, "opacity": 1 },
         { "minY": 49, "maxY": 54, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 48, "opacity": 1 },
         { "minY": 39, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -8186,8 +8072,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 54, "maxY": 56, "opacity": 0.09803921568627451 },
         { "minY": 52, "maxY": 53, "opacity": 1 },
         { "minY": 50, "maxY": 51, "opacity": 0.09803921568627451 },
@@ -8207,8 +8093,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 65, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 54, "maxY": 56, "opacity": 0.09803921568627451 },
         { "minY": 52, "maxY": 53, "opacity": 1 },
         { "minY": 51, "maxY": 51, "opacity": 0.09803921568627451 },
@@ -8734,9 +8620,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": -40, "maxY": 66, "opacity": 1 },
+        { "minY": -40, "maxY": 67, "opacity": 1 },
         { "minY": -64, "maxY": -43, "opacity": 1 }
       ],
       "biomeId": 32
@@ -8744,9 +8629,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 25, "maxY": 66, "opacity": 1 },
+        { "minY": 25, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -8759,9 +8643,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -8778,7 +8662,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -8799,7 +8683,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 43, "opacity": 1 },
         { "minY": 18, "maxY": 21, "opacity": 1 },
@@ -8818,7 +8702,7 @@
       "shadowRuns": [
         { "minY": 73, "maxY": 73, "opacity": 0.6 },
         { "minY": 69, "maxY": 71, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -8837,7 +8721,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 7, "maxY": 13, "opacity": 1 },
@@ -8850,7 +8734,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 1 },
@@ -8861,9 +8745,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 1 },
@@ -8877,7 +8760,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 1 },
@@ -8893,7 +8776,7 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 11, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -8910,7 +8793,7 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 53, "maxY": 54, "opacity": 1 },
         { "minY": 38, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
@@ -8928,8 +8811,8 @@
       "shadowRuns": [
         { "minY": 77, "maxY": 77, "opacity": 0.6 },
         { "minY": 69, "maxY": 75, "opacity": 0.6 },
-        { "minY": 62, "maxY": 66, "opacity": 1 },
-        { "minY": 53, "maxY": 59, "opacity": 1 },
+        { "minY": 62, "maxY": 67, "opacity": 1 },
+        { "minY": 53, "maxY": 60, "opacity": 1 },
         { "minY": 50, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 49, "opacity": 1 },
         { "minY": 38, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -8948,8 +8831,8 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 63, "maxY": 66, "opacity": 1 },
-        { "minY": 56, "maxY": 59, "opacity": 1 },
+        { "minY": 63, "maxY": 67, "opacity": 1 },
+        { "minY": 56, "maxY": 60, "opacity": 1 },
         { "minY": 50, "maxY": 55, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 49, "opacity": 1 },
         { "minY": 38, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -8970,8 +8853,8 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 65, "maxY": 66, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 67, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 50, "maxY": 56, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 49, "opacity": 1 },
         { "minY": 38, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -8988,8 +8871,8 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 65, "maxY": 67, "opacity": 1 },
-        { "minY": 57, "maxY": 60, "opacity": 1 },
+        { "minY": 65, "maxY": 68, "opacity": 1 },
+        { "minY": 57, "maxY": 61, "opacity": 1 },
         { "minY": 50, "maxY": 56, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 49, "opacity": 1 },
         { "minY": 38, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -9512,9 +9395,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 25, "maxY": 66, "opacity": 1 },
+        { "minY": 25, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
@@ -9527,9 +9409,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 2, "maxY": 21, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
         { "minY": -5, "maxY": -5, "opacity": 1 },
@@ -9543,9 +9425,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -9563,9 +9444,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -9585,7 +9466,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -9606,7 +9487,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 51, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 49, "maxY": 50, "opacity": 1 },
         { "minY": 38, "maxY": 48, "opacity": 0.09803921568627451 },
@@ -9622,7 +9503,7 @@
       "y": 70,
       "shadowRuns": [
         { "minY": 70, "maxY": 70, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 11, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -9634,9 +9515,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 11, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -9648,9 +9528,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 13, "maxY": 13, "opacity": 1 },
@@ -9666,7 +9546,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -9684,7 +9564,7 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 37, "maxY": 37, "opacity": 1 },
         { "minY": 11, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -9700,7 +9580,7 @@
       "shadowRuns": [
         { "minY": 77, "maxY": 77, "opacity": 0.6 },
         { "minY": 69, "maxY": 75, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 53, "maxY": 55, "opacity": 1 },
         { "minY": 37, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 35, "maxY": 36, "opacity": 1 },
@@ -9738,8 +9618,8 @@
       "shadowRuns": [
         { "minY": 77, "maxY": 77, "opacity": 0.6 },
         { "minY": 69, "maxY": 75, "opacity": 0.6 },
-        { "minY": 62, "maxY": 66, "opacity": 1 },
-        { "minY": 56, "maxY": 59, "opacity": 1 },
+        { "minY": 62, "maxY": 67, "opacity": 1 },
+        { "minY": 56, "maxY": 60, "opacity": 1 },
         { "minY": 50, "maxY": 55, "opacity": 0.09803921568627451 },
         { "minY": 48, "maxY": 49, "opacity": 1 },
         { "minY": 37, "maxY": 47, "opacity": 0.09803921568627451 },
@@ -10276,9 +10156,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 2, "maxY": 21, "opacity": 1 },
         { "minY": -2, "maxY": 0, "opacity": 1 },
         { "minY": -5, "maxY": -4, "opacity": 1 },
@@ -10291,9 +10171,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 39, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -10311,9 +10190,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -10329,9 +10208,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -10350,9 +10229,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 68,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 52, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 49, "maxY": 51, "opacity": 1 },
         { "minY": 38, "maxY": 48, "opacity": 0.09803921568627451 },
@@ -10366,9 +10245,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10380,9 +10259,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10395,9 +10273,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10410,9 +10287,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 10, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10427,7 +10303,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10446,7 +10322,7 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -10465,7 +10341,7 @@
         { "minY": 74, "maxY": 74, "opacity": 0.6 },
         { "minY": 71, "maxY": 72, "opacity": 0.6 },
         { "minY": 69, "maxY": 69, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 53, "maxY": 55, "opacity": 1 },
         { "minY": 49, "maxY": 52, "opacity": 0.09803921568627451 },
         { "minY": 47, "maxY": 48, "opacity": 1 },
@@ -11043,7 +10919,7 @@
       "y": 79,
       "shadowRuns": [
         { "minY": 79, "maxY": 79, "opacity": 0.6 },
-        { "minY": 34, "maxY": 66, "opacity": 1 },
+        { "minY": 34, "maxY": 67, "opacity": 1 },
         { "minY": 10, "maxY": 21, "opacity": 1 },
         { "minY": 9, "maxY": 9, "opacity": 0.09803921568627451 },
         { "minY": 2, "maxY": 8, "opacity": 1 },
@@ -11059,9 +10935,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 40, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 39, "opacity": 0.09803921568627451 },
@@ -11080,9 +10955,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 49, "maxY": 66, "opacity": 1 },
+        { "minY": 49, "maxY": 67, "opacity": 1 },
         { "minY": 44, "maxY": 48, "opacity": 0.09803921568627451 },
         { "minY": 43, "maxY": 43, "opacity": 1 },
         { "minY": 38, "maxY": 42, "opacity": 0.09803921568627451 },
@@ -11103,9 +10978,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 52, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 49, "maxY": 51, "opacity": 1 },
         { "minY": 38, "maxY": 48, "opacity": 0.09803921568627451 },
@@ -11121,9 +10995,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11135,9 +11008,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11149,9 +11022,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 9, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11164,9 +11036,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 69,
-      "supportY": 66,
+      "supportY": 67,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 8, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11181,9 +11053,8 @@
     {
       "name": "minecraft:grass",
       "y": 67,
-      "supportY": 66,
       "shadowRuns": [
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 8, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11200,7 +11071,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 2, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -11215,7 +11086,7 @@
       "y": 71,
       "shadowRuns": [
         { "minY": 71, "maxY": 71, "opacity": 0.6 },
-        { "minY": 57, "maxY": 66, "opacity": 1 },
+        { "minY": 57, "maxY": 67, "opacity": 1 },
         { "minY": 38, "maxY": 53, "opacity": 0.09803921568627451 },
         { "minY": 36, "maxY": 37, "opacity": 1 },
         { "minY": 2, "maxY": 13, "opacity": 0.09803921568627451 },
@@ -12370,9 +12241,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -1, "maxY": 63, "opacity": 1 },
+        { "minY": -1, "maxY": 64, "opacity": 1 },
         { "minY": -4, "maxY": -2, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": -5, "opacity": 1 }
       ],
@@ -12381,9 +12251,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -7, "maxY": 63, "opacity": 1 },
+        { "minY": -7, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -9, "opacity": 1 }
       ],
       "biomeId": 5
@@ -12391,8 +12260,8 @@
     {
       "name": "minecraft:tallgrass",
       "y": 65,
-      "supportY": 63,
-      "shadowRuns": [{ "minY": -64, "maxY": 63, "opacity": 1 }],
+      "supportY": 64,
+      "shadowRuns": [{ "minY": -64, "maxY": 64, "opacity": 1 }],
       "biomeId": 5
     },
     {
@@ -12400,7 +12269,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -9, "maxY": 63, "opacity": 1 },
+        { "minY": -9, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -15, "opacity": 1 }
       ],
       "biomeId": 5
@@ -12410,7 +12279,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -11, "maxY": 63, "opacity": 1 },
+        { "minY": -11, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -17, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13124,9 +12993,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": 2, "maxY": 63, "opacity": 1 },
+        { "minY": 2, "maxY": 64, "opacity": 1 },
         { "minY": -2, "maxY": 1, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": -3, "opacity": 1 }
       ],
@@ -13135,9 +13003,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -2, "maxY": 63, "opacity": 1 },
+        { "minY": -2, "maxY": 64, "opacity": 1 },
         { "minY": -4, "maxY": -3, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": -5, "opacity": 1 }
       ],
@@ -13146,9 +13013,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 66,
-      "supportY": 63,
+      "supportY": 64,
       "shadowRuns": [
-        { "minY": -7, "maxY": 63, "opacity": 1 },
+        { "minY": -7, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -9, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13156,9 +13023,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -8, "maxY": 63, "opacity": 1 },
+        { "minY": -8, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -12, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13168,7 +13034,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -10, "maxY": 63, "opacity": 1 },
+        { "minY": -10, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -16, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13178,7 +13044,7 @@
       "y": 73,
       "shadowRuns": [
         { "minY": 71, "maxY": 73, "opacity": 0.6 },
-        { "minY": -11, "maxY": 63, "opacity": 1 },
+        { "minY": -11, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -17, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13930,9 +13796,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": 3, "maxY": 63, "opacity": 1 },
+        { "minY": 3, "maxY": 64, "opacity": 1 },
         { "minY": -2, "maxY": 2, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": -3, "opacity": 1 }
       ],
@@ -13941,9 +13806,9 @@
     {
       "name": "minecraft:double_plant",
       "y": 66,
-      "supportY": 63,
+      "supportY": 64,
       "shadowRuns": [
-        { "minY": -3, "maxY": 63, "opacity": 1 },
+        { "minY": -3, "maxY": 64, "opacity": 1 },
         { "minY": -4, "maxY": -4, "opacity": 0.09803921568627451 },
         { "minY": -5, "maxY": -5, "opacity": 1 },
         { "minY": -64, "maxY": -7, "opacity": 1 }
@@ -13953,16 +13818,15 @@
     {
       "name": "minecraft:tallgrass",
       "y": 65,
-      "supportY": 63,
-      "shadowRuns": [{ "minY": -64, "maxY": 63, "opacity": 1 }],
+      "supportY": 64,
+      "shadowRuns": [{ "minY": -64, "maxY": 64, "opacity": 1 }],
       "biomeId": 5
     },
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -9, "maxY": 63, "opacity": 1 },
+        { "minY": -9, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -13, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13972,7 +13836,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -13, "maxY": 63, "opacity": 1 },
+        { "minY": -13, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -17, "opacity": 1 }
       ],
       "biomeId": 5
@@ -13982,7 +13846,7 @@
       "y": 73,
       "shadowRuns": [
         { "minY": 71, "maxY": 73, "opacity": 0.6 },
-        { "minY": -12, "maxY": 63, "opacity": 1 },
+        { "minY": -12, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -18, "opacity": 1 }
       ],
       "biomeId": 5
@@ -14791,9 +14655,8 @@
     {
       "name": "minecraft:grass",
       "y": 64,
-      "supportY": 63,
       "shadowRuns": [
-        { "minY": -12, "maxY": 63, "opacity": 1 },
+        { "minY": -12, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -14, "opacity": 1 }
       ],
       "biomeId": 5
@@ -14803,7 +14666,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -11, "maxY": 63, "opacity": 1 },
+        { "minY": -11, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -17, "opacity": 1 }
       ],
       "biomeId": 32
@@ -14813,7 +14676,7 @@
       "y": 73,
       "shadowRuns": [
         { "minY": 71, "maxY": 73, "opacity": 0.6 },
-        { "minY": -12, "maxY": 63, "opacity": 1 },
+        { "minY": -12, "maxY": 64, "opacity": 1 },
         { "minY": -64, "maxY": -18, "opacity": 1 }
       ],
       "biomeId": 32
@@ -15649,7 +15512,7 @@
       "y": 72,
       "shadowRuns": [
         { "minY": 72, "maxY": 72, "opacity": 0.6 },
-        { "minY": -13, "maxY": 62, "opacity": 1 },
+        { "minY": -13, "maxY": 63, "opacity": 1 },
         { "minY": -64, "maxY": -19, "opacity": 1 }
       ],
       "biomeId": 32
@@ -21952,9 +21815,9 @@
     {
       "name": "minecraft:tallgrass",
       "y": 63,
-      "supportY": 61,
+      "supportY": 62,
       "shadowRuns": [
-        { "minY": 7, "maxY": 61, "opacity": 1 },
+        { "minY": 7, "maxY": 62, "opacity": 1 },
         { "minY": 2, "maxY": 6, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": 1, "opacity": 1 }
       ],
@@ -22724,9 +22587,8 @@
     {
       "name": "minecraft:grass",
       "y": 62,
-      "supportY": 61,
       "shadowRuns": [
-        { "minY": 7, "maxY": 61, "opacity": 1 },
+        { "minY": 7, "maxY": 62, "opacity": 1 },
         { "minY": 2, "maxY": 6, "opacity": 0.09803921568627451 },
         { "minY": -64, "maxY": 1, "opacity": 1 }
       ],

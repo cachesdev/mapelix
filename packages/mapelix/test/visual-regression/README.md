@@ -1,7 +1,7 @@
 # Renderer visual regression suite
 
 This directory preserves the lossless uNmINeD oracle and the final Mapelix
-prototype baseline for eight Amelix scenes. It is test input, not generated
+prototype baseline for ten Amelix scenes. It is test input, not generated
 documentation.
 
 Each scene owns five files:

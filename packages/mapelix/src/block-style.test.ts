@@ -25,6 +25,15 @@ describe("defaultBlockStyle", () => {
     ["minecraft:oxidized_lightning_rod", [82, 172, 139, 255]],
     ["minecraft:reeds", [132, 163, 40, 255]],
     ["minecraft:yellow_terracotta", [169, 154, 96, 255]],
+    ["minecraft:lit_pumpkin", [255, 234, 50, 255]],
+    ["minecraft:obsidian", [13, 9, 23, 255]],
+    ["minecraft:redstone_wire", [216, 38, 38, 255]],
+    ["minecraft:unpowered_repeater", [216, 38, 38, 255]],
+    ["minecraft:powered_comparator", [216, 38, 38, 255]],
+    ["minecraft:dispenser", [216, 38, 38, 255]],
+    ["minecraft:lever", [216, 38, 38, 255]],
+    ["minecraft:sticky_piston", [216, 38, 38, 255]],
+    ["minecraft:stone", [127, 127, 127, 255]],
   ] as const)("matches the uNmINeD base color for %s", (name, expected) => {
     const actual = defaultBlockStyle(name);
     expect([actual.red, actual.green, actual.blue, actual.alpha]).toEqual(expected);
