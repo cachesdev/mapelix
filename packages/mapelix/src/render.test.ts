@@ -31,13 +31,41 @@ describe("renderSurface", () => {
       resolveBlockStyle: () => ({ red: 100, green: 100, blue: 100, alpha: 255 }),
     });
     const reds = Array.from({ length: pixelsPerBlock }, (_, localX) => {
-      const x = 16 * pixelsPerBlock + localX;
+      const x = 17 * pixelsPerBlock + localX;
       const z = 16 * pixelsPerBlock + Math.floor(pixelsPerBlock / 2);
       return rgba[(z * TILE_SIZE + x) * 4]!;
     });
 
-    expect(new Set(reds.slice(0, -1))).toEqual(new Set([100]));
-    expect(reds.at(-1)).toBeGreaterThan(100);
+    expect(reds[0]).toBeGreaterThan(100);
+    expect(new Set(reds.slice(1))).toEqual(new Set([100]));
+  });
+
+  it("stores a shared height contour in exactly one output pixel", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (_, index): SurfaceBlock => ({
+        name: "minecraft:iron_block",
+        y: index % sampleSize < sampleSize / 2 ? 64 : 65,
+      }),
+    );
+
+    const rgba = renderSurface(samples, {
+      resolveBlockStyle: () => ({ red: 100, green: 100, blue: 100, alpha: 255 }),
+    });
+    const boundaryX = (sampleSize / 2) * pixelsPerBlock;
+    const outputZ = 20 * pixelsPerBlock + 2;
+    const reds = Array.from(
+      { length: pixelsPerBlock * 2 },
+      (_, offset) => rgba[(outputZ * TILE_SIZE + boundaryX - pixelsPerBlock + offset) * 4]!,
+    );
+    const changedPixels = reds
+      .map((red, index) => ({ red, index }))
+      .filter(({ red }) => red !== 100);
+
+    expect(changedPixels).toHaveLength(1);
+    expect(changedPixels[0]?.index).toBe(pixelsPerBlock);
   });
 
   it("lights decorative cover from its supporting ground height", () => {
@@ -106,7 +134,7 @@ describe("renderSurface", () => {
     expect(rgba[7]).toBe(255);
   });
 
-  it("blends biome tints only at the two blocks touching a boundary", () => {
+  it("keeps biome tint boundaries discrete", () => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
       (_, index): SurfaceBlock => ({
@@ -122,11 +150,11 @@ describe("renderSurface", () => {
       return `${rgba[pixel]},${rgba[pixel + 1]},${rgba[pixel + 2]}`;
     });
 
-    expect(new Set(colors).size).toBe(4);
+    expect(new Set(colors).size).toBe(2);
     expect(colors[0]).toBe("145,193,85");
     expect(colors.at(-1)).toBe("107,114,54");
-    expect(colors[1]).toBe(colors[0]);
-    expect(colors[4]).toBe(colors[5]);
+    expect(colors.slice(0, 3)).toEqual(Array.from({ length: 3 }, () => colors[0]));
+    expect(colors.slice(3)).toEqual(Array.from({ length: 3 }, () => colors[5]));
   });
 
   it("shifts natural terrain from green toward ochre with altitude", () => {

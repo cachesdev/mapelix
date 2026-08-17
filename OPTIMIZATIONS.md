@@ -68,6 +68,7 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 | Zoom-aware packed-key filtering | 41.46 s | 1× 1.65 s; 2× 0.63 s; 4× 0.37 s; 8× 0.30 s | 1× 1.17 s; 2× 0.61 s; 4× 0.38 s; 8× 0.27 s | 1.27 GiB | Keep every PNG at 256×256, reduce its world bounds at higher zooms, and filter packed keys before worker dispatch. More detailed tiles became faster because they decoded fewer chunks. PNG size also fell from 172.5 KB at 1× to 114.7 KB at 8×. |
 | Remove generated per-block grain and bevels | 42.03 s | 1× 1.41 s; 2× 0.55 s; 4× 0.34 s; 8× 0.15 s | 1× 1.26 s; 2× 0.57 s; 4× 0.26 s; 8× 0.15 s | 1.28 GiB | Keep material color flat and block-sized. Decorative cover uses its supporting ground height and does not cast false terrain shadows. The grid ratio at `(-2950, -2630)` fell from 1.93 to 0; the 8× PNG fell from 114.7 KB to 56.8 KB. These timings include the later-rejected bilinear light field and are retained only as that experiment's performance record. |
 | Output-resolution height normals and shadow rays | 49.22 s | 1× 1.62 s; 2× 0.59 s; 4× 0.35 s; 8× 0.18 s | 1× 1.45 s; 2× 0.61 s; 4× 0.37 s; 8× 0.18 s | 1.27 GiB | Nearest-expand terrain heights, then derive Lambert edge light and directional shadows at output resolution. The flat-area grid ratio stayed 0. Against the rejected blur, dense-tile mean Sobel rose 63%, mean absolute Laplacian rose 135%, and strong-edge pixels rose from 9.6% to 24.3%. |
+| Selective shared-edge contour and discrete biome tint | 89.55 s | 4× 0.33 s | Not measured | 1.52 GiB | At native 4× detail on aligned Amelix tile `(-32,-49)`, storing each height edge in one output pixel raised exact edge F1 from 0.434 to 0.677 and one-pixel-tolerant F1 from 0.701 to 0.885. Reference-edge recall rose from 58.81% to 84.73%, best alignment became `(0,0)`, and PNG size fell from 20.8 KB to 13.2 KB. Discrete biome lookup removes the unsupported spatial blur while keeping an optional blend radius for artistic use. |
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
 
@@ -83,13 +84,14 @@ An early 8×8 pass restarted a brightness gradient and seeded noise inside every
 - Mapelix with eight workers: 88.14 s cold in-memory index, 321.70 ms tile render, 1.53 GiB peak RSS
 - Published oracle: uNmINeD `zoom.2/-4/-5/tile.-32.-49.jpeg`
 
-The geometry in this exact pair aligns. At a Sobel threshold of 80, Mapelix
-has 39.27 mean edge energy and 18.28% strong-edge pixels; uNmINeD has 86.15
-and 38.14%. With one-pixel tolerance, 86.62% of Mapelix edges match uNmINeD,
-while Mapelix recalls 58.81% of uNmINeD edges. This indicates missing local
-structure more than misplaced structure. A global sharpen is not the target:
-the missing reference edges cluster around height faces, cast shadows, and
-small material features.
+The geometry in this exact pair aligns. The first symmetric-normal baseline
+had 39.27 mean Sobel energy, 18.28% strong-edge pixels, and 58.81% reference
+edge recall with one-pixel tolerance. Replacing it with one stored contour per
+shared height edge raised those values to 47.74, 28.83%, and 84.73%. The exact
+edge F1 rose from 0.434 to 0.677; one-pixel-tolerant F1 rose from 0.701 to
+0.885. This confirms that missing local structure was more important than
+misplaced structure. The remaining reference-only edges cluster around cast
+shadows and small material features.
 
 The official uNmINeD 0.20.1 Linux CLI is usable as a local oracle, but it
 rejects this backup before rendering because its manifest references missing

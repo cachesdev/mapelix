@@ -4,6 +4,8 @@ import { TILE_SIZE, type SurfaceSamples } from "./tile.js";
 
 export interface RenderSurfaceOptions {
   readonly resolveBlockStyle?: BlockStyleResolver;
+  /** Optional artistic extension. The uNmINeD-compatible default is no spatial biome blend. */
+  readonly biomeBlendRadius?: number;
 }
 
 export interface RenderSurfaceContext {
@@ -11,7 +13,6 @@ export interface RenderSurfaceContext {
   readonly biomeAt?: (x: number, z: number) => number | undefined;
 }
 
-const BIOME_BLEND_RADIUS = 1;
 const CAST_SHADOW_DISTANCE = 3;
 const CAST_SHADOW_SHADE = 0.76;
 const BIOME_CHANNELS = 11;
@@ -40,8 +41,12 @@ export function renderSurface(
   }
 
   const resolveBlockStyle = options.resolveBlockStyle ?? defaultBlockStyle;
+  const biomeBlendRadius = options.biomeBlendRadius ?? 0;
+  if (!Number.isSafeInteger(biomeBlendRadius) || biomeBlendRadius < 0) {
+    throw new RangeError(`Biome blend radius must be a non-negative integer`);
+  }
   const rgba = new Uint8Array(TILE_SIZE * TILE_SIZE * 4);
-  const biomeTints = createBiomeTintField(samples, context, sampleSize);
+  const biomeTints = createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
 
   for (let z = 0; z < sampleSize; z += 1) {
     for (let x = 0; x < sampleSize; x += 1) {
@@ -71,6 +76,21 @@ export function renderSurface(
 }
 
 function calculateOutputShade(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
+  height: number,
+): number {
+  const relief =
+    pixelsPerBlock === 1
+      ? calculateSinglePixelRelief(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height)
+      : calculateHeightContour(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
+  return relief * castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
+}
+
+function calculateSinglePixelRelief(
   samples: SurfaceSamples,
   sampleSize: number,
   pixelsPerBlock: number,
@@ -115,8 +135,35 @@ function calculateOutputShade(
   const normalLength = Math.hypot(slopeX, 1, slopeZ);
   const light = (-slopeX * -0.45 + 0.78 + -slopeZ * -0.45) / normalLength;
   const hillShade = 1 + (light - 0.78) * 0.62;
-  const relief = clamp(hillShade, 0.68, 1.18);
-  return relief * castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
+  return clamp(hillShade, 0.68, 1.18);
+}
+
+function calculateHeightContour(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
+  height: number,
+): number {
+  let shade = 1;
+  if (outputX % pixelsPerBlock === 0) {
+    shade *= heightStepShade(
+      height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX - 1, outputZ, height),
+    );
+  }
+  if (outputZ % pixelsPerBlock === 0) {
+    shade *= heightStepShade(
+      height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX, outputZ - 1, height),
+    );
+  }
+  return clamp(shade, 1 / 1.3, 1.3);
+}
+
+function heightStepShade(delta: number): number {
+  if (delta > 0) return 1.3;
+  if (delta < 0) return 1 / 1.3;
+  return 1;
 }
 
 function outputHeight(
@@ -198,9 +245,10 @@ function createBiomeTintField(
   samples: SurfaceSamples,
   context: RenderSurfaceContext,
   sampleSize: number,
+  blendRadius: number,
 ): BiomeTintField | undefined {
   if (!samples.some((sample) => sample !== undefined && usesBiomeTint(sample))) return undefined;
-  const extendedSize = sampleSize + BIOME_BLEND_RADIUS * 2;
+  const extendedSize = sampleSize + blendRadius * 2;
   const stride = extendedSize + 1;
   const integral = new Uint32Array(stride * stride * BIOME_CHANNELS);
   const rowSums = new Uint32Array(BIOME_CHANNELS);
@@ -208,13 +256,7 @@ function createBiomeTintField(
   for (let z = 0; z < extendedSize; z += 1) {
     rowSums.fill(0);
     for (let x = 0; x < extendedSize; x += 1) {
-      const biomeId = sampleBiome(
-        samples,
-        sampleSize,
-        x - BIOME_BLEND_RADIUS,
-        z - BIOME_BLEND_RADIUS,
-        context,
-      );
+      const biomeId = sampleBiome(samples, sampleSize, x - blendRadius, z - blendRadius, context);
       if (biomeId !== undefined) addBiomeStyle(rowSums, legacyBiomeStyle(biomeId));
       const cell = ((z + 1) * stride + x + 1) * BIOME_CHANNELS;
       const above = (z * stride + x + 1) * BIOME_CHANNELS;
@@ -226,7 +268,7 @@ function createBiomeTintField(
 
   const colors = new Uint8Array(sampleSize * sampleSize * BLENDED_CHANNELS);
   const valid = new Uint8Array(sampleSize * sampleSize);
-  const windowSize = BIOME_BLEND_RADIUS * 2 + 1;
+  const windowSize = blendRadius * 2 + 1;
   for (let z = 0; z < sampleSize; z += 1) {
     for (let x = 0; x < sampleSize; x += 1) {
       const count = rectangleSum(integral, stride, x, z, windowSize, 0);
