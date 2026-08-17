@@ -60,6 +60,35 @@ describe("openBedrockWorld", () => {
       await rm(worldDirectory, { recursive: true, force: true });
     }
   });
+
+  it("loads shadow input from the neighboring index tile", async () => {
+    const worldDirectory = await mkdtemp(join(tmpdir(), "mapelix-shadow-halo-"));
+    try {
+      const databaseDirectory = join(worldDirectory, "db");
+      await mkdir(databaseDirectory);
+      await writeFile(
+        join(databaseDirectory, "000001.log"),
+        levelDbLog([singleBlockSubchunk(0, 0, 4, 0, 1), singleBlockSubchunk(-1, 0, 5, 15, 0, 1)]),
+      );
+
+      const world = await openBedrockWorld({ directory: worldDirectory });
+      const coordinates = { dimension: "overworld" as const, z: 2, x: 0, y: 0 };
+      const [lit, shadowed] = await Promise.all([
+        world.renderTile(coordinates, { shadows: false }),
+        world.renderTile(coordinates),
+      ]);
+      const receiverOffsets = Array.from(
+        { length: 16 },
+        (_, index) => ((4 + Math.floor(index / 4)) * 256 + (index % 4)) * 4,
+      );
+
+      expect(receiverOffsets.some((offset) => shadowed.rgba[offset] !== lit.rgba[offset])).toBe(
+        true,
+      );
+    } finally {
+      await rm(worldDirectory, { recursive: true, force: true });
+    }
+  });
 });
 
 function int32(value: number): number[] {
@@ -104,9 +133,10 @@ function singleBlockSubchunk(
   subchunkY: number,
   localX: number,
   localZ: number,
+  localY = 15,
 ) {
   const words = new Uint8Array(Math.ceil(4096 / 32) * 4);
-  const blockIndex = localX * 256 + localZ * 16 + 15;
+  const blockIndex = localX * 256 + localZ * 16 + localY;
   words[Math.floor(blockIndex / 8)]! |= 1 << (blockIndex % 8);
   const palette = new Uint8Array([
     10,

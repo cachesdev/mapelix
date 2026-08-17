@@ -75,3 +75,59 @@ test("renders the real Stratos world", async ({ page }) => {
     maxDiffPixelRatio: 0.01,
   });
 });
+
+test("keeps Stratos shadows continuous across native tile boundaries", async ({
+  page,
+  request,
+}) => {
+  const cases = [
+    { axis: "x", zoom: 1, firstX: -24, firstY: -25 },
+    { axis: "x", zoom: 2, firstX: -47, firstY: -49 },
+    { axis: "x", zoom: 3, firstX: -93, firstY: -98 },
+    { axis: "z", zoom: 1, firstX: -24, firstY: -25 },
+    { axis: "z", zoom: 2, firstX: -47, firstY: -49 },
+    { axis: "z", zoom: 3, firstX: -93, firstY: -98 },
+  ] as const;
+
+  for (const seam of cases) {
+    const secondX = seam.firstX + (seam.axis === "x" ? 1 : 0);
+    const secondY = seam.firstY + (seam.axis === "z" ? 1 : 0);
+    const [first, second] = await Promise.all([
+      tileDataUrl(request, seam.zoom, seam.firstX, seam.firstY),
+      tileDataUrl(request, seam.zoom, secondX, secondY),
+    ]);
+    await page.setContent(seamStrip(first, second, seam.axis));
+    await expect(page.locator("#seam")).toHaveScreenshot(
+      `stratos-seam-${seam.axis}-z${seam.zoom}.png`,
+      { animations: "disabled", maxDiffPixels: 0 },
+    );
+  }
+});
+
+async function tileDataUrl(
+  request: import("@playwright/test").APIRequestContext,
+  zoom: number,
+  x: number,
+  y: number,
+): Promise<string> {
+  const response = await request.get(`/tiles/${zoom}/${x}/${y}.png`);
+  expect(response.ok()).toBe(true);
+  return `data:image/png;base64,${(await response.body()).toString("base64")}`;
+}
+
+function seamStrip(first: string, second: string, axis: "x" | "z"): string {
+  const horizontal = axis === "x";
+  const width = horizontal ? 32 : 256;
+  const height = horizontal ? 256 : 32;
+  const flow = horizontal ? "row" : "column";
+  const translate = horizontal ? "translateX(-240px)" : "translateY(-240px)";
+  return `<!doctype html>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: transparent; }
+      #seam { width: ${width}px; height: ${height}px; overflow: hidden; }
+      #tiles { display: flex; flex-direction: ${flow}; transform: ${translate}; }
+      img { display: block; width: 256px; height: 256px; image-rendering: pixelated; flex: none; }
+    </style>
+    <div id="seam"><div id="tiles"><img src="${first}"><img src="${second}"></div></div>`;
+}

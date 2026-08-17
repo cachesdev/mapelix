@@ -19,6 +19,7 @@ function singleBlockSubchunk(
   blockName: string,
   localX = 0,
   localZ = 0,
+  localY = 15,
 ): { key: Uint8Array; value: Uint8Array } {
   const key = new Uint8Array([...int32(chunkX), ...int32(chunkZ), 0x2f, subchunkY & 0xff]);
   const words = new Uint8Array(Math.ceil(4096 / 32) * 4);
@@ -34,7 +35,7 @@ function singleBlockSubchunk(
     ...nbtString("name", blockName),
     0,
   ]);
-  const blockIndex = localX * 256 + localZ * 16 + 15;
+  const blockIndex = localX * 256 + localZ * 16 + localY;
   words[Math.floor(blockIndex / 8)]! |= 1 << (blockIndex % 8);
   return {
     key,
@@ -232,6 +233,46 @@ describe("createBedrockWorld", () => {
     expect(colors).toEqual(new Set(["54,112,58,255"]));
     expect(tile.rgba[(4 * 256 + 4) * 4 + 3]).toBe(0);
   });
+
+  it.each([
+    { axis: "X", zoom: 1, receiverX: 0, receiverZ: 1, occluderX: -1, occluderZ: 0 },
+    { axis: "X", zoom: 2, receiverX: 0, receiverZ: 1, occluderX: -1, occluderZ: 0 },
+    { axis: "X", zoom: 3, receiverX: 0, receiverZ: 1, occluderX: -1, occluderZ: 0 },
+    { axis: "Z", zoom: 1, receiverX: 1, receiverZ: 0, occluderX: 0, occluderZ: -1 },
+    { axis: "Z", zoom: 2, receiverX: 1, receiverZ: 0, occluderX: 0, occluderZ: -1 },
+    { axis: "Z", zoom: 3, receiverX: 1, receiverZ: 0, occluderX: 0, occluderZ: -1 },
+  ])(
+    "casts a shadow across the $axis native tile boundary at zoom $zoom",
+    async ({ zoom, receiverX, receiverZ, occluderX, occluderZ }) => {
+      const world = createBedrockWorld([
+        singleBlockSubchunk(0, 0, 4, "minecraft:stone", receiverX, receiverZ),
+        singleBlockSubchunk(
+          Math.floor(occluderX / 16),
+          Math.floor(occluderZ / 16),
+          5,
+          "minecraft:stone",
+          (occluderX + 16) % 16,
+          (occluderZ + 16) % 16,
+          1,
+        ),
+      ]);
+
+      const coordinates = { dimension: "overworld" as const, z: zoom, x: 0, y: 0 };
+      const [lit, shadowed] = await Promise.all([
+        world.renderTile(coordinates, { shadows: false }),
+        world.renderTile(coordinates),
+      ]);
+      const pixelsPerBlock = 2 ** zoom;
+      const receiverRed = (tile: typeof lit) =>
+        Array.from({ length: pixelsPerBlock * pixelsPerBlock }, (_, index) => {
+          const pixelX = receiverX * pixelsPerBlock + (index % pixelsPerBlock);
+          const pixelZ = receiverZ * pixelsPerBlock + Math.floor(index / pixelsPerBlock);
+          return tile.rgba[(pixelZ * 256 + pixelX) * 4];
+        });
+
+      expect(receiverRed(shadowed)).not.toEqual(receiverRed(lit));
+    },
+  );
 
   it("does not let decorative cover alter its neighbor's terrain lighting", async () => {
     const plain = createBedrockWorld([flatGroundSubchunk(false)]);

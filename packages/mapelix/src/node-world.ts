@@ -24,7 +24,12 @@ import {
   type RenderedTile,
   type TileCoordinates,
 } from "./tile.js";
-import type { BedrockWorld, RenderTileOptions, TileCoverage } from "./world.js";
+import {
+  tileInputBounds,
+  type BedrockWorld,
+  type RenderTileOptions,
+  type TileCoverage,
+} from "./world.js";
 import type { EffectiveBedrockRecord } from "./world.js";
 
 export interface BedrockWorldDirectory {
@@ -109,7 +114,7 @@ class IndexedBedrockWorld implements BedrockWorld {
   }
 
   renderTile(coordinates: TileCoordinates, options: RenderTileOptions = {}): Promise<RenderedTile> {
-    const job = this.createRenderJob(coordinates);
+    const job = this.createRenderJob(coordinates, options);
     if (this.workerPool !== undefined && Object.keys(options).length === 0) {
       return this.workerPool.render(job);
     }
@@ -139,13 +144,17 @@ class IndexedBedrockWorld implements BedrockWorld {
     return coverage;
   }
 
-  private createRenderJob(coordinates: TileCoordinates): IndexedTileRenderJob {
+  private createRenderJob(
+    coordinates: TileCoordinates,
+    options: RenderTileOptions,
+  ): IndexedTileRenderJob {
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const bounds = tileBounds(coordinates);
+    const inputBounds = tileInputBounds(coordinates, options.shadows !== false);
     const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
     const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
-    const tile = this.tiles.get(indexTileKey(dimension, storageTileX, storageTileY));
     const biomeRecords: EffectiveBedrockRecord[] = [];
+    const sourceGroups = new Map<string, PackedKeyGroup[]>();
 
     for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
       for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
@@ -156,11 +165,25 @@ class IndexedBedrockWorld implements BedrockWorld {
       }
     }
 
+    const minInputTileX = floorDiv(inputBounds.minX, TILE_SIZE);
+    const minInputTileY = floorDiv(inputBounds.minZ, TILE_SIZE);
+    const maxInputTileX = floorDiv(inputBounds.maxX - 1, TILE_SIZE);
+    const maxInputTileY = floorDiv(inputBounds.maxZ - 1, TILE_SIZE);
+    for (let inputTileY = minInputTileY; inputTileY <= maxInputTileY; inputTileY += 1) {
+      for (let inputTileX = minInputTileX; inputTileX <= maxInputTileX; inputTileX += 1) {
+        const inputTile = this.tiles.get(indexTileKey(dimension, inputTileX, inputTileY));
+        for (const source of filterSources(inputTile?.sources ?? [], inputBounds)) {
+          const groups = sourceGroups.get(source.name) ?? [];
+          groups.push(...source.keyGroups);
+          sourceGroups.set(source.name, groups);
+        }
+      }
+    }
+
     return {
       coordinates,
       databaseDirectory: this.databaseDirectory,
-      sources:
-        coordinates.z === 0 ? (tile?.sources ?? []) : filterSources(tile?.sources ?? [], bounds),
+      sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
       biomeRecords,
     };
   }

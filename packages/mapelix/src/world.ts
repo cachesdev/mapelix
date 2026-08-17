@@ -16,6 +16,7 @@ import {
   floorDiv,
   tileBlockSpan,
   tileBounds,
+  type BlockBounds,
   type Dimension,
   type RenderedTile,
   type ShadowOpacityRun,
@@ -48,6 +49,9 @@ const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
   "the-end": 2,
 };
 
+/** uNmINeD-compatible horizontal input halo for the default 3D shadow pass. */
+export const SHADOW_RENDER_HALO = 256;
+
 class RecordBedrockWorld implements BedrockWorld {
   readonly tileRecords = new Map<string, EffectiveBedrockRecord[]>();
 
@@ -77,7 +81,7 @@ class RecordBedrockWorld implements BedrockWorld {
     const biome3DChunks = new Map<number, Map<number, DecodedData3D>>();
     const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
     const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
-    const records = this.tileRecords.get(tileRecordKey(dimension, storageTileX, storageTileY));
+    const inputBounds = tileInputBounds(coordinates, options.shadows !== false);
 
     for (let tileOffsetY = -1; tileOffsetY <= 1; tileOffsetY += 1) {
       for (let tileOffsetX = -1; tileOffsetX <= 1; tileOffsetX += 1) {
@@ -98,36 +102,43 @@ class RecordBedrockWorld implements BedrockWorld {
       }
     }
 
-    for (const record of records ?? []) {
-      const mapKey = classifyMapRecordKey(record.key);
-      if (mapKey?.tag === DATA_2D_TAG || mapKey?.tag === DATA_3D_TAG) {
-        continue;
-      }
-      const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
-      if (
-        key === undefined ||
-        key.dimension !== dimension ||
-        key.x * 16 < bounds.minX ||
-        key.x * 16 >= bounds.maxX ||
-        key.z * 16 < bounds.minZ ||
-        key.z * 16 >= bounds.maxZ
-      ) {
-        continue;
-      }
+    const minStorageTileX = floorDiv(inputBounds.minX, TILE_SIZE);
+    const minStorageTileY = floorDiv(inputBounds.minZ, TILE_SIZE);
+    const maxStorageTileX = floorDiv(inputBounds.maxX - 1, TILE_SIZE);
+    const maxStorageTileY = floorDiv(inputBounds.maxZ - 1, TILE_SIZE);
+    for (let inputTileY = minStorageTileY; inputTileY <= maxStorageTileY; inputTileY += 1) {
+      for (let inputTileX = minStorageTileX; inputTileX <= maxStorageTileX; inputTileX += 1) {
+        const records = this.tileRecords.get(tileRecordKey(dimension, inputTileX, inputTileY));
+        for (const record of records ?? []) {
+          const mapKey = classifyMapRecordKey(record.key);
+          if (mapKey?.tag === DATA_2D_TAG || mapKey?.tag === DATA_3D_TAG) continue;
+          const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
+          if (
+            key === undefined ||
+            key.dimension !== dimension ||
+            key.x * 16 < inputBounds.minX ||
+            key.x * 16 >= inputBounds.maxX ||
+            key.z * 16 < inputBounds.minZ ||
+            key.z * 16 >= inputBounds.maxZ
+          ) {
+            continue;
+          }
 
-      const subchunk = decodeSubchunk(record.key, record.value);
-      if (subchunk === undefined) {
-        continue;
+          const subchunk = decodeSubchunk(record.key, record.value);
+          if (subchunk === undefined) continue;
+          const chunkKey = `${key.x},${key.z}`;
+          const group = chunks.get(chunkKey) ?? [];
+          group.push(subchunk);
+          chunks.set(chunkKey, group);
+        }
       }
-      const chunkKey = `${key.x},${key.z}`;
-      const group = chunks.get(chunkKey) ?? [];
-      group.push(subchunk);
-      chunks.set(chunkKey, group);
     }
 
     const blockSpan = tileBlockSpan(coordinates.z);
-    const samples = Array.from(
-      { length: blockSpan * blockSpan },
+    const inputWidth = inputBounds.maxX - inputBounds.minX;
+    const inputHeight = inputBounds.maxZ - inputBounds.minZ;
+    const inputSamples = Array.from(
+      { length: inputWidth * inputHeight },
       (): SurfaceBlock | undefined => undefined,
     );
     for (const subchunks of chunks.values()) {
@@ -137,10 +148,11 @@ class RecordBedrockWorld implements BedrockWorld {
         continue;
       }
       writeChunkSurface(
-        samples,
-        blockSpan,
-        bounds.minX,
-        bounds.minZ,
+        inputSamples,
+        inputWidth,
+        inputHeight,
+        inputBounds.minX,
+        inputBounds.minZ,
         key.x,
         key.z,
         subchunks,
@@ -149,8 +161,33 @@ class RecordBedrockWorld implements BedrockWorld {
       );
     }
 
+    const samples = Array.from(
+      { length: blockSpan * blockSpan },
+      (_, index): SurfaceBlock | undefined => {
+        const x = index % blockSpan;
+        const z = Math.floor(index / blockSpan);
+        return inputSamples[
+          (bounds.minZ + z - inputBounds.minZ) * inputWidth + (bounds.minX + x - inputBounds.minX)
+        ];
+      },
+    );
+    let maximumHeight = Number.NEGATIVE_INFINITY;
+    for (const sample of inputSamples) {
+      if (sample !== undefined)
+        maximumHeight = Math.max(maximumHeight, sample.supportY ?? sample.y);
+    }
+
     const rgba = renderSurface(samples, options, {
       biomeAt: (x, z) => biomeAt(biomeChunks, bounds.minX + x, bounds.minZ + z),
+      sampleAt: (x, z) => {
+        const inputX = bounds.minX + x - inputBounds.minX;
+        const inputZ = bounds.minZ + z - inputBounds.minZ;
+        if (inputX < 0 || inputX >= inputWidth || inputZ < 0 || inputZ >= inputHeight) {
+          return undefined;
+        }
+        return inputSamples[inputZ * inputWidth + inputX];
+      },
+      maximumHeight,
     });
     return {
       coordinates,
@@ -218,9 +255,21 @@ export function createBedrockWorld(records: Iterable<EffectiveBedrockRecord>): B
   return new RecordBedrockWorld(records);
 }
 
+export function tileInputBounds(coordinates: TileCoordinates, shadows: boolean): BlockBounds {
+  const bounds = tileBounds(coordinates);
+  const negativeHalo = shadows ? SHADOW_RENDER_HALO : 1;
+  return {
+    minX: bounds.minX - negativeHalo,
+    minZ: bounds.minZ - negativeHalo,
+    maxX: bounds.maxX + 1,
+    maxZ: bounds.maxZ + 1,
+  };
+}
+
 function writeChunkSurface(
   samples: Array<SurfaceBlock | undefined>,
-  sampleSize: number,
+  sampleWidth: number,
+  sampleHeight: number,
   tileMinX: number,
   tileMinZ: number,
   chunkX: number,
@@ -241,13 +290,13 @@ function writeChunkSurface(
       }
       const pixelX = chunkX * 16 + localX - tileMinX;
       const pixelZ = chunkZ * 16 + localZ - tileMinZ;
-      if (pixelX < 0 || pixelX >= sampleSize || pixelZ < 0 || pixelZ >= sampleSize) continue;
+      if (pixelX < 0 || pixelX >= sampleWidth || pixelZ < 0 || pixelZ >= sampleHeight) continue;
       const biomeId =
         (biomes3D === undefined
           ? undefined
           : data3DBiomeAt(biomes3D, biomeSectionYs, localX, surface.y, localZ)) ??
         (biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ));
-      samples[pixelZ * sampleSize + pixelX] =
+      samples[pixelZ * sampleWidth + pixelX] =
         biomeId === undefined ? surface : { ...surface, biomeId };
     }
   }

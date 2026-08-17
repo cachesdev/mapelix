@@ -20,6 +20,10 @@ export interface RenderSurfaceOptions {
 export interface RenderSurfaceContext {
   /** Returns a biome ID outside the current tile for seam-free tint blending. */
   readonly biomeAt?: (x: number, z: number) => number | undefined;
+  /** Returns a surface block at tile-relative block coordinates, including the render halo. */
+  readonly sampleAt?: (x: number, z: number) => SurfaceSamples[number];
+  /** Maximum terrain height in the tile and its shadow halo. */
+  readonly maximumHeight?: number;
 }
 
 const SHADOW_MINIMUM_LIGHT = 0.6;
@@ -63,7 +67,7 @@ export function renderSurface(
     biomeBlendRadius === 0
       ? undefined
       : createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
-  const maximumHeight = maximumTerrainHeight(samples);
+  const maximumHeight = context.maximumHeight ?? maximumTerrainHeight(samples);
 
   for (let z = 0; z < sampleSize; z += 1) {
     for (let x = 0; x < sampleSize; x += 1) {
@@ -85,6 +89,7 @@ export function renderSurface(
       writeSurfaceBlock(
         rgba,
         samples,
+        context,
         sampleSize,
         pixelsPerBlock,
         maximumHeight,
@@ -112,6 +117,7 @@ function memoizeBlockStyle(resolve: BlockStyleResolver): BlockStyleResolver {
 
 function calculateOutputShade(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
@@ -122,9 +128,18 @@ function calculateOutputShade(
   const height = reliefHeight(sample);
   const relief =
     pixelsPerBlock === 1
-      ? calculateSinglePixelRelief(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height)
+      ? calculateSinglePixelRelief(
+          samples,
+          context,
+          sampleSize,
+          pixelsPerBlock,
+          outputX,
+          outputZ,
+          height,
+        )
       : calculateHeightContour(
           samples,
+          context,
           sampleSize,
           pixelsPerBlock,
           outputX,
@@ -137,6 +152,7 @@ function calculateOutputShade(
 
 function calculateSinglePixelRelief(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
@@ -145,6 +161,7 @@ function calculateSinglePixelRelief(
 ): number {
   const northHeight = outputHeight(
     samples,
+    context,
     sampleSize,
     pixelsPerBlock,
     outputX,
@@ -153,6 +170,7 @@ function calculateSinglePixelRelief(
   );
   const southHeight = outputHeight(
     samples,
+    context,
     sampleSize,
     pixelsPerBlock,
     outputX,
@@ -161,6 +179,7 @@ function calculateSinglePixelRelief(
   );
   const westHeight = outputHeight(
     samples,
+    context,
     sampleSize,
     pixelsPerBlock,
     outputX - 1,
@@ -169,6 +188,7 @@ function calculateSinglePixelRelief(
   );
   const eastHeight = outputHeight(
     samples,
+    context,
     sampleSize,
     pixelsPerBlock,
     outputX + 1,
@@ -185,6 +205,7 @@ function calculateSinglePixelRelief(
 
 function calculateHeightContour(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
@@ -195,13 +216,15 @@ function calculateHeightContour(
   let shade = 1;
   if (outputX % pixelsPerBlock === 0) {
     shade *= heightStepShade(
-      height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX - 1, outputZ, height),
+      height -
+        outputHeight(samples, context, sampleSize, pixelsPerBlock, outputX - 1, outputZ, height),
       sample,
     );
   }
   if (outputZ % pixelsPerBlock === 0) {
     shade *= heightStepShade(
-      height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX, outputZ - 1, height),
+      height -
+        outputHeight(samples, context, sampleSize, pixelsPerBlock, outputX, outputZ - 1, height),
       sample,
     );
   }
@@ -219,13 +242,14 @@ function heightStepShade(delta: number, sample: NonNullable<SurfaceSamples[numbe
 
 function outputHeight(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
   outputZ: number,
   fallback: number,
 ): number {
-  const sample = outputSample(samples, sampleSize, pixelsPerBlock, outputX, outputZ);
+  const sample = outputSample(samples, context, sampleSize, pixelsPerBlock, outputX, outputZ);
   return sample === undefined ? fallback : reliefHeight(sample);
 }
 
@@ -236,6 +260,7 @@ interface ShadowTrace {
 
 function traceOutputShadow(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
@@ -282,7 +307,14 @@ function traceOutputShadow(
       const candidateX = voxelX - (combination & 1 ? 1 : 0);
       const candidateY = voxelY + (combination & 2 ? 1 : 0);
       const candidateZ = voxelZ - (combination & 4 ? 1 : 0);
-      const opacity = shadowOpacityAt(samples, sampleSize, candidateX, candidateY, candidateZ);
+      const opacity = shadowOpacityAt(
+        samples,
+        context,
+        sampleSize,
+        candidateX,
+        candidateY,
+        candidateZ,
+      );
       if (opacity <= 0) continue;
       hit = true;
       if (opacity >= 1) return { gain: SHADOW_MINIMUM_LIGHT, hit };
@@ -304,7 +336,6 @@ function traceOutputShadow(
       voxelZ -= 1;
       nextZ += stepZ;
     }
-    if (voxelX < 0 || voxelX >= sampleSize || voxelZ < 0 || voxelZ >= sampleSize) break;
   }
 
   return {
@@ -315,13 +346,13 @@ function traceOutputShadow(
 
 function shadowOpacityAt(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   x: number,
   y: number,
   z: number,
 ): number {
-  if (x < 0 || x >= sampleSize || z < 0 || z >= sampleSize) return 0;
-  const sample = samples[z * sampleSize + x];
+  const sample = surfaceSampleAt(samples, context, sampleSize, x, z);
   if (sample === undefined) return 0;
   if (sample.shadowRuns !== undefined) {
     for (const run of sample.shadowRuns) {
@@ -352,18 +383,28 @@ function approximatelyEqual(left: number, right: number): boolean {
 
 function outputSample(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
   outputZ: number,
 ): SurfaceSamples[number] {
-  if (outputX < 0 || outputX >= TILE_SIZE || outputZ < 0 || outputZ >= TILE_SIZE) {
-    return undefined;
-  }
   const blockX = Math.floor(outputX / pixelsPerBlock);
   const blockZ = Math.floor(outputZ / pixelsPerBlock);
-  if (blockX >= sampleSize || blockZ >= sampleSize) return undefined;
-  return samples[blockZ * sampleSize + blockX];
+  return surfaceSampleAt(samples, context, sampleSize, blockX, blockZ);
+}
+
+function surfaceSampleAt(
+  samples: SurfaceSamples,
+  context: RenderSurfaceContext,
+  sampleSize: number,
+  blockX: number,
+  blockZ: number,
+): SurfaceSamples[number] {
+  if (blockX >= 0 && blockX < sampleSize && blockZ >= 0 && blockZ < sampleSize) {
+    return samples[blockZ * sampleSize + blockX];
+  }
+  return context.sampleAt?.(blockX, blockZ);
 }
 
 function resolveSurfaceColor(
@@ -684,6 +725,7 @@ function isFoliage(name: string): boolean {
 function writeSurfaceBlock(
   target: Uint8Array,
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   maximumHeight: number,
@@ -697,6 +739,7 @@ function writeSurfaceBlock(
   if (sample === undefined) return;
   const shadowGains = blockShadowGains(
     samples,
+    context,
     sampleSize,
     pixelsPerBlock,
     blockX,
@@ -712,6 +755,7 @@ function writeSurfaceBlock(
       const outputZ = blockZ * pixelsPerBlock + pixelZ;
       const shade = calculateOutputShade(
         samples,
+        context,
         sampleSize,
         pixelsPerBlock,
         outputX,
@@ -726,6 +770,7 @@ function writeSurfaceBlock(
 
 function blockShadowGains(
   samples: SurfaceSamples,
+  context: RenderSurfaceContext,
   sampleSize: number,
   pixelsPerBlock: number,
   blockX: number,
@@ -742,6 +787,7 @@ function blockShadowGains(
   sampleShadowPixels(pixelsPerBlock, (pixelX, pixelZ) => {
     const trace = traceOutputShadow(
       samples,
+      context,
       sampleSize,
       pixelsPerBlock,
       blockX * pixelsPerBlock + pixelX,
