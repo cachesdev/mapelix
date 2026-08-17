@@ -136,6 +136,11 @@ ground elevation overlay to legacy `minecraft:grass`, but not modern
 `short_grass` or `tall_grass`. Classifying the legacy name separately reduced
 mean perceptual error across its 502 affected blocks from `11.60` to `0.33`,
 and reduced whole-tile mean error from `1.79` to `0.41`.
+Using its real terrain Y for relief and shadow receivers, and decoding it as
+opaque terrain, then removed the matching one-block inset: exact edge F1 rose
+from `0.977` to `0.988`, one-pixel-tolerant edge F1 from `0.990` to `0.997`,
+and shadow-mask F1 from `0.983` to `0.990`. Shadow-loss correlation increased
+from `0.986` to `0.989`.
 Its shadowless block-color comparison has mean perceptual error `0.180`; 99%
 of blocks are exact at the median and 99.44% are within error 6. Its normal
 image has mean channel error `1.61`, luminance correlation `0.947`, and best

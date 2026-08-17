@@ -416,7 +416,6 @@ function isDecorativeCover(name: string): boolean {
     block === "short_grass" ||
     block === "tall_grass" ||
     block === "tallgrass" ||
-    block === "grass" ||
     block === "bush" ||
     block === "double_plant" ||
     block === "seagrass" ||

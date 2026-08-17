@@ -566,7 +566,7 @@ function applyElevationGradient(
   sample: NonNullable<SurfaceSamples[number]>,
 ): RgbaColor {
   if (!isElevationStyledGround(sample.name) || isWater(sample.name)) return base;
-  const height = sample.name === "minecraft:grass" ? sample.y : terrainHeight(sample);
+  const height = terrainHeight(sample);
   if (isDirtPath(sample.name)) return darken(base, elevationLightness(height));
   const mountainOpacity = usesGroundElevationColor(sample) ? clamp((height - 62) / 50, 0, 1) : 0;
   const elevationColor = blend(base, mountainColor(sample.name), mountainOpacity);
@@ -574,6 +574,7 @@ function applyElevationGradient(
 }
 
 function terrainHeight(sample: NonNullable<SurfaceSamples[number]>): number {
+  if (sample.name === "minecraft:grass") return sample.y;
   return sample.supportY ?? sample.y;
 }
 

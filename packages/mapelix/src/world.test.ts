@@ -202,6 +202,23 @@ describe("createBedrockWorld", () => {
     });
   });
 
+  it("decodes legacy minecraft:grass as opaque terrain instead of decorative cover", async () => {
+    const world = createBedrockWorld([stackedSubchunk(["minecraft:grass", "minecraft:dirt"])]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: 0, y: 0 },
+      { includeSurface: true, shadows: false },
+    );
+    const surface = tile.surface?.samples[0];
+
+    expect(surface).toMatchObject({
+      name: "minecraft:grass",
+      y: 79,
+      shadowRuns: [{ minY: 78, maxY: 79, opacity: 1 }],
+    });
+    expect(surface).not.toHaveProperty("supportY");
+  });
+
   it("blends biome tint across a tile boundary using neighboring biome records", async () => {
     const world = createBedrockWorld([
       singleBlockSubchunk(15, 0, 4, "minecraft:grass_block", 15, 0),

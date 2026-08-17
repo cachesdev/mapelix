@@ -124,6 +124,26 @@ describe("renderSurface", () => {
     );
   });
 
+  it("does not inset legacy minecraft:grass below equal-height terrain", () => {
+    const sampleSize = 64;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:grass_block", y: 90, biomeId: 1 }),
+    );
+    const legacyIndex = 32 * sampleSize + 32;
+    const legacySamples = [...samples];
+    legacySamples[legacyIndex] = {
+      name: "minecraft:grass",
+      y: 90,
+      supportY: 89,
+      biomeId: 1,
+    };
+
+    expect(renderSurface(legacySamples, { shadows: false })).toEqual(
+      renderSurface(samples, { shadows: false }),
+    );
+  });
+
   it("leaves missing world data transparent", () => {
     const rgba = renderSurface(
       Array.from({ length: TILE_SIZE * TILE_SIZE }, (): SurfaceBlock | undefined => undefined),
