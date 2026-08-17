@@ -61,15 +61,7 @@ export function renderSurface(
         resolveSurfaceColor(sample, resolveBlockStyle, biome),
         sample,
       );
-      writeSurfaceBlock(
-        rgba,
-        samples,
-        sampleSize,
-        pixelsPerBlock,
-        x,
-        z,
-        increaseSaturation(base, 1.08),
-      );
+      writeSurfaceBlock(rgba, samples, sampleSize, pixelsPerBlock, x, z, base);
     }
   }
   return rgba;
@@ -157,7 +149,7 @@ function calculateHeightContour(
       height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX, outputZ - 1, height),
     );
   }
-  return clamp(shade, 1 / 1.3, 1.3);
+  return shade;
 }
 
 function heightStepShade(delta: number): number {
@@ -354,33 +346,36 @@ function applyElevationGradient(
   base: RgbaColor,
   sample: NonNullable<SurfaceSamples[number]>,
 ): RgbaColor {
-  if (!isNaturalTerrain(sample.name) || isWater(sample.name)) return base;
+  if (!isElevationStyledGround(sample.name) || isWater(sample.name)) return base;
   const height = terrainHeight(sample);
-  const distanceFromSeaLevel = Math.abs(height - 64);
-  const strength = clamp((distanceFromSeaLevel / 128) * 0.6, 0, 0.58);
-  if (strength === 0) return base;
-  return blend(base, elevationColor(height), strength);
+  if (isDirtPath(sample.name)) return darken(base, elevationLightness(height));
+  const mountainOpacity = clamp((height - 62) / 50, 0, 1);
+  const elevationColor = blend(base, mountainColor(sample.name), mountainOpacity);
+  return darken(elevationColor, elevationLightness(height));
 }
 
 function terrainHeight(sample: NonNullable<SurfaceSamples[number]>): number {
   return sample.supportY ?? sample.y;
 }
 
-function elevationColor(height: number): RgbaColor {
-  if (height <= 64) return color(74, 128, 91);
-  if (height <= 112)
-    return interpolateColor(color(128, 164, 75), color(157, 143, 67), (height - 64) / 48);
-  if (height <= 176)
-    return interpolateColor(color(157, 143, 67), color(163, 105, 53), (height - 112) / 64);
-  return interpolateColor(
-    color(163, 105, 53),
-    color(119, 75, 41),
-    clamp((height - 176) / 80, 0, 1),
-  );
+function mountainColor(name: string): RgbaColor {
+  if (/red_sand/.test(name)) return color(195, 92, 34);
+  if (/sand/.test(name)) return color(179, 168, 77);
+  if (/stone|deepslate/.test(name)) return color(153, 153, 153);
+  return color(145, 90, 8);
 }
 
-function interpolateColor(from: RgbaColor, to: RgbaColor, amount: number): RgbaColor {
-  return blend(from, to, clamp(amount, 0, 1));
+function elevationLightness(height: number): number {
+  if (height <= -64) return 0.875;
+  if (height <= 30) return interpolate(0.875, 0.925, (height + 64) / 94);
+  if (height <= 62) return interpolate(0.925, 1, (height - 30) / 32);
+  if (height <= 112) return interpolate(1, 0.925, (height - 62) / 50);
+  if (height <= 319) return interpolate(0.925, 0.875, (height - 112) / 207);
+  return 0.875;
+}
+
+function interpolate(from: number, to: number, amount: number): number {
+  return from + (to - from) * amount;
 }
 
 function color(red: number, green: number, blue: number): RgbaColor {
@@ -416,18 +411,12 @@ function darken(value: RgbaColor, factor: number): RgbaColor {
   };
 }
 
-function increaseSaturation(value: RgbaColor, factor: number): RgbaColor {
-  const average = (value.red + value.green + value.blue) / 3;
-  return {
-    red: Math.round(clamp(average + (value.red - average) * factor, 0, 255)),
-    green: Math.round(clamp(average + (value.green - average) * factor, 0, 255)),
-    blue: Math.round(clamp(average + (value.blue - average) * factor, 0, 255)),
-    alpha: value.alpha,
-  };
-}
-
 function isWater(name: string): boolean {
   return name === "minecraft:water" || name === "minecraft:flowing_water";
+}
+
+function isDirtPath(name: string): boolean {
+  return /(?:dirt|grass)_path/.test(name);
 }
 
 function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
@@ -437,8 +426,8 @@ function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
   );
 }
 
-function isNaturalTerrain(name: string): boolean {
-  return /grass|moss|leaves|vine|dirt|podzol|mycelium|mud|sand|gravel|stone|deepslate|terracotta|clay/.test(
+function isElevationStyledGround(name: string): boolean {
+  return /grass_block|moss_block|dirt|podzol|mycelium|mud|sand|gravel|stone|deepslate|terracotta|clay/.test(
     name,
   );
 }

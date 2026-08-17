@@ -97,7 +97,7 @@ describe("createBedrockWorld", () => {
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
 
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([95, 146, 61, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([107, 121, 43, 255]);
     expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: 0, maxZ: 256 });
     expect(Array.from(tile.png.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
@@ -111,7 +111,7 @@ describe("createBedrockWorld", () => {
 
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([109, 117, 55, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([116, 102, 39, 255]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
   });
 
@@ -143,7 +143,7 @@ describe("createBedrockWorld", () => {
     }
 
     expect(tile.bounds).toEqual({ minX: 0, minZ: 0, maxX: 64, maxZ: 64 });
-    expect(colors).toEqual(new Set(["59,118,57,255"]));
+    expect(colors).toEqual(new Set(["54,112,58,255"]));
     expect(tile.rgba[(4 * 256 + 4) * 4 + 3]).toBe(0);
   });
 

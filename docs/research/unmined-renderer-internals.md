@@ -26,11 +26,15 @@ global lighting filter:
    where adjacent ground heights differ. It stores each boundary once, on the
    north or west edge of a block. Equal-height neighbors cause no visible
    change, so flat ground has no global grid.
-4. Cast shadows are a separate optional pass. The caster samples rays at image
-   subpixels, not once per Minecraft block. At zoom 2, a shadow boundary can
-   therefore have up to 4 x 4 positions inside a solid-color block. This is the
-   strongest explanation for the extra detail in shaded uNmINeD areas.
-5. The broad heatmap look is mostly an absolute-elevation color and lightness
+4. Cast shadows are a separate pass. The published export explicitly uses the
+   `3do` mode. The caster samples rays at image subpixels, not once per
+   Minecraft block. At zoom 2, a shadow boundary can therefore have up to
+   4 x 4 positions inside a solid-color block. This is the strongest
+   explanation for the extra detail in shaded uNmINeD areas.
+5. The public export does not enable block models. Its block interiors are
+   style-color fills; paths stand out because of an explicit path style, not a
+   15/16-height model.
+6. The broad heatmap look is mostly an absolute-elevation color and lightness
    style. It is not biome blur. The inspected Bedrock path does not spatially
    blend biome colors.
 
@@ -43,6 +47,8 @@ The official single-file Linux executable was unpacked outside the repository.
 ILSpy 11 decompiled its managed assemblies successfully. The behavior below
 was traced through named types and methods, and checked against the CLI help,
 the distributed default configuration, and the published Amelix zoom-2 tile.
+The Amelix update script records its CLI flags but does not pin an uNmINeD
+version, so it cannot prove that the published tile used this exact build.
 
 Labels used below:
 
@@ -143,14 +149,51 @@ do not always have to be the same block.
 6. final saturation and lightness effects.
 
 The default MIT-licensed stylesheet enables `useLandElevationGradient`. It
-defines a cartographic land color gradient from sea level toward mountain
-level. It also defines `land.lightness.elevation`, which is brightest near sea
-level and gradually darker toward low and high extremes. The compiled gradient
-and curve tables use linear interpolation at integer Y values.
+defines these ordinary-overworld anchors for a Bedrock world compatible with
+Minecraft 1.18 or newer:
+
+| Symbol | Y |
+| --- | ---: |
+| minimum | -64 |
+| sea | 62 |
+| sea minus 32 | 30 |
+| mountain | 112 |
+| maximum | 319 |
+
+The ordinary `land` elevation overlay is HSL `(36, 90%, 30%)`, approximately
+RGB `(145, 90, 8)`. Its alpha is zero at Y=62, grows linearly to 255 at Y=112,
+and stays clamped at the nearest endpoint outside that interval. The ordinary
+ground base is HSL `(78, 95%, 40%)`, approximately RGB `(141, 199, 5)`, before
+biome-specific rules and tinting.
+
+The independent `land.lightness.elevation` curve is:
+
+| Y | RGB multiplier |
+| ---: | ---: |
+| -64 | 0.875 |
+| 30 | 0.925 |
+| 62 | 1.000 |
+| 112 | 0.925 |
+| 319 | 0.875 |
+
+Both tables use piecewise-linear interpolation at integer Y. Color resolution
+first alpha-composites the elevation overlay over the base color in byte RGB
+space, then multiplies RGB by the lightness curve. This is not HSL lightness
+interpolation despite the configuration's HSL color declarations.
+
+Sand, red sand, and rock use the same sea-to-mountain alpha schedule with
+mountain overlay HSL values `(48, 40%, 50%)`, `(24, 70%, 45%)`, and
+`(0, 0%, 60%)`. Savanna, taiga, dark-forest, and swamp ground use their own
+base colors but the same ordinary brown mountain overlay.
 
 This creates smooth color bands over geographic distance because nearby terrain
 usually changes height gradually. It can look like a spatial heatmap even
 though the renderer looks up each block's own Y independently.
+
+Sources: the bundled MIT `default.stylesheet.minecraft.js`,
+`BedrockWorldDimension`, `StylesheetCompilationContext.GenerateGradient`,
+`StylesheetCompilationContext.GenerateCurveMapping`, and
+`TerrainRendererState.GetBlockColor`.
 
 ## The selective block contour
 
@@ -164,11 +207,46 @@ north and west neighbors. It writes only one row or column inside the block.
 The sun-direction quadrant decides whether a given signed height difference is
 treated as light-facing or shade-facing.
 
-The response saturates quickly. In the default strength path, a one-block step
-is already close to the maximum local adjustment: approximately 1.3 times RGB
-on the bright side or its reciprocal on the dark side. The modification is a
-plain multiplicative RGB adjustment. It is not a blur, convolution, or texture
-lookup.
+The exact stored edges are:
+
+- north comparison: the current block's top image row, from its top-left pixel
+  toward the right;
+- west comparison: the current block's left image column, from its top-left
+  pixel downward.
+
+The top-left output pixel therefore receives both adjustments when both edges
+have a height change.
+
+The clean-room response for an oriented integer height difference `d` is:
+
+```text
+if d < 0:
+    raw = 1.5 * d / 128 * 28.8
+else:
+    raw = 1.5 * floor((d + 1) / 2) / 128 * 28.8
+
+v = clamp(raw, -0.3, +0.3) * material_shading_factor
+v = v * (visibility_range - min(depth, visibility_range)) / visibility_range
+gain = 1 + v                    when v > 0
+gain = 1 / (1 - v)              otherwise
+```
+
+For land, `material_shading_factor` is 1. Because
+`1.5 * 28.8 / 128 = 0.3375`, every nonzero integer land difference reaches the
+clamp immediately. The exact gains are therefore:
+
+| Oriented land delta | Edge gain |
+| ---: | ---: |
+| less than 0 | `1 / 1.3 = 0.769230...` |
+| 0 | `1` |
+| greater than 0 | `1.3` |
+
+If both current edges brighten, the top-left pixel gets `1.3^2 = 1.69`. If
+both darken, it gets `(1 / 1.3)^2 = 0.591716...`. Opposite signs cancel at the
+corner. Pixel channels still clamp to 255 after multiplication.
+
+The modification is a plain multiplicative RGB adjustment. It is not a blur,
+convolution, or texture lookup.
 
 Only north and west are needed because each shared block boundary is processed
 once. A same-height comparison produces a neutral factor. This is the direct
@@ -188,6 +266,25 @@ for each stored edge in [north, west]:
 
 At Amelix zoom 2, `N = 4`. The result is a solid 4 x 4 block interior plus a
 selective one-pixel contour at real height steps.
+
+The quadrant comes from `floor((abs(round(sunDirectionDegrees)) mod 360)/90)`.
+Its sign rules are:
+
+| Quadrant | Approximate angle | North delta | West delta |
+| ---: | ---: | --- | --- |
+| 0 | 0-89 degrees | unchanged | inverted |
+| 1 | 90-179 degrees | unchanged | unchanged |
+| 2 | 180-269 degrees | inverted | unchanged |
+| 3 | 270-359 degrees | inverted | inverted |
+
+The default 120-degree sun direction is quadrant 1. Therefore neither the
+north nor west signed difference is inverted: a current ground height above
+its north or west neighbor brightens that stored edge, while a lower current
+height darkens it. The rounded-angle boundary is technically at each
+half-degree, so the ranges in the table are descriptive rather than a claim
+about floating-point endpoint inclusion.
+
+Source: `TerrainShader.ApplyShadingOnPixel` and `TerrainShader.AdjustLightness`.
 
 ### Zoom 0
 
@@ -228,9 +325,53 @@ angles are direction 120 degrees and altitude 45 degrees. A completely blocked
 ray is mixed with the original color using the configured shadow strength; the
 default strength is 40%, so full occlusion retains 60% of the unshadowed RGB.
 
-For solid-color blocks above zoom 1, the implementation first probes block
-corners and edges. It scans interior subpixels only when the edge results show
-a possible shadow boundary. This avoids most `N x N` work on fully lit blocks.
+At those default angles, the unit vector toward the sun is approximately:
+
+```text
+(-0.353553, +0.707107, -0.612372)
+```
+
+For an `N x N` block image, the horizontal ray origins are pixel centers:
+
+```text
+x = (pixel_x + 0.5) / N
+z = (pixel_z + 0.5) / N
+y = 255 / 256
+```
+
+At zoom 2, X and Z are therefore `0.125, 0.375, 0.625, 0.875`. The actual
+world origin adds the block position and the rendered surface Y. The
+`255/256` vertical offset starts just below the voxel's top boundary and avoids
+an exact-boundary self-hit. The origin voxel `(0,0,0)` is removed from the
+precomputed relative path.
+
+The voxel traversal is a supercover DDA:
+
+```text
+for each axis:
+    step = sign(direction)
+    t_delta = 1 / abs(direction)
+    t_max = distance along ray to the next integer voxel boundary
+
+repeat until the relative Y cell is above 256:
+    t = min(t_max_x, t_max_y, t_max_z)
+    emit every voxel touched at that crossing
+    advance each axis whose t_max equals t
+```
+
+If a ray starts exactly on an integer boundary and moves in the negative
+direction, the initial cell is the cell on the negative side. At tied crossings
+the traversal emits all face-, edge-, or corner-touching voxel combinations.
+This supercover behavior prevents light leaks through diagonal contacts.
+
+For solid-color blocks above zoom 1, the implementation first probes all four
+corners. It probes a top, bottom, left, or right edge only when one of that
+edge's corners hit shadow-map occupancy. It records hit columns from the top
+and bottom and hit rows from the left and right. It probes interior pixels only
+at intersections of those recorded columns and rows inside their bounds. A
+"hit" here means any occupied shadow voxel was encountered, including partial
+opacity; it does not mean only a fully black result. With block models enabled,
+or at `N <= 2`, it scans every output pixel.
 
 **Fact.** `TerrainRendererService.StartRenderAsync` disables the ray caster
 above zoom 5. The published zoom 2 path is within the supported range.
@@ -248,11 +389,28 @@ opacity smoothing enabled, transmission is also scaled by the ray's travel
 distance through a voxel. Multiple translucent hits multiply their remaining
 light.
 
-**Inference, high confidence.** The published Amelix images visibly contain
-directional cast shade, so Forest likely exported with one of the `--shadows`
-options or equivalent saved settings. The static export does not publish its
-map-settings file, so the exact shadow-map mode is not recoverable from its web
-metadata alone.
+More exactly, the modes test a ray sample as follows:
+
+- `2d`: the ray is blocked when a sampled column's top elevation reaches the
+  sampled voxel Y;
+- `3d`: solid and empty vertical runs are tested, and any solid hit is opaque;
+- `3do`: vertical runs carry opacity. Water defaults to 10% opacity and leaves
+  to 60%; ordinary blocks carry 100%. Transmission multiplies across hits.
+  With default opacity smoothing, each voxel opacity is also multiplied by the
+  distance between its DDA entry point and the next emitted entry point,
+  divided by `sqrt(2)`. The final precomputed entry has zero stored length;
+  tied supercover entries can also have zero length because they share one
+  crossing point.
+
+**Fact for the published Amelix export.** The repository's update script passes
+`--shadows 3do`, `--zoomin 2`, and `--showgrid false`. This removes the earlier
+ambiguity: the reference uses the 3D opacity shadow map, not the 2D heightmap or
+fully opaque 3D mode. See the immutable first-party
+[export script](https://github.com/ForestOfLight/AmelixSMPViewer/blob/80763d20d7ff182a9f4c9a4ca64f38023ab2341c/UpdateSMPViewer.py).
+
+Sources: `ShadowCasterPool.GetSunAngle`, `ShadowCaster`,
+`ShadowRayCast.GetIntersectedBlocks`, `TerrainRendererState.ApplyShade`, and
+`ShadowmapChunkProcessorRequest.Prepare`.
 
 ## Biomes: no spatial blur in the inspected Bedrock path
 
@@ -279,10 +437,10 @@ Therefore:
 **Fact.** Water uses several independent depth effects:
 
 - `WaterVisibilityRange`, default 12 blocks;
-- a depth-dependent alpha used to blend the water over lower visible blocks;
-- gradual darkening beginning at depth 6;
-- reduced local elevation shading as depth increases;
-- optional low-opacity contribution to cast shadows.
+- `WaterBlendingStrength`, 30%, with fade start 0 and range 12;
+- `WaterDarkeningStrength`, 50%, with start 6 and range 22;
+- `WaterShadingStrength`, 50%, with effective fade start 0 and range 12;
+- 10% water opacity in the published `3do` cast-shadow map.
 
 `ElevationMapGenerator` accumulates consecutive water depth up to the visibility
 range. Local relief compares `surface elevation - water depth`, which
@@ -290,10 +448,56 @@ approximates the bed rather than treating every water surface as identical.
 This lets underwater terrain influence water shading while the visible water
 surface remains flat.
 
-The default shallow-water blend starts near 70% water opacity and becomes more
-opaque with depth. Water beyond the visibility range is opaque. The style's
-base water color can come from the exact biome, but it is not spatially mixed
-with nearby biome water colors.
+Let `D` be consecutive water depth and `d = min(D, 12)`. For visible depth not
+clipped by the range (`D <= 12`), the stored water alpha is:
+
+```text
+blend = floor(255 * 0.30) = 76
+base_alpha = 255 - blend = 179
+alpha(D) = floor(179 + min(D - 1, 12) / 12 * 76)
+```
+
+| D | Alpha | RGB darkening gain | Maximum local contour magnitude |
+| ---: | ---: | ---: | ---: |
+| 1 | 179 | 1.000000 | 0.1375 |
+| 2 | 185 | 1.000000 | 0.1250 |
+| 3 | 191 | 1.000000 | 0.1125 |
+| 4 | 198 | 1.000000 | 0.1000 |
+| 5 | 204 | 1.000000 | 0.0875 |
+| 6 | 210 | 1.000000 | 0.0750 |
+| 7 | 217 | 1.000000 | 0.0625 |
+| 8 | 223 | 0.977273 | 0.0500 |
+| 9 | 229 | 0.954545 | 0.0375 |
+| 10 | 236 | 0.931818 | 0.0250 |
+| 11 | 242 | 0.909091 | 0.0125 |
+| 12 | 248 | 0.886364 | 0.0000 |
+
+When `D > 12`, the visibility range clips the depth and the color is made fully
+opaque instead of using the table. The renderer alpha-composites a translucent
+water color over lower non-water slice runs until the column is opaque, then
+forces the final rendered block alpha to 255.
+
+The darkening formula is:
+
+```text
+dark_gain = 1 - 0.50 * min(max(0, d - 7), 22) / 22
+```
+
+The zoom-1/2 contour first halves the land contour because water shading
+strength is 50%, then attenuates it linearly to zero over 12 water blocks:
+
+```text
+water_contour_magnitude = 0.15 * (12 - min(D, 12)) / 12
+```
+
+Thus a flat water surface does not gain a grid. Relief derives from
+`surface Y - water depth`, and its remaining one-pixel bed-height contour fades
+away with depth. The style's base water color can come from the exact biome,
+but it is not spatially mixed with nearby biome water colors.
+
+Sources: `TerrainRendererOptions`, `TerrainRendererState.GetTerrainBlockColor`,
+`TerrainShader.ApplyDepthTranslucency`, `ElevationMapGenerator`, and
+`SliceGeneratorBlockStateSettingsProvider`.
 
 ## Optional textures and block models
 
@@ -312,10 +516,104 @@ The Bedrock CLI option `--bedrock-vanilla-pack` supplies a vanilla resource
 pack for this path. If a model image is unavailable, rendering falls back to
 the resolved style color.
 
-**Inference.** The public Amelix tile does not look like a uniform full-texture
-render, but small model-shaped blocks and the selective shading passes can both
-create within-block detail. Without the original map-settings file, the export's
-`UseBlockModels` value remains unproven.
+**Fact for the published Amelix export.** Block models are off. The first-party
+update script passes neither `--blockrender` nor `--bedrock-vanilla-pack`, while
+the option default is false. The pixel evidence agrees: roofs and paths use
+whole 4 x 4 style-color blocks; the tiles do not contain repeatable 4 x 4 top
+textures, alpha holes, or partial model silhouettes. Low-amplitude variation
+inside those blocks is JPEG loss, not proof of a material texture.
+
+If block models were on at zoom 2, a model-backed block could have a repeatable
+4 x 4 nearest-neighbor texture or partial occupancy, and its per-output-pixel
+surface height could affect the 3D shadow ray origin. None of that model data is
+used by this published export.
+
+Source: `TerrainRendererOptions.UseBlockModels`, `CommonRenderOptions`,
+`TerrainRendererState.RenderBlockTextured`, and the first-party export script
+linked above.
+
+## Why dirt paths remain distinct
+
+**Fact.** Bedrock `grass_path` and `dirt_path` match `#path`, which is tagged
+natural and blocking, then included in `#soil` and `#ground`. Their final base
+style is `map.path`: HSL `(36, 50%, 30%)`, approximately RGB `(115, 84, 38)`.
+They retain the `#ground` elevation-lightness curve described above.
+
+The later explicit path-color rule also clears the earlier `#ground` elevation
+color overlay. This follows from the style accumulator: applying a new base
+color clears the existing elevation-color field but does not clear the
+elevation-lightness field. A path is therefore a stable brown material whose
+brightness still changes gently with absolute Y. It does not receive the
+green-to-brown land overlay. This style rule, not fractional geometry, is why
+paths remain easy to distinguish in the village tile.
+
+**Fact.** With block models off, path geometry is treated as an ordinary full
+voxel:
+
+- the visible surface is the slice's integer `TopY`;
+- the elevation map also stores that integer `TopY` because paths are not
+  `#shadeless`;
+- zoom-2 contours compare that integer Y with neighboring integer Y values;
+- a path at the same stored Y as grass gets no relief line at their material
+  boundary;
+- the 15/16-block collision or model-top height used by Minecraft is not read;
+- in the published `3do` map, a path is not `#shadowless` and keeps the default
+  255/255 shadow opacity, so the shadow volume treats it as a full voxel.
+
+As a receiver, a path receives the same local contour and per-output-pixel cast
+shadow passes as other land. As a caster, it matters only where the integer
+voxel can occlude a lower receiver; it does not cast a thin 1/16-height lip.
+
+Related partial-height blocks use the same coarse mechanism in this export:
+
+- farmland is tagged artificial, nonblocking, and `#crops`, with base HSL
+  `(42, 60%, 40%)`. It is not shadeless or shadowless, so it still becomes the
+  integer elevation surface and a default-opacity shadow voxel. "Nonblocking"
+  affects column/cave classification, not fractional render height.
+- slabs are tagged artificial and blocking. Their material tags choose their
+  style color, but, with models off, top and bottom slabs both use the block's
+  integer `TopY` and a full shadow voxel. No half-block surface enters either
+  the zoom-2 contour or the ray origin.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js` and
+`default.stylesheet.minecraft.js`, `TerrainRendererBlockStylesGenerator.Apply`,
+`TerrainDbBlocksToSliceBlocksConverter`, `ElevationMapGenerator`,
+`ShadowmapChunkProcessorRequest`, and `ShadowMapWithOpacity`.
+
+## Published tile encoding and comparison effects
+
+**Fact.** The web exporter defaults to JPEG, and the Amelix update script does
+not override it. It uses ImageSharp 4.0 with a default `JpegEncoder`; no quality
+or color-sampling option is set by the exporter.
+
+The published zoom-2 tile's markers confirm:
+
+- baseline 8-bit JPEG, 256 x 256 pixels;
+- luminance and chrominance quantization tables for quality 75;
+- YCbCr 4:2:0 sampling: Y uses a 2 x 2 sampling factor while Cb and Cr use
+  1 x 1;
+- opaque output; JPEG does not carry the terrain renderer's alpha channel.
+
+This matters for a pixel metric. One Minecraft block is 4 x 4 pixels at zoom 2,
+while the JPEG transform works in 8 x 8 luma blocks. A compression block spans
+two Minecraft blocks in each direction. Chroma is also subsampled over 2 x 2
+output pixels. As a result:
+
+- compare edge position and luminance before raw RGB equality;
+- expect chroma to look softer than the geometric contour;
+- do not interpret low-amplitude within-block variation or 8-pixel periodicity
+  as a material texture;
+- decode both images to a common color space before calculating color error.
+
+For formats without transparency, the web exporter starts partial edge tiles
+with an opaque background. The Amelix overworld script supplies `#78a7ff`.
+Rendered visible columns are already forced opaque after internal water/glass
+composition. Missing area outside the clipped world rectangle retains the
+background color.
+
+Sources: `WebMapExportOptions`, `WebMapExport`, `ImageSharpSerializer`, the
+bundled `SixLabors.ImageSharp 4.0.0` assembly, the published tile's JPEG SOF and
+DQT markers, and the first-party export script.
 
 ## Cave contour is a separate feature
 
@@ -338,6 +636,15 @@ The official CLI exposes these comparison controls directly:
 --chunkprocessors=N
 --topY=N --bottomY=N --gndxray --night
 ```
+
+The published Amelix updater's exact common options are:
+
+```text
+--zoomout 6 --zoomin 2 --shadows 3do --showgrid false
+```
+
+It supplies overworld background `#78a7ff`, uses the default JPEG output, and
+does not pass a map-settings file, block-render flag, or Bedrock vanilla pack.
 
 Relevant saved renderer-setting names found in `IRendererSettings` include:
 
@@ -402,8 +709,12 @@ The exact methods that support the main findings are:
 - `ShadowCaster.InternalGetLightLevel`
 - `ShadowRayCast.GetIntersectedBlocks`
 - `ShadowmapChunkProcessorRequest.Prepare`
+- `ShadowMapWithOpacity.Generate`
+- `SliceGeneratorBlockStateSettingsProvider.GenerateBlockStateSettings`
 - `TerrainRendererChunkProcessorRequest<TPixel>.DoneAsync`
 - `WebMapExport.RenderZoomOutTiles`
+- `ImageSharpSerializer.GetJpegEncoder`
+- `TerrainRendererBlockStylesGenerator.Apply`
 - `StylesheetCompilationContext.GenerateGradient`
 - `StylesheetCompilationContext.GenerateCurveMapping`
 

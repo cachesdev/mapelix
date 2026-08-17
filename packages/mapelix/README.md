@@ -28,7 +28,7 @@ For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file a
 - Uses the primary block storage layer. It does not render waterlogging overlays, entities, structures, or texture packs.
 - Reads legacy Data2D biome IDs used by the Stratos world. Modern Data3D biome palettes are not implemented yet.
 - Uses biome-aware grass, foliage, and water colors. Biome tint is discrete by default to match uNmINeD; callers can request an artistic seam-safe transition with `biomeBlendRadius`.
-- Uses water-depth compositing, a sea-level-relative elevation gradient, a selective one-pixel contour on shared height edges, and three-block directional ray-cast shadows. Equal-height interiors stay flat. Foliage transmits part of the shadow light. Callers can inject a `BlockStyleResolver`.
+- Uses water-depth compositing, the uNmINeD Bedrock elevation color and lightness curves, a selective one-pixel contour on shared height edges, and directional ray-cast shadows. Equal-height interiors stay flat. Paths use their distinct soil-brown style instead of the generic grass tint. Foliage transmits part of the shadow light. Callers can inject a `BlockStyleResolver`.
 - Treats grass, flowers, ferns, and saplings as decorative cover supported by the ground below, so they do not create false terrain relief. The untextured renderer keeps a flat same-material region uniform; it does not use generated grain or resource-pack textures.
 - Does not validate LevelDB checksums yet.
 - Builds the index one database file at a time. It retains packed subchunk keys and only the 256/512-byte biome payload from Data2D records. Block values load on demand. More workers increase throughput and temporary memory use.

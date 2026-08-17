@@ -72,6 +72,7 @@ const result = {
     candidateStrongFraction: fractionTrue(candidateStrong),
     referenceStrongFraction: fractionTrue(referenceStrong),
   },
+  color: compareColor(candidate, reference, candidateLuminance, referenceLuminance),
   alignment: {
     bestOffsetPixels: alignment,
     exact: exactEdges,
@@ -152,6 +153,48 @@ function luminanceField(image) {
       image.data[offset + 2] * 0.0722;
   }
   return result;
+}
+
+function compareColor(candidate, reference, candidateLuminance, referenceLuminance) {
+  const candidateChannels = [0, 0, 0];
+  const referenceChannels = [0, 0, 0];
+  let absoluteChannelDelta = 0;
+  let absoluteLuminanceDelta = 0;
+  for (let pixel = 0; pixel < candidateLuminance.length; pixel += 1) {
+    const offset = pixel * 4;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const candidateValue = candidate.data[offset + channel];
+      const referenceValue = reference.data[offset + channel];
+      candidateChannels[channel] += candidateValue;
+      referenceChannels[channel] += referenceValue;
+      absoluteChannelDelta += Math.abs(candidateValue - referenceValue);
+    }
+    absoluteLuminanceDelta += Math.abs(candidateLuminance[pixel] - referenceLuminance[pixel]);
+  }
+  return {
+    candidateMeanRgb: candidateChannels.map((channel) => channel / candidateLuminance.length),
+    referenceMeanRgb: referenceChannels.map((channel) => channel / referenceLuminance.length),
+    meanAbsoluteChannelDelta: absoluteChannelDelta / (candidateLuminance.length * 3),
+    meanAbsoluteLuminanceDelta: absoluteLuminanceDelta / candidateLuminance.length,
+    luminanceCorrelation: correlation(candidateLuminance, referenceLuminance),
+  };
+}
+
+function correlation(left, right) {
+  const leftMean = mean(left);
+  const rightMean = mean(right);
+  let covariance = 0;
+  let leftVariance = 0;
+  let rightVariance = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftDifference = left[index] - leftMean;
+    const rightDifference = right[index] - rightMean;
+    covariance += leftDifference * rightDifference;
+    leftVariance += leftDifference * leftDifference;
+    rightVariance += rightDifference * rightDifference;
+  }
+  const denominator = Math.sqrt(leftVariance * rightVariance);
+  return denominator === 0 ? 0 : covariance / denominator;
 }
 
 function sobelField(luminance, width, height) {

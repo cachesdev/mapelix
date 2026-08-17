@@ -10,6 +10,7 @@ export type BlockStyleResolver = (blockName: string) => RgbaColor;
 const FIXED_COLORS: ReadonlyArray<readonly [RegExp, RgbaColor]> = [
   [/water|bubble_column/, color(46, 92, 181, 220)],
   [/lava|magma/, color(230, 88, 24)],
+  [/(?:dirt|grass)_path/, color(115, 84, 38)],
   [/grass|moss|azalea/, color(92, 142, 63)],
   [/leaves|vine/, color(54, 112, 58)],
   [/sand|sandstone|end_stone/, color(218, 204, 144)],

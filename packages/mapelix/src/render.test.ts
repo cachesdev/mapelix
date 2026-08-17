@@ -68,6 +68,25 @@ describe("renderSurface", () => {
     expect(changedPixels[0]?.index).toBe(pixelsPerBlock);
   });
 
+  it("combines the north and west contour gains at a raised corner", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:iron_block", y: 64 }),
+    );
+    const blockX = 16;
+    const blockZ = 16;
+    samples[blockZ * sampleSize + blockX] = { name: "minecraft:iron_block", y: 65 };
+
+    const rgba = renderSurface(samples, {
+      resolveBlockStyle: () => ({ red: 100, green: 100, blue: 100, alpha: 255 }),
+    });
+    const corner = (blockZ * pixelsPerBlock * TILE_SIZE + blockX * pixelsPerBlock) * 4;
+
+    expect(rgba[corner]).toBe(169);
+  });
+
   it("lights decorative cover from its supporting ground height", () => {
     const sampleSize = 32;
     const samples = Array.from(
@@ -109,7 +128,7 @@ describe("renderSurface", () => {
     samples[1] = { name: "minecraft:grass_block", y: 72 };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([97, 155, 64, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([100, 150, 65, 255]);
     expect(rgba[4]).toBeGreaterThan(rgba[0] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -129,7 +148,7 @@ describe("renderSurface", () => {
     };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([90, 96, 46, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([91, 94, 46, 255]);
     expect(rgba[4]).toBeLessThan(rgba[5] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -151,8 +170,8 @@ describe("renderSurface", () => {
     });
 
     expect(new Set(colors).size).toBe(2);
-    expect(colors[0]).toBe("145,193,85");
-    expect(colors.at(-1)).toBe("107,114,54");
+    expect(colors[0]).toBe("145,184,86");
+    expect(colors.at(-1)).toBe("108,111,55");
     expect(colors.slice(0, 3)).toEqual(Array.from({ length: 3 }, () => colors[0]));
     expect(colors.slice(3)).toEqual(Array.from({ length: 3 }, () => colors[5]));
   });
@@ -168,9 +187,49 @@ describe("renderSurface", () => {
     samples[highIndex] = { name: "minecraft:grass_block", y: 160, biomeId: 1 };
 
     const rgba = renderSurface(samples);
-    expect(rgba[highIndex * 4]).toBeGreaterThan(rgba[lowIndex * 4] ?? 0);
+    expect(rgba[highIndex * 4]! / rgba[highIndex * 4 + 1]!).toBeGreaterThan(
+      rgba[lowIndex * 4]! / rgba[lowIndex * 4 + 1]!,
+    );
     expect(rgba[highIndex * 4 + 1]).toBeLessThan(rgba[lowIndex * 4 + 1] ?? 0);
     expect(rgba[highIndex * 4 + 2]).toBeLessThan(rgba[lowIndex * 4 + 2] ?? 0);
+  });
+
+  it("applies the cartographic sea-to-mountain elevation style only to ground", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const seaIndex = 10 * TILE_SIZE + 10;
+    const mountainIndex = 40 * TILE_SIZE + 200;
+    const leavesIndex = 200 * TILE_SIZE + 40;
+    samples[seaIndex] = { name: "minecraft:grass_block", y: 62 };
+    samples[mountainIndex] = { name: "minecraft:grass_block", y: 112 };
+    samples[leavesIndex] = { name: "minecraft:oak_leaves", y: 112 };
+
+    const rgba = renderSurface(samples, {
+      resolveBlockStyle: () => ({ red: 100, green: 100, blue: 100, alpha: 255 }),
+    });
+
+    expect(Array.from(rgba.slice(seaIndex * 4, seaIndex * 4 + 4))).toEqual([100, 100, 100, 255]);
+    expect(Array.from(rgba.slice(mountainIndex * 4, mountainIndex * 4 + 4))).toEqual([
+      134, 83, 7, 255,
+    ]);
+    expect(Array.from(rgba.slice(leavesIndex * 4, leavesIndex * 4 + 4))).toEqual([
+      100, 100, 100, 255,
+    ]);
+  });
+
+  it("keeps dirt paths brown while applying only elevation lightness", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const pathIndex = 100 * TILE_SIZE + 100;
+    samples[pathIndex] = { name: "minecraft:dirt_path", y: 112 };
+
+    const rgba = renderSurface(samples);
+
+    expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 78, 35, 255]);
   });
 
   it("lights terrain from a four-neighbor surface normal", () => {
