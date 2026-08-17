@@ -8,7 +8,7 @@ const defaultWorldDirectory = "/tmp/mapelix-stratos-tmbcraft-pruned-v2";
 const worldDirectory = process.env.STRATOS_WORLD_DIRECTORY ?? defaultWorldDirectory;
 const cacheDirectory = process.env.STRATOS_CACHE_DIRECTORY ?? "/tmp/mapelix-stratos-viewer-cache";
 const renderConcurrency = positiveInteger(process.env.STRATOS_RENDER_WORKERS ?? "2");
-const cacheFormat = "multires-v2";
+const cacheFormat = "edge-light-v1";
 
 let worldPromise: Promise<BedrockWorld> | undefined;
 let metadataPromise: Promise<StratosMetadataResult> | undefined;

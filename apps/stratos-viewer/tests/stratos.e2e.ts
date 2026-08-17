@@ -47,4 +47,18 @@ test("renders the real Stratos world", async ({ page }) => {
     animations: "disabled",
     maxDiffPixelRatio: 0.01,
   });
+
+  const flatLightingTile = page.waitForResponse(
+    (response) => response.url().endsWith("/tiles/3/-93/-83.png"),
+    { timeout: 120_000 },
+  );
+  await page.getByLabel("X", { exact: true }).fill("-2950");
+  await page.getByLabel("Z", { exact: true }).fill("-2630");
+  await page.getByRole("button", { name: "Locate" }).click();
+  expect((await flatLightingTile).ok()).toBe(true);
+  await expect(page.getByText("Ready", { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot("stratos-flat-lighting.png", {
+    animations: "disabled",
+    maxDiffPixelRatio: 0.01,
+  });
 });
