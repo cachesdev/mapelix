@@ -56,7 +56,6 @@ export function renderSurface(
         resolveSurfaceColor(sample, resolveBlockStyle, biome),
         sample,
       );
-      const shade = calculateShade(samples, sampleSize, x, z, sample.y);
       writeSurfaceBlock(
         rgba,
         samples,
@@ -64,62 +63,91 @@ export function renderSurface(
         pixelsPerBlock,
         x,
         z,
-        sample,
         increaseSaturation(base, 1.08),
-        shade,
       );
     }
   }
   return rgba;
 }
 
-function calculateShade(
+function calculateOutputShade(
   samples: SurfaceSamples,
   sampleSize: number,
-  x: number,
-  z: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
   height: number,
 ): number {
-  const northHeight = sampleHeight(samples, sampleSize, x, z - 1, height);
-  const southHeight = sampleHeight(samples, sampleSize, x, z + 1, height);
-  const westHeight = sampleHeight(samples, sampleSize, x - 1, z, height);
-  const eastHeight = sampleHeight(samples, sampleSize, x + 1, z, height);
-  const slopeX = (eastHeight - westHeight) * 0.06;
-  const slopeZ = (southHeight - northHeight) * 0.06;
+  const northHeight = outputHeight(
+    samples,
+    sampleSize,
+    pixelsPerBlock,
+    outputX,
+    outputZ - 1,
+    height,
+  );
+  const southHeight = outputHeight(
+    samples,
+    sampleSize,
+    pixelsPerBlock,
+    outputX,
+    outputZ + 1,
+    height,
+  );
+  const westHeight = outputHeight(
+    samples,
+    sampleSize,
+    pixelsPerBlock,
+    outputX - 1,
+    outputZ,
+    height,
+  );
+  const eastHeight = outputHeight(
+    samples,
+    sampleSize,
+    pixelsPerBlock,
+    outputX + 1,
+    outputZ,
+    height,
+  );
+  const slopeX = clamp((eastHeight - westHeight) * 0.45, -0.8, 0.8);
+  const slopeZ = clamp((southHeight - northHeight) * 0.45, -0.8, 0.8);
   const normalLength = Math.hypot(slopeX, 1, slopeZ);
   const light = (-slopeX * -0.45 + 0.78 + -slopeZ * -0.45) / normalLength;
-  const hillShade = 1 + (light - 0.78) * 0.78;
-  const stepRelief = Math.sign(height - northHeight) * 0.05 + Math.sign(height - westHeight) * 0.04;
-  const relief = clamp(hillShade + stepRelief, 0.62, 1.34);
-  return relief * castShadow(samples, sampleSize, x, z, height);
+  const hillShade = 1 + (light - 0.78) * 0.62;
+  const relief = clamp(hillShade, 0.68, 1.18);
+  return relief * castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
 }
 
-function sampleHeight(
+function outputHeight(
   samples: SurfaceSamples,
   sampleSize: number,
-  x: number,
-  z: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
   fallback: number,
 ): number {
-  if (x < 0 || x >= sampleSize || z < 0 || z >= sampleSize) return fallback;
-  return samples[z * sampleSize + x]?.y ?? fallback;
+  const sample = outputSample(samples, sampleSize, pixelsPerBlock, outputX, outputZ);
+  return sample === undefined ? fallback : terrainHeight(sample);
 }
 
-function castShadow(
+function castOutputShadow(
   samples: SurfaceSamples,
   sampleSize: number,
-  x: number,
-  z: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
   height: number,
 ): number {
   let shadow = 1;
-  for (let distance = 1; distance <= CAST_SHADOW_DISTANCE; distance += 1) {
-    const sourceX = x - distance;
-    const sourceZ = z - distance;
+  const maximumDistance = CAST_SHADOW_DISTANCE * pixelsPerBlock;
+  for (let distance = 1; distance <= maximumDistance; distance += 1) {
+    const sourceX = outputX - distance;
+    const sourceZ = outputZ - distance;
     if (sourceX < 0 || sourceZ < 0) break;
-    const source = samples[sourceZ * sampleSize + sourceX];
+    const source = outputSample(samples, sampleSize, pixelsPerBlock, sourceX, sourceZ);
     if (source !== undefined) {
-      const clearance = source.y - height - distance * 0.7;
+      const clearance = terrainHeight(source) - height - (distance / pixelsPerBlock) * 0.7;
       if (clearance > 0) {
         const opacity = isFoliage(source.name) ? 0.45 : 1;
         shadow = Math.min(shadow, 1 - (1 - CAST_SHADOW_SHADE) * opacity);
@@ -127,6 +155,22 @@ function castShadow(
     }
   }
   return shadow;
+}
+
+function outputSample(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  pixelsPerBlock: number,
+  outputX: number,
+  outputZ: number,
+): SurfaceSamples[number] {
+  if (outputX < 0 || outputX >= TILE_SIZE || outputZ < 0 || outputZ >= TILE_SIZE) {
+    return undefined;
+  }
+  const blockX = Math.floor(outputX / pixelsPerBlock);
+  const blockZ = Math.floor(outputZ / pixelsPerBlock);
+  if (blockX >= sampleSize || blockZ >= sampleSize) return undefined;
+  return samples[blockZ * sampleSize + blockX];
 }
 
 function resolveSurfaceColor(
@@ -269,10 +313,15 @@ function applyElevationGradient(
   sample: NonNullable<SurfaceSamples[number]>,
 ): RgbaColor {
   if (!isNaturalTerrain(sample.name) || isWater(sample.name)) return base;
-  const distanceFromSeaLevel = Math.abs(sample.y - 64);
+  const height = terrainHeight(sample);
+  const distanceFromSeaLevel = Math.abs(height - 64);
   const strength = clamp((distanceFromSeaLevel / 128) * 0.6, 0, 0.58);
   if (strength === 0) return base;
-  return blend(base, elevationColor(sample.y), strength);
+  return blend(base, elevationColor(height), strength);
+}
+
+function terrainHeight(sample: NonNullable<SurfaceSamples[number]>): number {
+  return sample.supportY ?? sample.y;
 }
 
 function elevationColor(height: number): RgbaColor {
@@ -363,80 +412,24 @@ function writeSurfaceBlock(
   pixelsPerBlock: number,
   blockX: number,
   blockZ: number,
-  sample: NonNullable<SurfaceSamples[number]>,
   base: RgbaColor,
-  shade: number,
 ): void {
-  if (pixelsPerBlock === 1) {
-    writeColor(target, (blockZ * TILE_SIZE + blockX) * 4, base, shade);
-    return;
-  }
-
-  const north = sampleHeight(samples, sampleSize, blockX, blockZ - 1, sample.y);
-  const south = sampleHeight(samples, sampleSize, blockX, blockZ + 1, sample.y);
-  const west = sampleHeight(samples, sampleSize, blockX - 1, blockZ, sample.y);
-  const east = sampleHeight(samples, sampleSize, blockX + 1, blockZ, sample.y);
-  const detail = materialDetail(sample.name);
-  const seed = blockSeed(sample.name, blockX, blockZ);
-
   for (let pixelZ = 0; pixelZ < pixelsPerBlock; pixelZ += 1) {
     for (let pixelX = 0; pixelX < pixelsPerBlock; pixelX += 1) {
       const outputX = blockX * pixelsPerBlock + pixelX;
       const outputZ = blockZ * pixelsPerBlock + pixelZ;
-      const relief = subBlockRelief(
-        sample.y,
-        north,
-        south,
-        west,
-        east,
+      const sample = samples[blockZ * sampleSize + blockX];
+      const shade = calculateOutputShade(
+        samples,
+        sampleSize,
         pixelsPerBlock,
-        pixelX,
-        pixelZ,
+        outputX,
+        outputZ,
+        sample === undefined ? 0 : terrainHeight(sample),
       );
-      const texture = materialTexture(seed, detail, pixelX, pixelZ);
-      writeColor(target, (outputZ * TILE_SIZE + outputX) * 4, base, shade * relief * texture);
+      writeColor(target, (outputZ * TILE_SIZE + outputX) * 4, base, shade);
     }
   }
-}
-
-function subBlockRelief(
-  height: number,
-  north: number,
-  south: number,
-  west: number,
-  east: number,
-  size: number,
-  x: number,
-  z: number,
-): number {
-  let shade = 1;
-  if (z === 0 && height > north) shade *= 1.1;
-  if (x === 0 && height > west) shade *= 1.07;
-  if (z === size - 1 && height > south) shade *= 0.84;
-  if (x === size - 1 && height > east) shade *= 0.88;
-  return shade;
-}
-
-function materialDetail(name: string): number {
-  if (isFoliage(name)) return 0.15;
-  if (isWater(name)) return 0.07;
-  if (isNaturalTerrain(name)) return 0.08;
-  return 0.04;
-}
-
-function materialTexture(seed: number, detail: number, x: number, z: number): number {
-  const mixed =
-    Math.imul(seed ^ Math.imul(x + 1, 0x9e3779b1), 0x85ebca6b) ^ Math.imul(z + 1, 0xc2b2ae35);
-  const noise = ((mixed >>> 24) / 255 - 0.5) * 0.7;
-  return 1 + noise * detail;
-}
-
-function blockSeed(name: string, x: number, z: number): number {
-  let hash = Math.imul(x, 0x1f123bb5) ^ Math.imul(z, 0x5f356495);
-  for (const character of name) {
-    hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 16_777_619);
-  }
-  return hash;
 }
 
 function writeColor(target: Uint8Array, offset: number, base: RgbaColor, shade: number): void {

@@ -34,7 +34,7 @@ describe("openBedrockWorld", () => {
     }
   });
 
-  it("maps a detailed negative tile to its parent index tile", async () => {
+  it("maps a solid-color detailed negative tile to its parent index tile", async () => {
     const worldDirectory = await mkdtemp(join(tmpdir(), "mapelix-detail-"));
     try {
       const databaseDirectory = join(worldDirectory, "db");
@@ -55,7 +55,7 @@ describe("openBedrockWorld", () => {
       }
 
       expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: -192, maxZ: 64 });
-      expect(colors.size).toBeGreaterThan(1);
+      expect(colors).toEqual(new Set(["95,146,61,255"]));
     } finally {
       await rm(worldDirectory, { recursive: true, force: true });
     }

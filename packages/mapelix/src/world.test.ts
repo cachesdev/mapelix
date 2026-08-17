@@ -51,6 +51,46 @@ function data2DChunk(chunkX: number, chunkZ: number, biomeId: number) {
   };
 }
 
+function flatGroundSubchunk(withCover: boolean): { key: Uint8Array; value: Uint8Array } {
+  const subchunkY = 4;
+  const words = new Uint8Array(Math.ceil(4096 / 16) * 4);
+  const view = new DataView(words.buffer);
+  const setIndex = (blockIndex: number, paletteIndex: number) => {
+    const wordIndex = Math.floor(blockIndex / 16);
+    const shift = (blockIndex % 16) * 2;
+    const word = view.getUint32(wordIndex * 4, true);
+    view.setUint32(wordIndex * 4, word | (paletteIndex << shift), true);
+  };
+  for (let localZ = 0; localZ < 16; localZ += 1) {
+    for (let localX = 0; localX < 16; localX += 1) {
+      setIndex(localX * 256 + localZ * 16 + 14, 1);
+    }
+  }
+  if (withCover) setIndex(8 * 256 + 8 * 16 + 15, 2);
+
+  const palette = new Uint8Array([
+    10,
+    0,
+    0,
+    ...nbtString("name", "minecraft:air"),
+    0,
+    10,
+    0,
+    0,
+    ...nbtString("name", "minecraft:grass_block"),
+    0,
+    10,
+    0,
+    0,
+    ...nbtString("name", "minecraft:short_grass"),
+    0,
+  ]);
+  return {
+    key: new Uint8Array([...int32(0), ...int32(0), 0x2f, subchunkY]),
+    value: new Uint8Array([9, 1, subchunkY, 4, ...words, 3, 0, 0, 0, ...palette]),
+  };
+}
+
 describe("createBedrockWorld", () => {
   it("renders a decoded surface at the correct negative tile coordinate", async () => {
     const world = createBedrockWorld([singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block")]);
@@ -90,7 +130,7 @@ describe("createBedrockWorld", () => {
     expect(tile.rgba[pixelOffset + 1]).toBeGreaterThan(114);
   });
 
-  it("renders genuine four-pixel block detail at zoom two", async () => {
+  it("renders one untextured block color across four pixels at zoom two", async () => {
     const world = createBedrockWorld([singleBlockSubchunk(0, 0, 4, "minecraft:oak_leaves", 0, 0)]);
 
     const tile = await world.renderTile({ dimension: "overworld", z: 2, x: 0, y: 0 });
@@ -103,7 +143,20 @@ describe("createBedrockWorld", () => {
     }
 
     expect(tile.bounds).toEqual({ minX: 0, minZ: 0, maxX: 64, maxZ: 64 });
-    expect(colors.size).toBeGreaterThan(1);
+    expect(colors).toEqual(new Set(["59,118,57,255"]));
     expect(tile.rgba[(4 * 256 + 4) * 4 + 3]).toBe(0);
+  });
+
+  it("does not let decorative cover alter its neighbor's terrain lighting", async () => {
+    const plain = createBedrockWorld([flatGroundSubchunk(false)]);
+    const covered = createBedrockWorld([flatGroundSubchunk(true)]);
+
+    const plainTile = await plain.renderTile({ dimension: "overworld", z: 3, x: 0, y: 0 });
+    const coveredTile = await covered.renderTile({ dimension: "overworld", z: 3, x: 0, y: 0 });
+    const neighborOffset = ((8 * 8 + 4) * 256 + (9 * 8 + 4)) * 4;
+
+    expect(Array.from(coveredTile.rgba.slice(neighborOffset, neighborOffset + 4))).toEqual(
+      Array.from(plainTile.rgba.slice(neighborOffset, neighborOffset + 4)),
+    );
   });
 });

@@ -29,6 +29,8 @@ export interface RenderedTile {
 export interface SurfaceBlock {
   readonly name: string;
   readonly y: number;
+  /** Supporting terrain height when decorative cover must not alter lighting or cast shadows. */
+  readonly supportY?: number;
   /** Numeric Bedrock biome identifier when the world stores a compatible biome record. */
   readonly biomeId?: number;
   /** Number of visible water blocks above the first non-water block. */

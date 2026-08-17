@@ -4,6 +4,67 @@ import { renderSurface } from "./render.js";
 import { TILE_SIZE, type SurfaceBlock } from "./tile.js";
 
 describe("renderSurface", () => {
+  it.each([256, 128, 64, 32])(
+    "keeps a uniform flat grass field uniform at sample size %i",
+    (sampleSize) => {
+      const samples = Array.from(
+        { length: sampleSize * sampleSize },
+        (): SurfaceBlock => ({ name: "minecraft:grass_block", y: 64, biomeId: 1 }),
+      );
+
+      const rgba = renderSurface(samples);
+      const first = rgba.slice(0, 4);
+      expect(rgba.every((channel, index) => channel === first[index % 4])).toBe(true);
+    },
+  );
+
+  it("keeps block interiors flat and confines height lighting to edge pixels", () => {
+    const sampleSize = 32;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:iron_block", y: 64 }),
+    );
+    samples[16 * sampleSize + 17] = { name: "minecraft:iron_block", y: 80 };
+
+    const rgba = renderSurface(samples, {
+      resolveBlockStyle: () => ({ red: 100, green: 100, blue: 100, alpha: 255 }),
+    });
+    const reds = Array.from({ length: pixelsPerBlock }, (_, localX) => {
+      const x = 16 * pixelsPerBlock + localX;
+      const z = 16 * pixelsPerBlock + Math.floor(pixelsPerBlock / 2);
+      return rgba[(z * TILE_SIZE + x) * 4]!;
+    });
+
+    expect(new Set(reds.slice(0, -1))).toEqual(new Set([100]));
+    expect(reds.at(-1)).toBeGreaterThan(100);
+  });
+
+  it("lights decorative cover from its supporting ground height", () => {
+    const sampleSize = 32;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:grass_block", y: 64, biomeId: 1 }),
+    );
+    const covered = [...samples];
+    covered[16 * sampleSize + 16] = {
+      name: "minecraft:short_grass",
+      y: 65,
+      supportY: 64,
+      biomeId: 1,
+    };
+
+    const plainRgba = renderSurface(samples);
+    const coveredRgba = renderSurface(covered);
+    const neighborX = 17 * 8 + 4;
+    const neighborZ = 16 * 8 + 4;
+    const neighborOffset = (neighborZ * TILE_SIZE + neighborX) * 4;
+
+    expect(Array.from(coveredRgba.slice(neighborOffset, neighborOffset + 4))).toEqual(
+      Array.from(plainRgba.slice(neighborOffset, neighborOffset + 4)),
+    );
+  });
+
   it("leaves missing world data transparent", () => {
     const rgba = renderSurface(
       Array.from({ length: TILE_SIZE * TILE_SIZE }, (): SurfaceBlock | undefined => undefined),
@@ -20,7 +81,7 @@ describe("renderSurface", () => {
     samples[1] = { name: "minecraft:grass_block", y: 72 };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([99, 158, 66, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([97, 155, 64, 255]);
     expect(rgba[4]).toBeGreaterThan(rgba[0] ?? 0);
     expect(rgba[7]).toBe(255);
   });
@@ -40,7 +101,7 @@ describe("renderSurface", () => {
     };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([105, 111, 53, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([90, 96, 46, 255]);
     expect(rgba[4]).toBeLessThan(rgba[5] ?? 0);
     expect(rgba[7]).toBe(255);
   });

@@ -232,6 +232,7 @@ function findSurfaceBlock(
   localX: number,
   localZ: number,
 ): SurfaceBlock | undefined {
+  let decorativeCover: SurfaceBlock | undefined;
   let waterSurface: SurfaceBlock | undefined;
   let fluidDepth = 0;
   for (const subchunk of subchunks) {
@@ -240,11 +241,20 @@ function findSurfaceBlock(
       const paletteIndex = subchunk.primary.indexes[blockIndex];
       const name = paletteIndex === undefined ? undefined : subchunk.primary.palette[paletteIndex];
       if (name !== undefined && !isAir(name)) {
+        const y = subchunk.y * 16 + localY;
+        if (decorativeCover !== undefined) {
+          if (isDecorativeCover(name)) continue;
+          return { ...decorativeCover, supportY: y };
+        }
+        if (isDecorativeCover(name)) {
+          decorativeCover = { name, y };
+          continue;
+        }
         if (waterSurface === undefined) {
           if (!isWater(name)) {
-            return { name, y: subchunk.y * 16 + localY };
+            return { name, y };
           }
-          waterSurface = { name, y: subchunk.y * 16 + localY };
+          waterSurface = { name, y };
           fluidDepth = 1;
         } else if (isWater(name)) {
           fluidDepth += 1;
@@ -254,7 +264,26 @@ function findSurfaceBlock(
       }
     }
   }
+  if (decorativeCover !== undefined) return decorativeCover;
   return waterSurface === undefined ? undefined : { ...waterSurface, fluidDepth };
+}
+
+function isDecorativeCover(name: string): boolean {
+  const separator = name.indexOf(":");
+  const block = separator === -1 ? name : name.slice(separator + 1);
+  return (
+    block === "short_grass" ||
+    block === "tall_grass" ||
+    block === "tallgrass" ||
+    block === "fern" ||
+    block === "large_fern" ||
+    block === "deadbush" ||
+    block.endsWith("_sapling") ||
+    block.endsWith("_flower") ||
+    /^(?:dandelion|poppy|blue_orchid|allium|azure_bluet|.*_tulip|oxeye_daisy|cornflower|lily_of_the_valley|wither_rose|sunflower|lilac|rose_bush|peony|torchflower|pitcher_plant)$/.test(
+      block,
+    )
+  );
 }
 
 function isAir(name: string): boolean {

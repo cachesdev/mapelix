@@ -27,7 +27,9 @@ port.on("message", (request: WorkerRequest) => {
   void renderIndexedTile(request.job)
     .then((tile) => {
       const response: WorkerSuccess = { id: request.id, tile };
-      port.postMessage(response, [tile.rgba.buffer as ArrayBuffer, tile.png.buffer as ArrayBuffer]);
+      // PNG encoders can return a small pooled Buffer whose backing store Node marks untransferable.
+      // Clone the compressed PNG and transfer only the renderer-owned RGBA allocation.
+      port.postMessage(response, [tile.rgba.buffer as ArrayBuffer]);
     })
     .catch((cause: unknown) => {
       const response: WorkerFailure = {

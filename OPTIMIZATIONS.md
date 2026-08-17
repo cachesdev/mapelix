@@ -27,6 +27,19 @@ MAPELIX_BENCH_WORKERS=1 \
 pnpm --filter @mapelix/core benchmark:zoom
 ```
 
+Measure periodic block-grid contrast in a rendered tile with:
+
+```sh
+pnpm --filter @mapelix/core diagnose:grid \
+  http://127.0.0.1:5173/tiles/3/-93/-83.png 8 200 200 16
+```
+
+Measure Sobel and Laplacian edge energy with:
+
+```sh
+pnpm --filter @mapelix/core diagnose:sharpness path/to/tile.png
+```
+
 Timing can vary with the filesystem cache. Compare repeated experiments in the same WSL session and use the JSON data rather than Turbo's total duration.
 
 ## Successful optimizations
@@ -41,12 +54,14 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 | Retain compact biome payloads for the render halo | 42.97 s | 1.26 s for both | 1.14 s for both | 1.60 GiB | Keep only the 256/512-byte biome payload, not the unused 512-byte Data2D height prefix. Send the halo with worker jobs instead of reopening LevelDB files. This restored repeated rendering from 3.08 s to 1.14 s and cut retained array buffers from about 230 MiB to 110 MiB. |
 | Eight workers for eight dense visual tiles | 42.68 s | 2.07 s for all eight | 1.96 s for all eight | 2.53 GiB | The process reached 4.08 tiles/s and used 9.19 CPU cores during the first batch. Compared with two workers, throughput improved 2.33× for 4× the workers, about 58% parallel efficiency. Actual Mapelix peak RSS stayed below 4 GiB. |
 | Zoom-aware packed-key filtering | 41.46 s | 1× 1.65 s; 2× 0.63 s; 4× 0.37 s; 8× 0.30 s | 1× 1.17 s; 2× 0.61 s; 4× 0.38 s; 8× 0.27 s | 1.27 GiB | Keep every PNG at 256×256, reduce its world bounds at higher zooms, and filter packed keys before worker dispatch. More detailed tiles became faster because they decoded fewer chunks. PNG size also fell from 172.5 KB at 1× to 114.7 KB at 8×. |
+| Remove generated per-block grain and bevels | 42.03 s | 1× 1.41 s; 2× 0.55 s; 4× 0.34 s; 8× 0.15 s | 1× 1.26 s; 2× 0.57 s; 4× 0.26 s; 8× 0.15 s | 1.28 GiB | Keep material color flat and block-sized. Decorative cover uses its supporting ground height and does not cast false terrain shadows. The grid ratio at `(-2950, -2630)` fell from 1.93 to 0; the 8× PNG fell from 114.7 KB to 56.8 KB. These timings include the later-rejected bilinear light field and are retained only as that experiment's performance record. |
+| Output-resolution height normals and shadow rays | 49.22 s | 1× 1.62 s; 2× 0.59 s; 4× 0.35 s; 8× 0.18 s | 1× 1.45 s; 2× 0.61 s; 4× 0.37 s; 8× 0.18 s | 1.27 GiB | Nearest-expand terrain heights, then derive Lambert edge light and directional shadows at output resolution. The flat-area grid ratio stayed 0. Against the rejected blur, dense-tile mean Sobel rose 63%, mean absolute Laplacian rose 135%, and strong-edge pixels rose from 9.6% to 24.3%. |
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
 
-The visual comparison selected 4×4 pixels per block as the best general detail level. It makes block faces and tree crowns readable without dominating the viewport. The 8×8 level is useful for close inspection, but it exposes the limits of procedural material detail and is the point where real downsampled block textures would add the most value.
+The first visual comparison selected 4×4 pixels per block as the best general detail level. It makes tree crowns and structure edges readable without dominating the viewport. The untextured 8×8 level is useful for close inspection, but actual resource-pack top textures are the correct next source of within-block detail.
 
-An early 8×8 pass restarted the same diagonal brightness gradient inside every block. On flat terrain this made a visible grid with about 10 red-channel levels of corner-to-corner bias. Random material detail can vary inside a block, but it must not contain a non-tileable directional gradient. Height-step edge lighting remains separate and only appears when adjacent block heights differ.
+An early 8×8 pass restarted a brightness gradient and seeded noise inside every block. Removing only the diagonal was insufficient: the exact flat Stratos crop still had 1.93× more luminance change across block boundaries than inside them. The final untextured rule is stricter: do not generate any within-block material detail. Use actual top-face texture assets when texture mode exists.
 
 ## Runtime scaling observations
 
@@ -72,3 +87,5 @@ Record changes here when they fail, regress a metric, or only move cost elsewher
 | Replace effective-key `Array.from(...).join("")` hex encoding with repeated lookup-table concatenation | Index time regressed from 38.31 s to 51.73 s and peak RSS grew from 1.34 GiB to 1.55 GiB. | V8's repeated string concatenation retained costly intermediate string representations in this workload. Reverted. A binary or numeric key index is the next useful experiment. |
 | Blend each biome-tinted pixel with a direct 5×5 neighbor loop | Repeated two-tile rendering regressed from 0.98 s to 3.23 s and peak RSS grew from 1.34 GiB to 1.60 GiB. | Correct visual behavior, wrong computation shape. Replace repeated style and string-key lookups with one compact tile field and an integral image. |
 | Narrow biome blending and height-independent contour shadows | Two identical two-worker runs measured 1.40 s and 1.18 s for the repeated pair, or 1.43–1.70 tiles/s, with 1.65–1.66 GiB peak RSS. Cold Playwright took 59.7 s versus 58.8 s for terrain-v2. | Performance is neutral within observed run variance. A two-block biome transition, three-block shadow reach, and fixed contour tones materially improved block readability without a measurable end-to-end cost. |
+| Procedural per-block texture and edge relief | At `(-2950, -2630)`, the 8× tile had a 1.93 periodic-grid ratio even after removing its repeated diagonal gradient. | A separate micro-image per block is the wrong primitive for an untextured cartographic map. It was removed rather than blurred. |
+| Bilinearly interpolate block-center lighting | The flat-area grid disappeared, but every tree crown, shoreline, structure edge, and shadow became visibly soft. | Interpolation was a low-pass filter over the signal we needed to preserve. Derive a one- or two-pixel response from output-resolution height discontinuities instead. |

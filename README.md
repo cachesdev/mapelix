@@ -6,7 +6,7 @@ The first milestone reads a Bedrock world, renders standard 256 by 256 XYZ tiles
 
 The repository also includes a disposable SvelteKit viewer for the copied Stratos world. It proves that the module can support a real interactive Leaflet map. A Canopy integration remains future work.
 
-The prototype is proven against a real Bedrock world fixture and the large Stratos world. It reads LevelDB table and log data, decodes v9 palette subchunks and negative Y levels, finds the top visible block, applies biome colors, water compositing, relief, and shadows, and writes transparent PNG tiles. A Playwright test checks the generated terrain image in Chromium.
+The prototype is proven against a real Bedrock world fixture and the large Stratos world. It reads LevelDB table and log data, decodes v9 palette subchunks and negative Y levels, finds the top visible block, applies biome colors, water compositing, shared height-field lighting, and shadows, and writes transparent PNG tiles. A Playwright test checks the generated terrain image in Chromium.
 
 ## Commands
 
