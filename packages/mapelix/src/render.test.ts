@@ -394,7 +394,7 @@ describe("renderSurface", () => {
     );
     const blockX = 20;
     const blockZ = 20;
-    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 65 };
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 66 };
 
     const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
     const lit = renderSurface(samples, { shadows: false, resolveBlockStyle });
@@ -411,6 +411,55 @@ describe("renderSurface", () => {
     expect(mask).toEqual(["####", ".###", ".###", "...."]);
   });
 
+  it("does not cast a volume shadow from a one-block terrain step", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    const blockX = 20;
+    const blockZ = 20;
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 65 };
+
+    const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
+    const shadowless = renderSurface(samples, { shadows: false, resolveBlockStyle });
+    const shaded = renderSurface(samples, { resolveBlockStyle });
+    const receiverPixels = Array.from({ length: pixelsPerBlock * pixelsPerBlock }, (_, pixel) => {
+      const x = blockX * pixelsPerBlock + (pixel % pixelsPerBlock);
+      const z = blockZ * pixelsPerBlock + Math.floor(pixel / pixelsPerBlock);
+      const offset = (z * TILE_SIZE + x) * 4;
+      return { shadowless: shadowless[offset], shaded: shaded[offset] };
+    });
+
+    expect(receiverPixels.every((pixel) => pixel.shaded === pixel.shadowless)).toBe(true);
+  });
+
+  it("can correct uNmINeD's elevated models-off shadow receiver", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    const blockX = 20;
+    const blockZ = 20;
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 65 };
+
+    const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
+    const shadowless = renderSurface(samples, { shadows: false, resolveBlockStyle });
+    const parity = renderSurface(samples, { resolveBlockStyle });
+    const corrected = renderSurface(samples, { correctReferenceBugs: true, resolveBlockStyle });
+    const receiverOffsets = Array.from({ length: pixelsPerBlock * pixelsPerBlock }, (_, pixel) => {
+      const x = blockX * pixelsPerBlock + (pixel % pixelsPerBlock);
+      const z = blockZ * pixelsPerBlock + Math.floor(pixel / pixelsPerBlock);
+      return (z * TILE_SIZE + x) * 4;
+    });
+
+    expect(receiverOffsets.every((offset) => parity[offset] === shadowless[offset])).toBe(true);
+    expect(receiverOffsets.some((offset) => corrected[offset]! < parity[offset]!)).toBe(true);
+  });
+
   it("smooths foliage opacity by each subpixel ray chord", () => {
     const sampleSize = 64;
     const pixelsPerBlock = TILE_SIZE / sampleSize;
@@ -420,7 +469,7 @@ describe("renderSurface", () => {
     );
     const blockX = 20;
     const blockZ = 20;
-    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:oak_leaves", y: 65 };
+    samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:oak_leaves", y: 66 };
 
     const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
     const lit = renderSurface(samples, { shadows: false, resolveBlockStyle });
@@ -508,7 +557,7 @@ describe("renderSurface", () => {
     expect(redAt(18, 24)).toBeLessThan(redAt(24, 18));
   });
 
-  it("uses a stable shadow tone for one-block and tall height steps", () => {
+  it("uses a stable shadow tone for two-block and tall height steps", () => {
     const renderShadow = (sourceHeight: number) => {
       const samples = Array.from(
         { length: TILE_SIZE * TILE_SIZE },
@@ -518,7 +567,7 @@ describe("renderSurface", () => {
       return renderSurface(samples)[(11 * TILE_SIZE + 11) * 4]!;
     };
 
-    expect(Math.abs(renderShadow(65) - renderShadow(84))).toBeLessThanOrEqual(2);
+    expect(Math.abs(renderShadow(66) - renderShadow(84))).toBeLessThanOrEqual(2);
   });
 
   it("uses a stable edge highlight for one-block and tall height steps", () => {
@@ -543,7 +592,7 @@ describe("renderSurface", () => {
         (): SurfaceBlock | undefined => undefined,
       );
       samples[targetIndex] = { name: "minecraft:stone", y: 64 };
-      if (sourceName !== undefined) samples[0] = { name: sourceName, y: 66 };
+      if (sourceName !== undefined) samples[0] = { name: sourceName, y: 67 };
       return renderSurface(samples)[targetIndex * 4]!;
     };
 

@@ -52,6 +52,23 @@ edges, and white for exact overlap. The command also reports alignment,
 one-pixel-tolerant edge precision and recall, block-grid contrast, and
 within-block luminance variation.
 
+Compare block colors without cast shadows and report the worst world XYZ,
+block name, biome, water depth, and underwater block:
+
+```sh
+pnpm --filter @mapelix/core diagnose:color \
+  mapelix-shadowless.png unmined-shadowless.png color-error.png \
+  4 -32 -49 color-report.json surface.json
+```
+
+Compare cast shadows independently from material colors and local contours:
+
+```sh
+pnpm --filter @mapelix/core diagnose:shadows \
+  mapelix.png mapelix-shadowless.png unmined.png unmined-shadowless.png \
+  shadow-overlay.png 4 -32 -49 shadow-report.json surface.json
+```
+
 Timing can vary with the filesystem cache. Compare repeated experiments in the same WSL session and use the JSON data rather than Turbo's total duration.
 
 ## Successful optimizations
@@ -75,6 +92,8 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 | Correct Z/X biomes, classic colors, and memoized style lookup | 88.53 s | 4× 0.72 s before memoization | Not measured | 1.51 GiB | Fixing the transposed Data2D index and matching classic grass, foliage, water, dye, light, crop, and flower colors raised published-reference edge F1 from 0.922 to 0.928 and luminance correlation from 0.890 to 0.912. RGB error fell from 11.92 to 10.60. Per-tile block-style and biome caches reduced a real-fixture 4× regression from 162/98 ms cold/repeated to 89/78 ms; the pre-color baseline was 80/67 ms. |
 | Lazy modern Data3D biomes at visible Y | 98.51 s | 4× 0.55 s | Not measured | Not measured | Index Data3D keys without retaining their values, then decode only the selected tile. Correctly preserving modern IDs such as `190` and `192`, instead of treating them as legacy mutation aliases, raised published-reference exact edge F1 from 0.928 to 0.943 and tolerant F1 from 0.985 to 0.991. RGB error fell from 10.60 to 8.56 and luminance error from 8.19 to 5.61. A regression test prevents `grass_path` from receiving biome tint. |
 | Reconstructed comparison-only LevelDB manifest | 6.85 s official uNmINeD open and render | One lossless 4× tile | Not measured | 379 MiB | A classic manifest over all 556 valid tables lets the official CLI render lossless PNG from an isolated copy. This removes JPEG noise from palette and shadow evaluation. The source world hashes remained unchanged; reconstructed table precedence is comparison-only and not a Minecraft repair. |
+| Exact models-off receiver origin and sparse shadow sampling | 93.78 s | 4× 0.83 s | Not measured | 1.81 GiB | Reproduce uNmINeD's elevated shadow receiver and its corner/edge/interior sampling gates. On the lossless Amelix forest-town pair, shadow-mask F1 rose from 0.600 to 0.995, shadow-loss correlation rose from 0.597 to 0.994, and mean shadow loss became 0.03773 versus 0.03785. Full-image edge F1 reached 0.993 with 0.999 one-pixel-tolerant F1. Keep the physically correct receiver behind `correctReferenceBugs: true`; parity remains the default. |
+| Lossless per-block color oracle | Same indexed world | 4× shadowless tile | Not measured | Same scan | Against a local lossless uNmINeD PNG, 99.83% of 4,096 blocks are within perceptual error 3 and all are within 6. Mean perceptual error is 0.346. The seven large residuals are shallow water at world Z `-3104`, exactly on a chunk boundary, which is consistent with comparison-world precedence rather than a general palette error. |
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
 
@@ -88,9 +107,15 @@ An early 8×8 pass restarted a brightness gradient and seeded noise inside every
 - World: `Amelix SMP`, about 1.2 GB with 556 table files and one log file
 - Exact native tile: zoom 2, `x=-32`, `y=-49`, covering X `[-2048,-1984)` and Z `[-3136,-3072)`
 - Mapelix with eight workers: 88.14 s cold in-memory index, 321.70 ms tile render, 1.53 GiB peak RSS
-- Published oracle: uNmINeD `zoom.2/-4/-5/tile.-32.-49.jpeg`
+- Numeric oracle: local lossless uNmINeD PNG from the comparison-only classic
+  manifest, `unmined-classic-z2-x-32-y-49.png`
+- Published JPEG: `zoom.2/-4/-5/tile.-32.-49.jpeg`; use it only for historical
+  visual checks because quality-75 chroma subsampling changes colors and edges
 
-The geometry in this exact pair aligns. The first symmetric-normal baseline
+The geometry in this exact pair aligns. The final lossless comparison has
+0.993 exact edge F1, 0.999 one-pixel-tolerant edge F1, and 0.996 luminance
+correlation. Shadow-only F1 is 0.995 and shadow-loss correlation is 0.994.
+Mean absolute RGB-channel error is 1.20. The first symmetric-normal baseline
 had 39.27 mean Sobel energy, 18.28% strong-edge pixels, and 58.81% reference
 edge recall with one-pixel tolerance. Replacing it with one stored contour per
 shared height edge raised those values to 47.74, 28.83%, and 84.73%. The exact
@@ -99,11 +124,11 @@ edge F1 rose from 0.434 to 0.677; one-pixel-tolerant F1 rose from 0.701 to
 misplaced structure. The remaining reference-only edges cluster around cast
 shadows and small material features.
 
-The official uNmINeD 0.20.1 Linux CLI is usable as a local oracle, but it
-rejects this backup before rendering because its manifest references missing
-table `32439120`. Mapelix's raw record scan tolerates the backup and rendered
-the aligned tile. Use a clean Bedrock checkpoint when comparing fresh outputs
-from both renderers.
+The official uNmINeD 0.20.1 Linux CLI is usable as a local oracle. The original
+backup manifest references missing table `32439120`, so the CLI rejects it.
+An isolated comparison copy with a reconstructed classic manifest opens all
+556 valid tables and produces lossless PNGs. Do not treat that manifest as a
+Minecraft world repair; it exists only to keep renderer comparisons aligned.
 
 ## Runtime scaling observations
 

@@ -1,5 +1,6 @@
 import { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
 import { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
+import { sampleShadowPixels } from "./shadow-sampling.js";
 import { TILE_SIZE, type SurfaceSamples } from "./tile.js";
 
 export interface RenderSurfaceOptions {
@@ -8,6 +9,12 @@ export interface RenderSurfaceOptions {
   readonly biomeBlendRadius?: number;
   /** Enables the uNmINeD-compatible 3D-opacity cast-shadow pass. Defaults to true. */
   readonly shadows?: boolean;
+  /**
+   * Correct confirmed reference-renderer bugs instead of reproducing them for image parity.
+   * Defaults to false. The current correction starts models-off shadow rays at the physical
+   * top face instead of uNmINeD's nearly one-block-high receiver origin.
+   */
+  readonly correctReferenceBugs?: boolean;
 }
 
 export interface RenderSurfaceContext {
@@ -47,6 +54,7 @@ export function renderSurface(
   const resolveBlockStyle = options.resolveBlockStyle ?? memoizeBlockStyle(defaultBlockStyle);
   const biomeBlendRadius = options.biomeBlendRadius ?? 0;
   const castShadows = options.shadows ?? true;
+  const correctReferenceBugs = options.correctReferenceBugs ?? false;
   if (!Number.isSafeInteger(biomeBlendRadius) || biomeBlendRadius < 0) {
     throw new RangeError(`Biome blend radius must be a non-negative integer`);
   }
@@ -81,6 +89,7 @@ export function renderSurface(
         pixelsPerBlock,
         maximumHeight,
         castShadows,
+        correctReferenceBugs,
         x,
         z,
         base,
@@ -108,8 +117,7 @@ function calculateOutputShade(
   outputX: number,
   outputZ: number,
   sample: NonNullable<SurfaceSamples[number]>,
-  maximumHeight: number,
-  castShadows: boolean,
+  shadowGain: number,
 ): number {
   const height = reliefHeight(sample);
   const relief =
@@ -124,19 +132,7 @@ function calculateOutputShade(
           height,
           sample,
         );
-  if (!castShadows) return relief;
-  return (
-    relief *
-    castOutputShadow(
-      samples,
-      sampleSize,
-      pixelsPerBlock,
-      outputX,
-      outputZ,
-      terrainHeight(sample),
-      maximumHeight,
-    )
-  );
+  return relief * shadowGain;
 }
 
 function calculateSinglePixelRelief(
@@ -233,7 +229,12 @@ function outputHeight(
   return sample === undefined ? fallback : reliefHeight(sample);
 }
 
-function castOutputShadow(
+interface ShadowTrace {
+  readonly gain: number;
+  readonly hit: boolean;
+}
+
+function traceOutputShadow(
   samples: SurfaceSamples,
   sampleSize: number,
   pixelsPerBlock: number,
@@ -241,11 +242,12 @@ function castOutputShadow(
   outputZ: number,
   height: number,
   maximumHeight: number,
-): number {
-  if (height >= maximumHeight) return 1;
+  correctReferenceBugs: boolean,
+): ShadowTrace {
+  if (height > maximumHeight) return { gain: 1, hit: false };
 
   const originX = (outputX + 0.5) / pixelsPerBlock;
-  const originY = height + 255 / 256;
+  const originY = height + (correctReferenceBugs ? 0 : 255 / 256);
   const originZ = (outputZ + 0.5) / pixelsPerBlock;
   let voxelX = Math.floor(originX);
   let voxelY = Math.floor(originY);
@@ -257,6 +259,7 @@ function castOutputShadow(
   const stepY = 1 / SHADOW_SUN_Y;
   const stepZ = 1 / -SHADOW_SUN_Z;
   let transmission = 1;
+  let hit = false;
 
   while (voxelY <= maximumHeight && transmission > 0) {
     const next = Math.min(nextX, nextY, nextZ);
@@ -280,10 +283,12 @@ function castOutputShadow(
       const candidateY = voxelY + (combination & 2 ? 1 : 0);
       const candidateZ = voxelZ - (combination & 4 ? 1 : 0);
       const opacity = shadowOpacityAt(samples, sampleSize, candidateX, candidateY, candidateZ);
-      if (opacity >= 1) return SHADOW_MINIMUM_LIGHT;
+      if (opacity <= 0) continue;
+      hit = true;
+      if (opacity >= 1) return { gain: SHADOW_MINIMUM_LIGHT, hit };
       if (combination === crossedAxes) {
         transmission *= 1 - opacity * chordScale;
-        if (transmission <= 0) return SHADOW_MINIMUM_LIGHT;
+        if (transmission <= 0) return { gain: SHADOW_MINIMUM_LIGHT, hit };
       }
     }
 
@@ -302,7 +307,10 @@ function castOutputShadow(
     if (voxelX < 0 || voxelX >= sampleSize || voxelZ < 0 || voxelZ >= sampleSize) break;
   }
 
-  return SHADOW_MINIMUM_LIGHT + (1 - SHADOW_MINIMUM_LIGHT) * transmission;
+  return {
+    gain: SHADOW_MINIMUM_LIGHT + (1 - SHADOW_MINIMUM_LIGHT) * transmission,
+    hit,
+  };
 }
 
 function shadowOpacityAt(
@@ -640,16 +648,28 @@ function writeSurfaceBlock(
   pixelsPerBlock: number,
   maximumHeight: number,
   castShadows: boolean,
+  correctReferenceBugs: boolean,
   blockX: number,
   blockZ: number,
   base: RgbaColor,
 ): void {
+  const sample = samples[blockZ * sampleSize + blockX];
+  if (sample === undefined) return;
+  const shadowGains = blockShadowGains(
+    samples,
+    sampleSize,
+    pixelsPerBlock,
+    blockX,
+    blockZ,
+    terrainHeight(sample) + 1,
+    maximumHeight,
+    castShadows,
+    correctReferenceBugs,
+  );
   for (let pixelZ = 0; pixelZ < pixelsPerBlock; pixelZ += 1) {
     for (let pixelX = 0; pixelX < pixelsPerBlock; pixelX += 1) {
       const outputX = blockX * pixelsPerBlock + pixelX;
       const outputZ = blockZ * pixelsPerBlock + pixelZ;
-      const sample = samples[blockZ * sampleSize + blockX];
-      if (sample === undefined) continue;
       const shade = calculateOutputShade(
         samples,
         sampleSize,
@@ -657,12 +677,43 @@ function writeSurfaceBlock(
         outputX,
         outputZ,
         sample,
-        maximumHeight,
-        castShadows,
+        shadowGains[pixelZ * pixelsPerBlock + pixelX]!,
       );
       writeColor(target, (outputZ * TILE_SIZE + outputX) * 4, base, shade);
     }
   }
+}
+
+function blockShadowGains(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  pixelsPerBlock: number,
+  blockX: number,
+  blockZ: number,
+  originY: number,
+  maximumHeight: number,
+  castShadows: boolean,
+  correctReferenceBugs: boolean,
+): Float64Array {
+  const gains = new Float64Array(pixelsPerBlock * pixelsPerBlock);
+  gains.fill(1);
+  if (!castShadows || originY > maximumHeight) return gains;
+
+  sampleShadowPixels(pixelsPerBlock, (pixelX, pixelZ) => {
+    const trace = traceOutputShadow(
+      samples,
+      sampleSize,
+      pixelsPerBlock,
+      blockX * pixelsPerBlock + pixelX,
+      blockZ * pixelsPerBlock + pixelZ,
+      originY,
+      maximumHeight,
+      correctReferenceBugs,
+    );
+    if (trace.hit) gains[pixelZ * pixelsPerBlock + pixelX] = trace.gain;
+    return trace.hit;
+  });
+  return gains;
 }
 
 function writeColor(target: Uint8Array, offset: number, base: RgbaColor, shade: number): void {

@@ -362,11 +362,38 @@ z = (pixel_z + 0.5) / N
 y = 255 / 256
 ```
 
-At zoom 2, X and Z are therefore `0.125, 0.375, 0.625, 0.875`. The actual
-world origin adds the block position and the rendered surface Y. The
-`255/256` vertical offset starts just below the voxel's top boundary and avoids
-an exact-boundary self-hit. The origin voxel `(0,0,0)` is removed from the
+At zoom 2, X and Z are therefore `0.125, 0.375, 0.625, 0.875`. The occupancy
+traversal translates this precomputed relative path by the runtime integer
+`blockY`. It does not rebuild the path from the runtime fractional `subY`. The
+`255/256` offset starts just below a voxel's top boundary and avoids an
+exact-boundary self-hit. The origin voxel `(0,0,0)` is removed from the
 precomputed relative path.
+
+This distinction creates an important models-off compatibility quirk. The
+normal solid-color renderer writes `(TopY + 1) * 256` to the pixel height map.
+The shadow pass decodes that value as `blockY = TopY + 1` and `subY = 0`.
+Because the occupancy DDA still uses its precomputed relative Y of `255/256`,
+its effective origin is:
+
+```text
+TopY + 1 + 255/256
+```
+
+Its first tested voxel is therefore at world Y `TopY + 2`. In contrast, the
+model/textured renderer writes `TopY * 256 + 255`, giving an effective
+occupancy origin of `TopY + 255/256` and first tested voxel Y `TopY + 1`.
+`TopY` is the actual occupied block coordinate; it is not an upper-boundary
+coordinate.
+
+The caster also constructs a runtime geometric point at
+`blockY + subY/256`. That point is `TopY + 1.0` in the solid-color case, but it
+is used only for block-model intersection tests. It does not control ordinary
+3D-opacity voxel traversal. Block models are disabled on the published
+solid-color path, so the effective occupancy origin above is the relevant one.
+This appears physically high by almost one block, but it is the observed
+reference behavior that a parity implementation must reproduce. The shadow
+map's occupied run coordinates and maximum Y remain ordinary world block Ys;
+only the receiver height passed to the ray traversal is shifted.
 
 The voxel traversal is a supercover DDA:
 
@@ -459,9 +486,10 @@ Sources: `ShadowCasterPool.GetSunAngle`, `ShadowCaster`,
 
 ### Deterministic zoom-2 shadow acceptance cases
 
-These cases were checked by invoking the inspected build against a synthetic
-shadow-map interface. They isolate cast shadows by disabling local elevation
-shading. The receiver is a full block with top Y=0 at world `(0,0)`. Matrix
+These cases were checked by invoking the inspected caster directly against a
+synthetic shadow-map interface. They isolate cast shadows by disabling local
+elevation shading. The direct probe uses `blockY=0, subY=255`; it is a DDA
+oracle, not the integrated models-off height-map path described above. Matrix
 columns are its four output X samples, and rows are its four output Z samples.
 `#` means the ray encounters the stated opaque block.
 
@@ -499,6 +527,14 @@ unhit     unhit     unhit     unhit
 
 For example, ray light 0.484259 becomes final RGB gain
 `0.6 + 0.4 * 0.484259 = 0.793704` before byte truncation.
+
+For an integrated solid-color receiver whose actual top block is Y=0, the same
+three masks require their synthetic occluders one block higher: north at
+`(0,2,-1)` and northwest at `(-1,2,-1)`. An occluder at Y=1 is below the first
+tested occupancy voxel and does not cast this models-off shadow. A synthetic
+`TerrainRendererState` invocation confirmed the full chain for `TopY=64`: the
+stored height was `16640`, decoded as `(blockY=65, subY=0)`, and the first
+shadow-map query was Y=66. The equivalent topY-based trace first queried Y=65.
 
 ### Shadow columns preserve vertical air gaps
 
