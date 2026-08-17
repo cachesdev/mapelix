@@ -178,6 +178,24 @@ describe("renderSurface", () => {
     ]);
   });
 
+  it("keeps mossy masonry flat while natural cobblestone follows elevation lightness", () => {
+    const mossy = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name: "minecraft:mossy_cobblestone", y: 99 }),
+    );
+    const natural = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock => ({ name: "minecraft:cobblestone", y: 97 }),
+    );
+
+    expect(Array.from(renderSurface(mossy, { shadows: false }).slice(0, 4))).toEqual([
+      127, 127, 127, 255,
+    ]);
+    expect(Array.from(renderSurface(natural, { shadows: false }).slice(0, 4))).toEqual([
+      120, 120, 120, 255,
+    ]);
+  });
+
   it("fades water-bed contours with visible depth", () => {
     const sampleSize = 64;
     const pixelsPerBlock = TILE_SIZE / sampleSize;

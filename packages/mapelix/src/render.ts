@@ -618,6 +618,7 @@ function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
 
 function isElevationStyledGround(name: string): boolean {
   if (isDirtPath(name)) return true;
+  if (/mossy_cobblestone/.test(name)) return false;
   if (
     /stone_bricks?|planks|stairs|slab|wall|fence|door|trapdoor|button|pressure_plate/.test(name)
   ) {

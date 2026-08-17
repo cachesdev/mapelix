@@ -48,7 +48,7 @@ const FIXED_COLORS: ReadonlyArray<readonly [RegExp, RgbaColor]> = [
   [/dark_oak_(?:log|wood|planks|stairs|slab)/, color(98, 63, 28)],
   [/spruce_(?:log|wood|planks|stairs|slab)/, color(110, 76, 42)],
   [
-    /(?:^|:)oak_(?:log|wood|planks|stairs|slab|fence|fence_gate|door|trapdoor|button|pressure_plate|sign|wall_sign)/,
+    /(?:^|:)(?:stripped_)?oak_(?:log|wood|planks|stairs|slab|fence|fence_gate|door|trapdoor|button|pressure_plate|sign|wall_sign)/,
     color(178, 137, 76),
   ],
   [/(?:cobblestone|stone_bricks?)/, color(127, 127, 127)],
@@ -56,6 +56,7 @@ const FIXED_COLORS: ReadonlyArray<readonly [RegExp, RgbaColor]> = [
   [/gravel/, color(130, 126, 124)],
   [/stone|ore|andesite|diorite|granite/, color(127, 124, 118)],
   [/log|stem|wood|planks|hyphae|bamboo/, color(191, 153, 63)],
+  [/(?:^|:)trapdoor$/, color(191, 153, 63)],
   [/(?:^|:)dirt$|podzol/, color(142, 126, 61)],
   [/mud|clay|terracotta/, color(126, 89, 59)],
   [/brick|netherrack|nether_wart/, color(125, 54, 49)],

@@ -5,6 +5,8 @@ import { defaultBlockStyle } from "./block-style.js";
 describe("defaultBlockStyle", () => {
   it.each([
     ["minecraft:oak_fence", [178, 137, 76, 255]],
+    ["minecraft:stripped_oak_wood", [178, 137, 76, 255]],
+    ["minecraft:trapdoor", [191, 153, 63, 255]],
     ["minecraft:mossy_cobblestone", [127, 127, 127, 255]],
     ["minecraft:dirt", [142, 126, 61, 255]],
     ["minecraft:crafting_table", [216, 216, 216, 255]],
