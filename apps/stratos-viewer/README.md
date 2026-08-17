@@ -16,5 +16,5 @@ opening the world database. Set `STRATOS_CACHE_DIRECTORY` to change the cache lo
 
 `STRATOS_RENDER_WORKERS` controls the number of tile worker threads. The default is two. Each
 response includes `x-mapelix-cache: memory`, `disk`, or `render` and a `server-timing` duration so
-the cache path is easy to measure. Leaflet magnifies or reduces the native z0 tiles for interactive
-zooming.
+the cache path is easy to measure. Leaflet requests native z0 through z3 tiles. Those levels render
+each block at 1×1 through 8×8 pixels. Zoom 4 enlarges the z3 result.

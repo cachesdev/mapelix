@@ -8,7 +8,7 @@ const defaultWorldDirectory = "/tmp/mapelix-stratos-tmbcraft-pruned-v2";
 const worldDirectory = process.env.STRATOS_WORLD_DIRECTORY ?? defaultWorldDirectory;
 const cacheDirectory = process.env.STRATOS_CACHE_DIRECTORY ?? "/tmp/mapelix-stratos-viewer-cache";
 const renderConcurrency = positiveInteger(process.env.STRATOS_RENDER_WORKERS ?? "2");
-const cacheFormat = "terrain-v3";
+const cacheFormat = "multires-v2";
 
 let worldPromise: Promise<BedrockWorld> | undefined;
 let metadataPromise: Promise<StratosMetadataResult> | undefined;
@@ -61,8 +61,8 @@ export function getStratosMetadata(): Promise<StratosMetadataResult> {
   return metadataPromise;
 }
 
-export function renderStratosTile(x: number, y: number): Promise<StratosTileResult> {
-  const key = `${x}/${y}`;
+export function renderStratosTile(z: number, x: number, y: number): Promise<StratosTileResult> {
+  const key = `${z}/${x}/${y}`;
   const existing = tileCache.get(key);
   if (existing !== undefined) {
     tileCache.delete(key);
@@ -70,13 +70,13 @@ export function renderStratosTile(x: number, y: number): Promise<StratosTileResu
     return existing.then((result) => ({ ...result, cacheStatus: "memory" }));
   }
 
-  const pending = loadPersistentTile(x, y).then(async (cached) => {
+  const pending = loadPersistentTile(z, x, y).then(async (cached) => {
     if (cached !== undefined) {
       return { png: cached, cacheStatus: "disk" } as const;
     }
     const world = await getStratosWorld();
-    const tile = await world.renderTile({ dimension: "overworld", z: 0, x, y });
-    await writePersistentTile(x, y, tile.png);
+    const tile = await world.renderTile({ dimension: "overworld", z, x, y });
+    await writePersistentTile(z, x, y, tile.png);
     return { png: tile.png, cacheStatus: "render" } as const;
   });
   tileCache.set(key, pending);
@@ -131,16 +131,25 @@ async function loadMetadata(): Promise<StratosMetadataResult> {
   return { metadata, cacheStatus: "index" };
 }
 
-async function loadPersistentTile(x: number, y: number): Promise<Uint8Array | undefined> {
-  return readCacheFile(await persistentTilePath(x, y));
+async function loadPersistentTile(
+  z: number,
+  x: number,
+  y: number,
+): Promise<Uint8Array | undefined> {
+  return readCacheFile(await persistentTilePath(z, x, y));
 }
 
-async function writePersistentTile(x: number, y: number, png: Uint8Array): Promise<void> {
-  await writeCacheFile(await persistentTilePath(x, y), png);
+async function writePersistentTile(
+  z: number,
+  x: number,
+  y: number,
+  png: Uint8Array,
+): Promise<void> {
+  await writeCacheFile(await persistentTilePath(z, x, y), png);
 }
 
-async function persistentTilePath(x: number, y: number): Promise<string> {
-  return join(await getCacheNamespace(), "tiles", "0", String(x), `${y}.png`);
+async function persistentTilePath(z: number, x: number, y: number): Promise<string> {
+  return join(await getCacheNamespace(), "tiles", String(z), String(x), `${y}.png`);
 }
 
 async function getCacheNamespace(): Promise<string> {

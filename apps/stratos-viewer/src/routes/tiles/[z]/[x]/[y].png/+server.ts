@@ -1,4 +1,5 @@
 import { error } from "@sveltejs/kit";
+import { MAX_NATIVE_ZOOM } from "@mapelix/core";
 
 import { renderStratosTile } from "$lib/server/stratos";
 
@@ -9,11 +10,20 @@ export const GET: RequestHandler = async ({ params }) => {
   const z = Number(params.z);
   const x = Number(params.x);
   const y = Number(params.y);
-  if (z !== 0 || !Number.isInteger(x) || !Number.isInteger(y)) {
-    error(400, "Mapelix prototype tiles require integer x/y coordinates at z0");
+  if (
+    !Number.isInteger(z) ||
+    z < 0 ||
+    z > MAX_NATIVE_ZOOM ||
+    !Number.isInteger(x) ||
+    !Number.isInteger(y)
+  ) {
+    error(
+      400,
+      `Mapelix prototype tiles require integer coordinates from z0 through z${MAX_NATIVE_ZOOM}`,
+    );
   }
 
-  const result = await renderStratosTile(x, y);
+  const result = await renderStratosTile(z, x, y);
   const png = result.png;
   const body = png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer;
   return new Response(body, {

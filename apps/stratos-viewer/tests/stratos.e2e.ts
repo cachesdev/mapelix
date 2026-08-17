@@ -19,4 +19,32 @@ test("renders the real Stratos world", async ({ page }) => {
     animations: "disabled",
     maxDiffPixelRatio: 0.01,
   });
+
+  const detailedTile = page.waitForResponse(
+    (response) => /\/tiles\/2\/-?\d+\/-?\d+\.png$/.test(response.url()),
+    { timeout: 120_000 },
+  );
+  await page.locator(".leaflet-control-zoom-in").click();
+  await expect(page.getByText("+1", { exact: true })).toBeVisible();
+  await page.locator(".leaflet-control-zoom-in").click();
+  await expect(page.getByText("+2", { exact: true })).toBeVisible();
+  expect((await detailedTile).ok()).toBe(true);
+  await expect(page.getByText("Ready", { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot("stratos-detail.png", {
+    animations: "disabled",
+    maxDiffPixelRatio: 0.01,
+  });
+
+  const maximumDetailTile = page.waitForResponse(
+    (response) => /\/tiles\/3\/-?\d+\/-?\d+\.png$/.test(response.url()),
+    { timeout: 120_000 },
+  );
+  await page.locator(".leaflet-control-zoom-in").click();
+  await expect(page.getByText("+3", { exact: true })).toBeVisible();
+  expect((await maximumDetailTile).ok()).toBe(true);
+  await expect(page.getByText("Ready", { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot("stratos-detail-max.png", {
+    animations: "disabled",
+    maxDiffPixelRatio: 0.01,
+  });
 });

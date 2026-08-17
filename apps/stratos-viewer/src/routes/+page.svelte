@@ -74,7 +74,7 @@
             minZoom: -4,
             maxZoom: 4,
             minNativeZoom: 0,
-            maxNativeZoom: 0,
+            maxNativeZoom: 3,
             noWrap: true,
             keepBuffer: 2,
           })
