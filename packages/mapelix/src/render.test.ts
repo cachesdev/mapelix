@@ -148,9 +148,56 @@ describe("renderSurface", () => {
     };
 
     const rgba = renderSurface(samples);
-    expect(Array.from(rgba.slice(0, 4))).toEqual([91, 94, 46, 255]);
+    expect(Array.from(rgba.slice(0, 4))).toEqual([68, 71, 38, 255]);
     expect(rgba[4]).toBeLessThan(rgba[5] ?? 0);
     expect(rgba[7]).toBe(255);
+  });
+
+  it("matches the water depth alpha and darkening table", () => {
+    const samples = Array.from(
+      { length: TILE_SIZE * TILE_SIZE },
+      (): SurfaceBlock | undefined => undefined,
+    );
+    const indexes = [10 * TILE_SIZE + 10, 20 * TILE_SIZE + 20, 30 * TILE_SIZE + 30];
+    for (const [offset, depth] of [1, 12, 13].entries()) {
+      samples[indexes[offset]!] = {
+        name: "minecraft:water",
+        y: 64,
+        fluidDepth: depth,
+        underwaterName: "minecraft:stone",
+      };
+    }
+
+    const rgba = renderSurface(samples, { shadows: false });
+    const colors = indexes.map((index) => Array.from(rgba.slice(index * 4, index * 4 + 4)));
+
+    expect(colors).toEqual([
+      [54, 111, 195, 255],
+      [24, 95, 200, 255],
+      [22, 95, 203, 255],
+    ]);
+  });
+
+  it("fades water-bed contours with visible depth", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (_, index): SurfaceBlock => ({
+        name: "minecraft:water",
+        y: 64,
+        fluidDepth: index % sampleSize < sampleSize / 2 ? 12 : 1,
+        underwaterName: "minecraft:stone",
+      }),
+    );
+
+    const rgba = renderSurface(samples, { shadows: false });
+    const boundaryX = (sampleSize / 2) * pixelsPerBlock;
+    const outputZ = 20 * pixelsPerBlock + 2;
+    const redAt = (x: number) => rgba[(outputZ * TILE_SIZE + x) * 4]!;
+
+    expect(redAt(boundaryX)).toBe(61);
+    expect(redAt(boundaryX + 1)).toBe(54);
   });
 
   it("keeps biome tint boundaries discrete", () => {
@@ -170,8 +217,8 @@ describe("renderSurface", () => {
     });
 
     expect(new Set(colors).size).toBe(2);
-    expect(colors[0]).toBe("145,184,86");
-    expect(colors.at(-1)).toBe("108,111,55");
+    expect(colors[0]).toBe("128,163,75");
+    expect(colors.at(-1)).toBe("94,99,53");
     expect(colors.slice(0, 3)).toEqual(Array.from({ length: 3 }, () => colors[0]));
     expect(colors.slice(3)).toEqual(Array.from({ length: 3 }, () => colors[5]));
   });
@@ -219,24 +266,45 @@ describe("renderSurface", () => {
     ]);
   });
 
-  it("keeps dirt paths brown while applying only elevation lightness", () => {
+  it.each(["minecraft:dirt_path", "minecraft:grass_path"])(
+    "keeps %s brown with a Data3D biome while applying only elevation lightness",
+    (name) => {
+      const samples = Array.from(
+        { length: TILE_SIZE * TILE_SIZE },
+        (): SurfaceBlock | undefined => undefined,
+      );
+      const pathIndex = 100 * TILE_SIZE + 100;
+      samples[pathIndex] = { name, y: 112, biomeId: 192 };
+
+      const rgba = renderSurface(samples);
+
+      expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 78, 35, 255]);
+    },
+  );
+
+  it.each([
+    ["minecraft:dirt", [131, 117, 56, 255]],
+    ["minecraft:gravel", [120, 117, 115, 255]],
+  ] as const)("keeps %s material color and applies only elevation lightness", (name, expected) => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
       (): SurfaceBlock | undefined => undefined,
     );
-    const pathIndex = 100 * TILE_SIZE + 100;
-    samples[pathIndex] = { name: "minecraft:dirt_path", y: 112 };
+    const index = 100 * TILE_SIZE + 100;
+    samples[index] = { name, y: 112, biomeId: 192 };
 
-    const rgba = renderSurface(samples);
+    const rgba = renderSurface(samples, { shadows: false });
 
-    expect(Array.from(rgba.slice(pathIndex * 4, pathIndex * 4 + 4))).toEqual([106, 78, 35, 255]);
+    expect(Array.from(rgba.slice(index * 4, index * 4 + 4))).toEqual(expected);
   });
 
   it.each([
     ["minecraft:oak_stairs", [178, 137, 76, 255]],
     ["minecraft:spruce_planks", [110, 76, 42, 255]],
     ["minecraft:dark_oak_slab", [98, 63, 28, 255]],
+    ["minecraft:mangrove_planks", [191, 153, 63, 255]],
     ["minecraft:stone_bricks", [127, 127, 127, 255]],
+    ["minecraft:brick_stairs", [197, 105, 82, 255]],
   ] as const)("keeps artificial roof material %s at its style color", (name, expected) => {
     const samples = Array.from(
       { length: TILE_SIZE * TILE_SIZE },
@@ -310,8 +378,9 @@ describe("renderSurface", () => {
     const blockZ = 20;
     samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:stone", y: 65 };
 
-    const lit = renderSurface(samples, { shadows: false });
-    const shaded = renderSurface(samples);
+    const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
+    const lit = renderSurface(samples, { shadows: false, resolveBlockStyle });
+    const shaded = renderSurface(samples, { resolveBlockStyle });
     const mask = Array.from({ length: pixelsPerBlock }, (_, pixelZ) =>
       Array.from({ length: pixelsPerBlock }, (_, pixelX) => {
         const x = blockX * pixelsPerBlock + pixelX;
@@ -335,8 +404,9 @@ describe("renderSurface", () => {
     const blockZ = 20;
     samples[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:oak_leaves", y: 65 };
 
-    const lit = renderSurface(samples, { shadows: false });
-    const shaded = renderSurface(samples);
+    const resolveBlockStyle = () => ({ red: 240, green: 240, blue: 240, alpha: 255 });
+    const lit = renderSurface(samples, { shadows: false, resolveBlockStyle });
+    const shaded = renderSurface(samples, { resolveBlockStyle });
     const gains = Array.from({ length: pixelsPerBlock }, (_, pixelZ) =>
       Array.from({ length: pixelsPerBlock }, (_, pixelX) => {
         const x = blockX * pixelsPerBlock + pixelX;
@@ -351,6 +421,42 @@ describe("renderSurface", () => {
     expect(gains[1]?.[0]).toBeCloseTo(1, 2);
     expect(gains[2]?.[1]).toBeCloseTo(0.6 + 0.4 * 0.983_013, 2);
     expect(gains[3]).toEqual([1, 1, 1, 1]);
+  });
+
+  it("lets sunlight pass through air below a roof overhang", () => {
+    const sampleSize = 64;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const blockX = 20;
+    const blockZ = 20;
+    const base = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+    const fallback = [...base];
+    const exact = [...base];
+    fallback[(blockZ - 1) * sampleSize + blockX] = { name: "minecraft:oak_stairs", y: 70 };
+    exact[(blockZ - 1) * sampleSize + blockX] = {
+      name: "minecraft:oak_stairs",
+      y: 70,
+      shadowRuns: [
+        { minY: 70, maxY: 70, opacity: 1 },
+        { minY: -64, maxY: 64, opacity: 1 },
+      ],
+    };
+
+    const lit = renderSurface(exact, { shadows: false });
+    const fallbackShadow = renderSurface(fallback);
+    const exactShadow = renderSurface(exact);
+    const targetOffsets = Array.from({ length: pixelsPerBlock * pixelsPerBlock }, (_, pixel) => {
+      const x = blockX * pixelsPerBlock + (pixel % pixelsPerBlock);
+      const z = blockZ * pixelsPerBlock + Math.floor(pixel / pixelsPerBlock);
+      return (z * TILE_SIZE + x) * 4;
+    });
+
+    expect(targetOffsets.some((offset) => fallbackShadow[offset]! < lit[offset]!)).toBe(true);
+    expect(targetOffsets.map((offset) => exactShadow[offset])).toEqual(
+      targetOffsets.map((offset) => lit[offset]),
+    );
   });
 
   it("casts a bounded shadow southeast of raised terrain", () => {

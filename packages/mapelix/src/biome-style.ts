@@ -1,13 +1,16 @@
 import type { RgbaColor } from "./block-style.js";
 
 export interface BiomeStyle {
+  readonly groundGrass: RgbaColor;
   readonly grass: RgbaColor;
   readonly foliage: RgbaColor;
   readonly water: RgbaColor;
   readonly waterOpacity: number;
 }
 
-const DEFAULT_STYLE = style("#91bd59", "#77ab2f", "#44aff5", 0.55);
+const DEFAULT_STYLE = style("#8eb971", "#71a74d", "#3f76e4", 1);
+const PLAINS_STYLE = style("#91bd59", "#77ab2f", "#44aff5", 1);
+const RESOLVED_STYLES = new Map<number, BiomeStyle>();
 
 /**
  * Resolves legacy numeric biome IDs used by Bedrock Data2D records.
@@ -16,13 +19,61 @@ const DEFAULT_STYLE = style("#91bd59", "#77ab2f", "#44aff5", 0.55);
  * foliage colors are compact approximations of the vanilla biome color maps.
  */
 export function legacyBiomeStyle(biomeId: number): BiomeStyle {
-  const baseId = biomeId >= 128 && biomeId < 256 ? biomeId - 128 : biomeId;
-  return BIOME_STYLES.get(baseId) ?? DEFAULT_STYLE;
+  const baseId = canonicalBiomeId(biomeId);
+  const cached = RESOLVED_STYLES.get(baseId);
+  if (cached !== undefined) return cached;
+  const selected = CLASSIC_STYLES.get(baseId) ?? BIOME_STYLES.get(baseId) ?? DEFAULT_STYLE;
+  const resolved = { ...selected, water: classicWaterColor(baseId), waterOpacity: 1 };
+  RESOLVED_STYLES.set(baseId, resolved);
+  return resolved;
 }
+
+/** Resolves only the old mutated-biome aliases; modern Bedrock IDs remain distinct. */
+export function canonicalBiomeId(biomeId: number): number {
+  return LEGACY_MUTATION_BASES.get(biomeId) ?? biomeId;
+}
+
+const LEGACY_MUTATION_BASES = new Map<number, number>([
+  [129, 1],
+  [130, 2],
+  [131, 3],
+  [132, 4],
+  [133, 5],
+  [134, 6],
+  [140, 12],
+  [149, 21],
+  [151, 23],
+  [155, 27],
+  [156, 28],
+  [157, 29],
+  [158, 30],
+  [160, 32],
+  [161, 33],
+  [162, 34],
+  [163, 35],
+  [164, 36],
+  [165, 37],
+  [166, 38],
+  [167, 39],
+]);
+
+const CLASSIC_STYLES = new Map<number, BiomeStyle>([
+  [5, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [6, solidStyle([94, 99, 53], [100, 107, 45], [60, 65, 21])],
+  [19, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [29, solidStyle([70, 107, 45], [93, 142, 61], [50, 106, 26])],
+  [30, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [31, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [32, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [33, solidStyle([121, 163, 117], [73, 137, 66], [43, 89, 43])],
+  [35, solidStyle([172, 163, 82], [172, 163, 82], [92, 87, 39])],
+  [36, solidStyle([172, 163, 82], [172, 163, 82], [92, 87, 39])],
+  [191, solidStyle([94, 99, 53], [100, 107, 45], [60, 65, 21])],
+]);
 
 const BIOME_STYLES = new Map<number, BiomeStyle>([
   [0, style("#91bd59", "#77ab2f", "#1787d4", 0.62)],
-  [1, DEFAULT_STYLE],
+  [1, PLAINS_STYLE],
   [2, style("#bfb755", "#aea42a", "#32a598", 0.5)],
   [3, style("#8ab689", "#6da36b", "#007bf7", 0.55)],
   [4, style("#79c05a", "#59ae30", "#1e97f2", 0.55)],
@@ -67,15 +118,68 @@ const BIOME_STYLES = new Map<number, BiomeStyle>([
   [45, style("#80b497", "#70a58b", "#2080c9", 0.65)],
   [46, style("#80b497", "#70a58b", "#2570b5", 0.58)],
   [47, style("#80b497", "#70a58b", "#2570b5", 0.68)],
+  [178, style("#bfb755", "#aea42a", "#905957", 1)],
+  [179, style("#bfb755", "#aea42a", "#905957", 1)],
+  [180, style("#bfb755", "#aea42a", "#905957", 1)],
+  [181, style("#bfb755", "#aea42a", "#905957", 1)],
+  [182, style("#80b497", "#60a17b", "#0e63ab", 1)],
+  [183, style("#80b497", "#60a17b", "#0e63ab", 1)],
+  [184, style("#80b497", "#60a17b", "#0e63ab", 1)],
+  [185, style("#80b497", "#60a17b", "#0e63ab", 1)],
+  [186, style("#83bb6d", "#63a948", "#0e63ab", 1)],
+  [187, style("#8eb971", "#71a74d", "#44aff5", 1)],
+  [188, style("#8ab689", "#6da36b", "#44aff5", 1)],
+  [189, style("#9abe4b", "#82ac1e", "#0e63ab", 1)],
+  [190, style("#91bd59", "#77ab2f", "#44aff5", 1)],
+  [191, style("#6a7039", "#8db127", "#3a7a6a", 1)],
+  [192, style("#b6db61", "#b6db61", "#5db7ef", 1)],
 ]);
 
 function style(grass: string, foliage: string, water: string, waterOpacity: number): BiomeStyle {
+  const grassTint = fromHex(grass);
+  const foliageTint = fromHex(foliage);
   return {
-    grass: fromHex(grass),
-    foliage: fromHex(foliage),
+    groundGrass: multiplyTint(grassTint, 224),
+    grass: multiplyTint(grassTint, 224),
+    foliage: multiplyTint(foliageTint, 144),
     water: fromHex(water),
     waterOpacity,
   };
+}
+
+function solidStyle(
+  groundGrass: readonly [number, number, number],
+  grass: readonly [number, number, number],
+  foliage: readonly [number, number, number],
+): BiomeStyle {
+  return {
+    groundGrass: color(...groundGrass),
+    grass: color(...grass),
+    foliage: color(...foliage),
+    water: color(25, 107, 229),
+    waterOpacity: 1,
+  };
+}
+
+function classicWaterColor(biomeId: number): RgbaColor {
+  if (biomeId === 6 || biomeId === 191) return color(75, 102, 82);
+  if (biomeId === 0 || biomeId === 24) return color(25, 86, 229);
+  if (biomeId === 40 || biomeId === 41) return color(25, 127, 229);
+  if (biomeId === 42 || biomeId === 43) return color(25, 117, 229);
+  if ([10, 11, 44, 45, 46, 47, 183].includes(biomeId)) return color(8, 70, 215);
+  return color(25, 107, 229);
+}
+
+function multiplyTint(tint: RgbaColor, base: number): RgbaColor {
+  return color(
+    Math.floor((base * tint.red) / 255),
+    Math.floor((base * tint.green) / 255),
+    Math.floor((base * tint.blue) / 255),
+  );
+}
+
+function color(red: number, green: number, blue: number): RgbaColor {
+  return { red, green, blue, alpha: 255 };
 }
 
 function fromHex(value: string): RgbaColor {

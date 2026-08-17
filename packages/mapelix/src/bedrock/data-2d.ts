@@ -38,7 +38,7 @@ export function decodeData2D(
   return { key, heights, biomes };
 }
 
-/** Data2D columns are stored in Bedrock's X-major, Z-minor order. */
+/** Data2D biome columns are stored in row-major Z, X order. */
 export function data2DBiomeAt(data: DecodedData2D, localX: number, localZ: number): number {
-  return data.biomes[localX * 16 + localZ]!;
+  return data.biomes[localZ * 16 + localX]!;
 }

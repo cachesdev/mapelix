@@ -1,5 +1,5 @@
 import { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
-import { legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
+import { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
 import { TILE_SIZE, type SurfaceSamples } from "./tile.js";
 
 export interface RenderSurfaceOptions {
@@ -19,7 +19,7 @@ const SHADOW_MINIMUM_LIGHT = 0.6;
 const SHADOW_SUN_X = -0.353_553_390_593_273_8;
 const SHADOW_SUN_Y = 0.707_106_781_186_547_6;
 const SHADOW_SUN_Z = -0.612_372_435_695_794_5;
-const BIOME_CHANNELS = 11;
+const BIOME_CHANNELS = 14;
 const BLENDED_CHANNELS = BIOME_CHANNELS - 1;
 
 interface BiomeTintField {
@@ -44,14 +44,17 @@ export function renderSurface(
     );
   }
 
-  const resolveBlockStyle = options.resolveBlockStyle ?? defaultBlockStyle;
+  const resolveBlockStyle = options.resolveBlockStyle ?? memoizeBlockStyle(defaultBlockStyle);
   const biomeBlendRadius = options.biomeBlendRadius ?? 0;
   const castShadows = options.shadows ?? true;
   if (!Number.isSafeInteger(biomeBlendRadius) || biomeBlendRadius < 0) {
     throw new RangeError(`Biome blend radius must be a non-negative integer`);
   }
   const rgba = new Uint8Array(TILE_SIZE * TILE_SIZE * 4);
-  const biomeTints = createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
+  const biomeTints =
+    biomeBlendRadius === 0
+      ? undefined
+      : createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
   const maximumHeight = maximumTerrainHeight(samples);
 
   for (let z = 0; z < sampleSize; z += 1) {
@@ -62,7 +65,11 @@ export function renderSurface(
         continue;
       }
 
-      const biome = usesBiomeTint(sample) ? biomeStyleAt(biomeTints, index) : undefined;
+      const biome = usesBiomeTint(sample)
+        ? biomeBlendRadius === 0
+          ? legacyBiomeStyle(sample.biomeId!)
+          : biomeStyleAt(biomeTints, index)
+        : undefined;
       const base = applyElevationGradient(
         resolveSurfaceColor(sample, resolveBlockStyle, biome),
         sample,
@@ -83,24 +90,52 @@ export function renderSurface(
   return rgba;
 }
 
+function memoizeBlockStyle(resolve: BlockStyleResolver): BlockStyleResolver {
+  const colors = new Map<string, RgbaColor>();
+  return (name) => {
+    const cached = colors.get(name);
+    if (cached !== undefined) return cached;
+    const blockColor = resolve(name);
+    colors.set(name, blockColor);
+    return blockColor;
+  };
+}
+
 function calculateOutputShade(
   samples: SurfaceSamples,
   sampleSize: number,
   pixelsPerBlock: number,
   outputX: number,
   outputZ: number,
-  height: number,
+  sample: NonNullable<SurfaceSamples[number]>,
   maximumHeight: number,
   castShadows: boolean,
 ): number {
+  const height = reliefHeight(sample);
   const relief =
     pixelsPerBlock === 1
       ? calculateSinglePixelRelief(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height)
-      : calculateHeightContour(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height);
+      : calculateHeightContour(
+          samples,
+          sampleSize,
+          pixelsPerBlock,
+          outputX,
+          outputZ,
+          height,
+          sample,
+        );
   if (!castShadows) return relief;
   return (
     relief *
-    castOutputShadow(samples, sampleSize, pixelsPerBlock, outputX, outputZ, height, maximumHeight)
+    castOutputShadow(
+      samples,
+      sampleSize,
+      pixelsPerBlock,
+      outputX,
+      outputZ,
+      terrainHeight(sample),
+      maximumHeight,
+    )
   );
 }
 
@@ -159,24 +194,30 @@ function calculateHeightContour(
   outputX: number,
   outputZ: number,
   height: number,
+  sample: NonNullable<SurfaceSamples[number]>,
 ): number {
   let shade = 1;
   if (outputX % pixelsPerBlock === 0) {
     shade *= heightStepShade(
       height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX - 1, outputZ, height),
+      sample,
     );
   }
   if (outputZ % pixelsPerBlock === 0) {
     shade *= heightStepShade(
       height - outputHeight(samples, sampleSize, pixelsPerBlock, outputX, outputZ - 1, height),
+      sample,
     );
   }
   return shade;
 }
 
-function heightStepShade(delta: number): number {
-  if (delta > 0) return 1.3;
-  if (delta < 0) return 1 / 1.3;
+function heightStepShade(delta: number, sample: NonNullable<SurfaceSamples[number]>): number {
+  const magnitude = isWater(sample.name)
+    ? (0.15 * (12 - Math.min(sample.fluidDepth ?? 1, 12))) / 12
+    : 0.3;
+  if (delta > 0) return 1 + magnitude;
+  if (delta < 0) return 1 / (1 + magnitude);
   return 1;
 }
 
@@ -189,7 +230,7 @@ function outputHeight(
   fallback: number,
 ): number {
   const sample = outputSample(samples, sampleSize, pixelsPerBlock, outputX, outputZ);
-  return sample === undefined ? fallback : terrainHeight(sample);
+  return sample === undefined ? fallback : reliefHeight(sample);
 }
 
 function castOutputShadow(
@@ -273,10 +314,17 @@ function shadowOpacityAt(
 ): number {
   if (x < 0 || x >= sampleSize || z < 0 || z >= sampleSize) return 0;
   const sample = samples[z * sampleSize + x];
-  if (sample === undefined || y > terrainHeight(sample)) return 0;
+  if (sample === undefined) return 0;
+  if (sample.shadowRuns !== undefined) {
+    for (const run of sample.shadowRuns) {
+      if (y >= run.minY && y <= run.maxY) return run.opacity;
+    }
+    return 0;
+  }
+  if (y > terrainHeight(sample)) return 0;
   if (isWater(sample.name)) {
     const depth = sample.fluidDepth ?? 1;
-    return y >= sample.y - depth + 1 ? 0.1 : 0;
+    return y >= sample.y - depth + 1 ? 25 / 255 : 0;
   }
   if (isFoliage(sample.name)) return y === sample.y ? 0.6 : 0;
   return 1;
@@ -320,13 +368,16 @@ function resolveSurfaceColor(
   }
   if (isWater(sample.name)) {
     const water = biome?.water ?? resolve(sample.name);
+    const depth = sample.fluidDepth ?? 1;
+    const visibleDepth = Math.min(depth, 12);
+    const alpha = depth > 12 ? 255 : Math.floor(179 + (Math.min(depth - 1, 12) / 12) * 76);
+    const darkening = 1 - (0.5 * Math.min(Math.max(0, visibleDepth - 7), 22)) / 22;
+    const shadedWater = darken(water, darkening);
     if (sample.underwaterName === undefined) {
-      return { ...water, alpha: Math.round(255 * (biome?.waterOpacity ?? 0.62)) };
+      return { ...shadedWater, alpha };
     }
     const floor = tintBiome(resolve(sample.underwaterName), sample.underwaterName, biome);
-    const depth = sample.fluidDepth ?? 1;
-    const opacity = clamp((biome?.waterOpacity ?? 0.52) + Math.min(depth, 8) * 0.035, 0.45, 0.86);
-    return blend(floor, darken(water, Math.max(0.72, 1 - depth * 0.025)), opacity);
+    return compositeBytes(floor, shadedWater, alpha);
   }
   return tintBiome(resolve(sample.name), sample.name, biome);
 }
@@ -378,16 +429,19 @@ function createBiomeTintField(
 
 function addBiomeStyle(sums: Uint32Array, style: BiomeStyle): void {
   sums[0]! += 1;
-  sums[1]! += style.grass.red;
-  sums[2]! += style.grass.green;
-  sums[3]! += style.grass.blue;
-  sums[4]! += style.foliage.red;
-  sums[5]! += style.foliage.green;
-  sums[6]! += style.foliage.blue;
-  sums[7]! += style.water.red;
-  sums[8]! += style.water.green;
-  sums[9]! += style.water.blue;
-  sums[10]! += Math.round(style.waterOpacity * 255);
+  sums[1]! += style.groundGrass.red;
+  sums[2]! += style.groundGrass.green;
+  sums[3]! += style.groundGrass.blue;
+  sums[4]! += style.grass.red;
+  sums[5]! += style.grass.green;
+  sums[6]! += style.grass.blue;
+  sums[7]! += style.foliage.red;
+  sums[8]! += style.foliage.green;
+  sums[9]! += style.foliage.blue;
+  sums[10]! += style.water.red;
+  sums[11]! += style.water.green;
+  sums[12]! += style.water.blue;
+  sums[13]! += Math.round(style.waterOpacity * 255);
 }
 
 function rectangleSum(
@@ -409,10 +463,11 @@ function biomeStyleAt(field: BiomeTintField | undefined, pixel: number): BiomeSt
   if (field === undefined || field.valid[pixel] !== 1) return undefined;
   const offset = pixel * BLENDED_CHANNELS;
   return {
-    grass: packedColor(field.colors, offset),
-    foliage: packedColor(field.colors, offset + 3),
-    water: packedColor(field.colors, offset + 6),
-    waterOpacity: field.colors[offset + 9]! / 255,
+    groundGrass: packedColor(field.colors, offset),
+    grass: packedColor(field.colors, offset + 3),
+    foliage: packedColor(field.colors, offset + 6),
+    water: packedColor(field.colors, offset + 9),
+    waterOpacity: field.colors[offset + 12]! / 255,
   };
 }
 
@@ -447,13 +502,19 @@ function applyElevationGradient(
   if (!isElevationStyledGround(sample.name) || isWater(sample.name)) return base;
   const height = terrainHeight(sample);
   if (isDirtPath(sample.name)) return darken(base, elevationLightness(height));
-  const mountainOpacity = clamp((height - 62) / 50, 0, 1);
+  const mountainOpacity = usesGroundElevationColor(sample) ? clamp((height - 62) / 50, 0, 1) : 0;
   const elevationColor = blend(base, mountainColor(sample.name), mountainOpacity);
   return darken(elevationColor, elevationLightness(height));
 }
 
 function terrainHeight(sample: NonNullable<SurfaceSamples[number]>): number {
   return sample.supportY ?? sample.y;
+}
+
+function reliefHeight(sample: NonNullable<SurfaceSamples[number]>): number {
+  return isWater(sample.name)
+    ? terrainHeight(sample) - Math.min(sample.fluidDepth ?? 1, 12)
+    : terrainHeight(sample);
 }
 
 function mountainColor(name: string): RgbaColor {
@@ -486,7 +547,10 @@ function tintBiome(
   biome: ReturnType<typeof legacyBiomeStyle> | undefined,
 ): RgbaColor {
   if (biome === undefined) return base;
-  if (/grass|moss|azalea/.test(name)) return { ...biome.grass, alpha: base.alpha };
+  if (/grass_block/.test(name)) return { ...biome.groundGrass, alpha: base.alpha };
+  if (/(?:^|:)(?:short_grass|tall_grass|tallgrass|fern|large_fern)$/.test(name)) {
+    return { ...biome.grass, alpha: base.alpha };
+  }
   if (/leaves|vine/.test(name)) return { ...biome.foliage, alpha: base.alpha };
   return base;
 }
@@ -496,6 +560,22 @@ function blend(background: RgbaColor, foreground: RgbaColor, opacity: number): R
     red: Math.round(background.red * (1 - opacity) + foreground.red * opacity),
     green: Math.round(background.green * (1 - opacity) + foreground.green * opacity),
     blue: Math.round(background.blue * (1 - opacity) + foreground.blue * opacity),
+    alpha: 255,
+  };
+}
+
+function compositeBytes(background: RgbaColor, foreground: RgbaColor, alpha: number): RgbaColor {
+  const backgroundAlpha = 255 - alpha;
+  return {
+    red:
+      Math.floor((foreground.red * alpha) / 255) +
+      Math.floor((background.red * backgroundAlpha) / 255),
+    green:
+      Math.floor((foreground.green * alpha) / 255) +
+      Math.floor((background.green * backgroundAlpha) / 255),
+    blue:
+      Math.floor((foreground.blue * alpha) / 255) +
+      Math.floor((background.blue * backgroundAlpha) / 255),
     alpha: 255,
   };
 }
@@ -517,18 +597,29 @@ function isDirtPath(name: string): boolean {
   return /(?:dirt|grass)_path/.test(name);
 }
 
+function usesGroundElevationColor(sample: NonNullable<SurfaceSamples[number]>): boolean {
+  if (!/grass_block|mycelium/.test(sample.name)) return false;
+  if (sample.biomeId === undefined) return true;
+  const biomeId = canonicalBiomeId(sample.biomeId);
+  return ![5, 6, 19, 29, 30, 31, 32, 33, 35, 36, 191].includes(biomeId);
+}
+
 function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
   return (
     sample.biomeId !== undefined &&
-    (isWater(sample.name) || /grass|moss|azalea|leaves|vine/.test(sample.name))
+    !isDirtPath(sample.name) &&
+    sample.name !== "minecraft:cherry_leaves" &&
+    (isWater(sample.name) ||
+      /grass_block|(?:^|:)(?:short_grass|tall_grass|tallgrass|fern|large_fern)$|leaves|vine/.test(
+        sample.name,
+      ))
   );
 }
 
 function isElevationStyledGround(name: string): boolean {
+  if (isDirtPath(name)) return true;
   if (
-    /cobblestone|stone_bricks?|planks|stairs|slab|wall|fence|door|trapdoor|button|pressure_plate/.test(
-      name,
-    )
+    /stone_bricks?|planks|stairs|slab|wall|fence|door|trapdoor|button|pressure_plate/.test(name)
   ) {
     return false;
   }
@@ -538,7 +629,7 @@ function isElevationStyledGround(name: string): boolean {
 }
 
 function isFoliage(name: string): boolean {
-  return /leaves|vine|azalea/.test(name);
+  return /leaves/.test(name);
 }
 
 function writeSurfaceBlock(
@@ -557,13 +648,14 @@ function writeSurfaceBlock(
       const outputX = blockX * pixelsPerBlock + pixelX;
       const outputZ = blockZ * pixelsPerBlock + pixelZ;
       const sample = samples[blockZ * sampleSize + blockX];
+      if (sample === undefined) continue;
       const shade = calculateOutputShade(
         samples,
         sampleSize,
         pixelsPerBlock,
         outputX,
         outputZ,
-        sample === undefined ? 0 : terrainHeight(sample),
+        sample,
         maximumHeight,
         castShadows,
       );

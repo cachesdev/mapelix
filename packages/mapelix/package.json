@@ -17,6 +17,7 @@
     "benchmark": "node --expose-gc scripts/benchmark-world.mjs",
     "benchmark:zoom": "node --expose-gc scripts/benchmark-zoom.mjs",
     "diagnose:compare": "node scripts/compare-renderers.mjs",
+    "diagnose:color": "node scripts/measure-block-colors.mjs",
     "diagnose:grid": "node scripts/measure-tile-grid.mjs",
     "diagnose:sharpness": "node scripts/measure-tile-sharpness.mjs",
     "build": "tsc --project tsconfig.build.json",

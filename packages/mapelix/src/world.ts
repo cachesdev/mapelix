@@ -1,10 +1,12 @@
 import {
   DATA_2D_TAG,
+  DATA_3D_TAG,
   SUBCHUNK_TAG,
   classifyChunkKey,
   classifyMapRecordKey,
 } from "./bedrock/chunk-key.js";
 import { data2DBiomeAt, decodeData2D, type DecodedData2D } from "./bedrock/data-2d.js";
+import { data3DBiomeAt, decodeData3D, type DecodedData3D } from "./bedrock/data-3d.js";
 import type { LevelDbRecord } from "./bedrock/record-source.js";
 import { decodeSubchunk, type DecodedSubchunk } from "./bedrock/subchunk.js";
 import { encodePng } from "./png.js";
@@ -16,6 +18,7 @@ import {
   tileBounds,
   type Dimension,
   type RenderedTile,
+  type ShadowOpacityRun,
   type SurfaceBlock,
   type TileCoordinates,
 } from "./tile.js";
@@ -23,8 +26,13 @@ import {
 export type EffectiveBedrockRecord = Pick<LevelDbRecord, "key" | "value">;
 
 export interface BedrockWorld {
-  renderTile(coordinates: TileCoordinates, options?: RenderSurfaceOptions): Promise<RenderedTile>;
+  renderTile(coordinates: TileCoordinates, options?: RenderTileOptions): Promise<RenderedTile>;
   getTileCoverage(dimension: Dimension): readonly TileCoverage[];
+}
+
+export interface RenderTileOptions extends RenderSurfaceOptions {
+  /** Include block name, Y, biome, and shadow-run surface samples in the returned tile. */
+  readonly includeSurface?: boolean;
 }
 
 export interface TileCoverage {
@@ -59,12 +67,13 @@ class RecordBedrockWorld implements BedrockWorld {
 
   async renderTile(
     coordinates: TileCoordinates,
-    options: RenderSurfaceOptions = {},
+    options: RenderTileOptions = {},
   ): Promise<RenderedTile> {
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
     const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
+    const biome3DChunks = new Map<number, Map<number, DecodedData3D>>();
     const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
     const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
     const records = this.tileRecords.get(tileRecordKey(dimension, storageTileX, storageTileY));
@@ -76,16 +85,21 @@ class RecordBedrockWorld implements BedrockWorld {
         );
         for (const record of neighborRecords ?? []) {
           const mapKey = classifyMapRecordKey(record.key);
-          if (mapKey?.tag !== DATA_2D_TAG || mapKey.dimension !== dimension) continue;
-          const data = decodeData2D(record.key, record.value);
-          if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
+          if (mapKey === undefined || mapKey.dimension !== dimension) continue;
+          if (mapKey.tag === DATA_2D_TAG) {
+            const data = decodeData2D(record.key, record.value);
+            if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
+          } else if (mapKey.tag === DATA_3D_TAG) {
+            const data = decodeData3D(record.key, record.value);
+            if (data !== undefined) setBiomeChunk(biome3DChunks, mapKey.x, mapKey.z, data);
+          }
         }
       }
     }
 
     for (const record of records ?? []) {
       const mapKey = classifyMapRecordKey(record.key);
-      if (mapKey?.tag === DATA_2D_TAG) {
+      if (mapKey?.tag === DATA_2D_TAG || mapKey?.tag === DATA_3D_TAG) {
         continue;
       }
       const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
@@ -130,6 +144,7 @@ class RecordBedrockWorld implements BedrockWorld {
         key.z,
         subchunks,
         biomeChunks.get(key.x)?.get(key.z),
+        biome3DChunks.get(key.x)?.get(key.z),
       );
     }
 
@@ -143,6 +158,7 @@ class RecordBedrockWorld implements BedrockWorld {
       height: TILE_SIZE,
       rgba,
       png: encodePng(rgba, TILE_SIZE, TILE_SIZE),
+      ...(options.includeSurface === true ? { surface: { sampleSize: blockSpan, samples } } : {}),
     };
   }
 
@@ -180,13 +196,13 @@ function biomeAt(
   return data2DBiomeAt(biomes, worldX - chunkX * 16, worldZ - chunkZ * 16);
 }
 
-function setBiomeChunk(
-  biomeChunks: Map<number, Map<number, DecodedData2D>>,
+function setBiomeChunk<T>(
+  biomeChunks: Map<number, Map<number, T>>,
   chunkX: number,
   chunkZ: number,
-  data: DecodedData2D,
+  data: T,
 ): void {
-  const zChunks = biomeChunks.get(chunkX) ?? new Map<number, DecodedData2D>();
+  const zChunks = biomeChunks.get(chunkX) ?? new Map<number, T>();
   zChunks.set(chunkZ, data);
   biomeChunks.set(chunkX, zChunks);
 }
@@ -210,7 +226,12 @@ function writeChunkSurface(
   chunkZ: number,
   subchunks: readonly DecodedSubchunk[],
   biomes: DecodedData2D | undefined,
+  biomes3D: DecodedData3D | undefined,
 ): void {
+  const biomeSectionYs = subchunks
+    .map((subchunk) => subchunk.y)
+    .filter((y) => y >= -4 && y <= 19)
+    .sort((left, right) => left - right);
   for (let localZ = 0; localZ < 16; localZ += 1) {
     for (let localX = 0; localX < 16; localX += 1) {
       const surface = findSurfaceBlock(subchunks, localX, localZ);
@@ -220,7 +241,11 @@ function writeChunkSurface(
       const pixelX = chunkX * 16 + localX - tileMinX;
       const pixelZ = chunkZ * 16 + localZ - tileMinZ;
       if (pixelX < 0 || pixelX >= sampleSize || pixelZ < 0 || pixelZ >= sampleSize) continue;
-      const biomeId = biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ);
+      const biomeId =
+        (biomes3D === undefined
+          ? undefined
+          : data3DBiomeAt(biomes3D, biomeSectionYs, localX, surface.y, localZ)) ??
+        (biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ));
       samples[pixelZ * sampleSize + pixelX] =
         biomeId === undefined ? surface : { ...surface, biomeId };
     }
@@ -234,7 +259,9 @@ function findSurfaceBlock(
 ): SurfaceBlock | undefined {
   let decorativeCover: SurfaceBlock | undefined;
   let waterSurface: SurfaceBlock | undefined;
+  let surface: SurfaceBlock | undefined;
   let fluidDepth = 0;
+  const shadowRuns: ShadowOpacityRun[] = [];
   for (const subchunk of subchunks) {
     for (let localY = 15; localY >= 0; localY -= 1) {
       const blockIndex = localX * 256 + localZ * 16 + localY;
@@ -242,9 +269,12 @@ function findSurfaceBlock(
       const name = paletteIndex === undefined ? undefined : subchunk.primary.palette[paletteIndex];
       if (name !== undefined && !isAir(name)) {
         const y = subchunk.y * 16 + localY;
+        addShadowVoxel(shadowRuns, y, blockShadowOpacity(name));
+        if (surface !== undefined) continue;
         if (decorativeCover !== undefined) {
           if (isDecorativeCover(name)) continue;
-          return { ...decorativeCover, supportY: y };
+          surface = { ...decorativeCover, supportY: y };
+          continue;
         }
         if (isDecorativeCover(name)) {
           decorativeCover = { name, y };
@@ -252,20 +282,39 @@ function findSurfaceBlock(
         }
         if (waterSurface === undefined) {
           if (!isWater(name)) {
-            return { name, y };
+            surface = { name, y };
+            continue;
           }
           waterSurface = { name, y };
           fluidDepth = 1;
         } else if (isWater(name)) {
           fluidDepth += 1;
         } else {
-          return { ...waterSurface, fluidDepth, underwaterName: name };
+          surface = { ...waterSurface, fluidDepth, underwaterName: name };
         }
       }
     }
   }
-  if (decorativeCover !== undefined) return decorativeCover;
-  return waterSurface === undefined ? undefined : { ...waterSurface, fluidDepth };
+  surface ??=
+    decorativeCover ?? (waterSurface === undefined ? undefined : { ...waterSurface, fluidDepth });
+  return surface === undefined ? undefined : { ...surface, shadowRuns };
+}
+
+function addShadowVoxel(runs: ShadowOpacityRun[], y: number, opacity: number): void {
+  if (opacity <= 0) return;
+  const previous = runs.at(-1);
+  if (previous !== undefined && previous.opacity === opacity && y === previous.minY - 1) {
+    runs[runs.length - 1] = { ...previous, minY: y };
+    return;
+  }
+  runs.push({ minY: y, maxY: y, opacity });
+}
+
+function blockShadowOpacity(name: string): number {
+  if (isDecorativeCover(name) || /torch/.test(name)) return 0;
+  if (isWater(name)) return 25 / 255;
+  if (/leaves/.test(name)) return 0.6;
+  return 1;
 }
 
 function isDecorativeCover(name: string): boolean {

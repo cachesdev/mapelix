@@ -51,6 +51,20 @@ function data2DChunk(chunkX: number, chunkZ: number, biomeId: number) {
   };
 }
 
+function data3DChunk(
+  chunkX: number,
+  chunkZ: number,
+  biomeId: number,
+): { key: Uint8Array; value: Uint8Array } {
+  const sections = [1, ...int32(biomeId), 0xff];
+  const value = new Uint8Array(512 + sections.length);
+  value.set(sections, 512);
+  return {
+    key: new Uint8Array([...int32(chunkX), ...int32(chunkZ), 0x2b]),
+    value,
+  };
+}
+
 function flatGroundSubchunk(withCover: boolean): { key: Uint8Array; value: Uint8Array } {
   const subchunkY = 4;
   const words = new Uint8Array(Math.ceil(4096 / 16) * 4);
@@ -111,8 +125,39 @@ describe("createBedrockWorld", () => {
 
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
     const pixelOffset = 240 * 4;
-    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([116, 102, 39, 255]);
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([92, 96, 52, 255]);
     expect(world.getTileCoverage("overworld")).toEqual([{ x: -1, y: 0, subchunkCount: 1 }]);
+  });
+
+  it("uses the Data3D biome at the visible block height before the Data2D fallback", async () => {
+    const world = createBedrockWorld([
+      singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block"),
+      data2DChunk(-1, 0, 1),
+      data3DChunk(-1, 0, 29),
+    ]);
+
+    const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });
+    const pixelOffset = 240 * 4;
+    expect(Array.from(tile.rgba.slice(pixelOffset, pixelOffset + 4))).toEqual([68, 104, 44, 255]);
+  });
+
+  it("can include decoded XYZ-ready surface metadata for diagnostics", async () => {
+    const world = createBedrockWorld([
+      singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block"),
+      data3DChunk(-1, 0, 192),
+    ]);
+
+    const tile = await world.renderTile(
+      { dimension: "overworld", z: 0, x: -1, y: 0 },
+      { includeSurface: true, shadows: false },
+    );
+
+    expect(tile.surface?.sampleSize).toBe(256);
+    expect(tile.surface?.samples[240]).toMatchObject({
+      name: "minecraft:grass_block",
+      y: 79,
+      biomeId: 192,
+    });
   });
 
   it("blends biome tint across a tile boundary using neighboring biome records", async () => {

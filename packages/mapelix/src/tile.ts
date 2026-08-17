@@ -24,6 +24,13 @@ export interface RenderedTile {
   readonly height: number;
   readonly rgba: Uint8Array;
   readonly png: Uint8Array;
+  /** Optional decoded surface metadata requested for diagnostics and benchmarks. */
+  readonly surface?: RenderedSurface;
+}
+
+export interface RenderedSurface {
+  readonly sampleSize: number;
+  readonly samples: SurfaceSamples;
 }
 
 export interface SurfaceBlock {
@@ -37,6 +44,14 @@ export interface SurfaceBlock {
   readonly fluidDepth?: number;
   /** First non-water block below a water surface, used for visual compositing. */
   readonly underwaterName?: string;
+  /** Exact vertical opacity runs for 3D shadows. Omit to use the surface-height fallback. */
+  readonly shadowRuns?: readonly ShadowOpacityRun[];
+}
+
+export interface ShadowOpacityRun {
+  readonly minY: number;
+  readonly maxY: number;
+  readonly opacity: number;
 }
 
 export type SurfaceSamples = ReadonlyArray<SurfaceBlock | undefined>;

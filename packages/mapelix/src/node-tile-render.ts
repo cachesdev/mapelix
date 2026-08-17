@@ -2,9 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { readLevelDbRecords, type NamedLevelDbFile } from "./bedrock/record-source.js";
-import type { RenderSurfaceOptions } from "./render.js";
 import type { RenderedTile, TileCoordinates } from "./tile.js";
-import { createBedrockWorld, type EffectiveBedrockRecord } from "./world.js";
+import {
+  createBedrockWorld,
+  type EffectiveBedrockRecord,
+  type RenderTileOptions,
+} from "./world.js";
 
 export interface PackedKeyGroup {
   readonly bytes: Uint8Array;
@@ -25,7 +28,7 @@ export interface IndexedTileRenderJob {
 
 export async function renderIndexedTile(
   job: IndexedTileRenderJob,
-  options: RenderSurfaceOptions = {},
+  options: RenderTileOptions = {},
 ): Promise<RenderedTile> {
   const records: EffectiveBedrockRecord[] = job.biomeRecords.map((record) => {
     const value = new Uint8Array(512 + record.value.byteLength);

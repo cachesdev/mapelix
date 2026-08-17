@@ -15,7 +15,6 @@ import {
   type PackedKeyGroup,
 } from "./node-tile-render.js";
 import { TileRenderWorkerPool } from "./node-worker-pool.js";
-import type { RenderSurfaceOptions } from "./render.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -25,7 +24,7 @@ import {
   type RenderedTile,
   type TileCoordinates,
 } from "./tile.js";
-import type { BedrockWorld, TileCoverage } from "./world.js";
+import type { BedrockWorld, RenderTileOptions, TileCoverage } from "./world.js";
 import type { EffectiveBedrockRecord } from "./world.js";
 
 export interface BedrockWorldDirectory {
@@ -109,12 +108,9 @@ class IndexedBedrockWorld implements BedrockWorld {
     }
   }
 
-  renderTile(
-    coordinates: TileCoordinates,
-    options: RenderSurfaceOptions = {},
-  ): Promise<RenderedTile> {
+  renderTile(coordinates: TileCoordinates, options: RenderTileOptions = {}): Promise<RenderedTile> {
     const job = this.createRenderJob(coordinates);
-    if (this.workerPool !== undefined && options.resolveBlockStyle === undefined) {
+    if (this.workerPool !== undefined && Object.keys(options).length === 0) {
       return this.workerPool.render(job);
     }
 

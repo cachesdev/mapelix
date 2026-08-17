@@ -1,5 +1,7 @@
 /** Bedrock LevelDB record tag used for a subchunk value. */
 export const SUBCHUNK_TAG = 0x2f;
+/** Bedrock LevelDB record tag used for modern height and three-dimensional biome data. */
+export const DATA_3D_TAG = 0x2b;
 /** Bedrock LevelDB record tag used for legacy height and two-dimensional biome data. */
 export const DATA_2D_TAG = 0x2d;
 
@@ -21,7 +23,14 @@ export interface BedrockData2DKey {
   readonly dimension: number;
 }
 
-export type BedrockMapKey = BedrockSubchunkKey | BedrockData2DKey;
+export interface BedrockData3DKey {
+  readonly tag: typeof DATA_3D_TAG;
+  readonly x: number;
+  readonly z: number;
+  readonly dimension: number;
+}
+
+export type BedrockMapKey = BedrockSubchunkKey | BedrockData2DKey | BedrockData3DKey;
 
 /** Cheap filter for LevelDB scans. It does not allocate or decode coordinates. */
 export function isMapRecordKey(key: Uint8Array): boolean {
@@ -29,7 +38,8 @@ export function isMapRecordKey(key: Uint8Array): boolean {
   const tag = key[tagOffset];
   return (
     ((key.byteLength === 10 || key.byteLength === 14) && tag === SUBCHUNK_TAG) ||
-    ((key.byteLength === 9 || key.byteLength === 13) && tag === DATA_2D_TAG)
+    ((key.byteLength === 9 || key.byteLength === 13) &&
+      (tag === DATA_2D_TAG || tag === DATA_3D_TAG))
   );
 }
 
@@ -44,7 +54,7 @@ export function classifyMapRecordKey(key: Uint8Array): BedrockMapKey | undefined
     z: view.getInt32(4, true),
     dimension: tagOffset === 8 ? 0 : view.getInt32(8, true),
   };
-  if (tag === DATA_2D_TAG) return { tag, ...location };
+  if (tag === DATA_2D_TAG || tag === DATA_3D_TAG) return { tag, ...location };
   const y = key[tagOffset + 1]!;
   return { tag: SUBCHUNK_TAG, ...location, y: y >= 0x80 ? y - 0x100 : y };
 }
@@ -64,4 +74,10 @@ export function classifyChunkKey(key: Uint8Array): BedrockSubchunkKey | undefine
 export function classifyData2DKey(key: Uint8Array): BedrockData2DKey | undefined {
   const decoded = classifyMapRecordKey(key);
   return decoded?.tag === DATA_2D_TAG ? decoded : undefined;
+}
+
+/** Classifies the modern Data3D height and biome record for a chunk. */
+export function classifyData3DKey(key: Uint8Array): BedrockData3DKey | undefined {
+  const decoded = classifyMapRecordKey(key);
+  return decoded?.tag === DATA_3D_TAG ? decoded : undefined;
 }

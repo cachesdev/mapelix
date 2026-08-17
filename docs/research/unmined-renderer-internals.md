@@ -500,6 +500,89 @@ unhit     unhit     unhit     unhit
 For example, ray light 0.484259 becomes final RGB gain
 `0.6 + 0.4 * 0.484259 = 0.793704` before byte truncation.
 
+### Shadow columns preserve vertical air gaps
+
+**Fact.** The published `3do` shadow map is not a surface height field. For
+each world X/Z column it stores alternating occupied vertical runs and empty
+gaps. Every occupied run carries one opacity byte. The generator walks actual
+block-state runs from top to bottom, removes blocks tagged `#shadowless`, and
+encodes every Y gap between the remaining runs as air.
+
+This distinction matters for roof overhangs. A roof block at Y=3 does not make
+Y=2, Y=1, and Y=0 occupied merely because it is the column's top block. A ray
+below the roof can pass through the air gap. A height field that extrudes the
+top block down to the ground produces a materially different silhouette.
+
+Models-off stairs and slabs remain coarse in the other direction. Their tags
+classify them as blocking, not shadowless, and the `3do` format does not store
+their model or collision shape. Every stair or slab state therefore occupies
+its complete integer voxel with opacity 255. Top and bottom slabs, stair
+orientation, and stair shape do not change the shadow voxel. Air above and
+below that voxel is still preserved.
+
+A deterministic column acceptance case is:
+
+| World Y | Source column | Expected `3do` hit byte |
+| ---: | --- | ---: |
+| 3 | one roof stair or slab | 255 |
+| 2 | air below overhang | 0 |
+| 1 | air below overhang | 0 |
+| 0 | one ordinary ground block | 255 |
+| -1 | air or below test extent | 0 |
+
+The clean-room encoded behavior is one opaque run of length 1 at top Y=3, an
+air gap of length 2, then one opaque run of length 1 at Y=0. A ray sample at
+Y=2 or Y=1 must remain fully lit unless another X/Z column intersects it. A
+height-field implementation will fail this test by reporting an occluder.
+
+Waterlogged blocks are converted to water for this shadow map before the
+shadowless test, so their occupied voxel uses water opacity rather than the
+original block's default opacity.
+
+Sources: `ShadowmapChunkProcessorRequest.ProcessChunk`,
+`TerrainDbBlocksToSliceBlocksConverter`, `ShadowMapWithOpacity.Generate`, and
+`ShadowMapWithOpacity.IsHit`.
+
+### Exact foliage shadow classification
+
+Visible foliage tint and cast-shadow foliage opacity use different tag sets.
+The exact default `#leaves` name patterns are `**leaves`, `**leaves?`,
+`**leaves_?`, `*:*Leaves`, `*:*Leaves?`, `**foliage`, and `*:leaves*`. They
+include ordinary species leaves, `azalea_leaves`, and `cherry_leaves`. Those
+blocks are blocking flora and get the configured foliage shadow opacity. The
+default is 60%, converted with truncation to byte 153:
+
+```text
+shadowByte = trunc(clamp(percent * 255 / 100, 0, 255))
+```
+
+The renderer's foliage-color selector is broader: it covers `#leaves`,
+`#vine`, and `#bush`. The shadow settings provider tests only `#leaves`.
+Therefore vines, plain azalea, flowering azalea, and big dripleaf may receive
+foliage-like visible styling but do not receive byte 153 from the foliage
+shadow setting. Unless another tag changes them, they retain the ordinary
+opaque shadow byte 255. Bamboo is blocking flora too, but it is not `#leaves`
+and is also opaque in this path.
+
+The default `#shadowless` list contains grass, seagrass, kelp, flowers,
+saplings, stems, sprouts, candles, torches, rails, and carpets. The shadow-map
+converter removes these before it makes vertical runs. Leaves are not on that
+list, so all leaf species remain shadow casters. Species-specific visible
+colors do not change this: pink cherry leaves, fixed-color birch leaves, and
+fixed-color spruce leaves all still use byte 153. Water uses the same formula
+with the 10% default and becomes byte 25. A waterlogged state is changed to the
+water block before the shadowless check, so byte 25 wins for that voxel.
+
+This distinction is important for tree-shadow matching: do not derive shadow
+opacity from the visual foliage-tint selector. Use the narrower `#leaves`
+classification for 60%, the explicit shadowless set for 0%, water for 10%,
+and 100% for the remaining occupied blocks.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js`,
+`SliceGeneratorBlockStateSettingsProvider`, `TerrainRendererOptions`,
+`ShadowmapChunkProcessorRequest.ProcessChunk`, and
+`TerrainDbBlocksToSliceBlocksConverter`.
+
 ### Tile-boundary behavior
 
 Local elevation contours receive a one-block input halo. Cast shadows receive
@@ -543,6 +626,188 @@ Therefore:
 - blurring those boundaries is not required to match uNmINeD;
 - the smooth large-scale appearance mainly comes from elevation color and
   lightness, not biome convolution.
+
+### Exact Bedrock biome resolution
+
+The legacy Bedrock `Data2D` value must be exactly 768 bytes. uNmINeD takes its
+256 biome bytes from offset 512 and addresses them as `z * 16 + x`. Each byte
+is a numeric biome ID. The bundled number map resolves common IDs as follows:
+
+A minimal orientation test puts a nondefault ID at byte
+`512 + (7 * 16 + 3)`. It must be returned for local `(x=3,z=7)`, not
+`(x=7,z=3)`. This asymmetric case detects a per-chunk transpose that can make
+otherwise continuous biome boundaries look blotchy.
+
+| Numeric ID | Registered biome name |
+| ---: | --- |
+| 0 | `minecraft:ocean` |
+| 1 | `minecraft:plains` |
+| 2 | `minecraft:desert` |
+| 4 | `minecraft:forest` |
+| 5 | `minecraft:taiga` |
+| 6 | `minecraft:swampland` |
+| 12 | `minecraft:ice_plains` |
+| 24 | `minecraft:deep_ocean` |
+| 29 | `minecraft:roofed_forest` |
+| 35 | `minecraft:savanna` |
+| 186 | `minecraft:meadow` |
+
+An unmapped number becomes `unknown:<number>` and falls back to the provider's
+default tints: grass `#8eb971`, foliage `#71a74d`, and water `#3f76e4`.
+
+Modern Bedrock `Data3D` biome palettes are loaded after `Data2D` and select the
+section-palette layout when present. Palette entries are still numeric IDs
+resolved through the same number map. The modern index is per voxel in
+`x,z,y` bit order, not a neighboring-column average. The visible slice keeps
+the biome read for the top voxel of its block-state run. Block state does not
+change the numeric-ID mapping, although state-sensitive style selectors can
+still change the final material style.
+
+More exactly, the accepted Overworld section-Y window is fixed at `-4..19`,
+and the first 512 bytes of the `Data3D` value are skipped before biome storage
+is read. This implementation does not independently loop over 24 Y numbers.
+It walks the chunk's already sorted block-section array, ignores null or
+out-of-window sections without consuming biome bytes, and assigns the next
+biome storage to each existing in-window section. In a contiguous Overworld
+chunk that starts at section -4, each consumed stream slot `n` therefore maps
+to section `n - 4`, up to the chunk's highest existing section. If all 24
+sections exist, slots 0 through 23 map to -4 through 19. A sparse or
+differently based block-section array does not have an explicit
+`slot = sectionY + 4` safeguard.
+
+A storage header of `0xff`, or any header whose low bit is zero, stops the
+whole biome-storage loop; it is not treated as one missing slot followed by
+more slots. Otherwise `bitsPerBiome = header >> 1`. Zero bits means a
+one-entry constant palette with no packed data or palette-length field.
+Nonconstant storage has 4,096 aligned little-endian 32-bit-packed palette
+indexes, followed by a little-endian signed 32-bit palette length and that many
+little-endian signed 32-bit numeric biome IDs. The exact local voxel index is:
+
+```text
+(x << 8) | (z << 4) | y
+```
+
+Thus X is major, Z is middle, and Y is minor. Each coordinate is local 0..15.
+The number-map lookup happens after palette decoding; a stored numeric ID is
+not the registry's later dense runtime index.
+
+#### Modern numeric IDs 178 through 192
+
+The renderer's stored-Data3D map is `vanilla.biomenumbers.bedrock.txt`. Do not
+substitute `vanilla.cubiomesids.bedrock.txt`: that separate biome-generator
+map assigns different numbers, including 183 for deep dark and 185 for cherry
+groves. The stored palette mapping and default models-off behavior are:
+
+| ID | Registered name | Direct grass / foliage / water tint | Default classic match | Exact grass base / generic foliage / visible water |
+| ---: | --- | --- | --- | --- |
+| 178 | `minecraft:soulsand_valley` | `#bfb755` / `#aea42a` / `#905957` | none | `(167,160,74)` / `(98,92,23)` / `(25,107,229)` |
+| 179 | `minecraft:crimson_forest` | `#bfb755` / `#aea42a` / `#905957` | none | `(167,160,74)` / `(98,92,23)` / `(25,107,229)` |
+| 180 | `minecraft:warped_forest` | `#bfb755` / `#aea42a` / `#905957` | none | `(167,160,74)` / `(98,92,23)` / `(25,107,229)` |
+| 181 | `minecraft:basalt_deltas` | `#bfb755` / `#aea42a` / `#905957` | none | `(167,160,74)` / `(98,92,23)` / `(25,107,229)` |
+| 182 | `minecraft:jagged_peaks` | `#80b497` / `#60a17b` / `#0e63ab` | none | `(112,158,132)` / `(54,90,69)` / `(25,107,229)` |
+| 183 | `minecraft:frozen_peaks` | `#80b497` / `#60a17b` / `#0e63ab` | cold/frozen water only | `(112,158,132)` / `(54,90,69)` / `(8,70,215)` |
+| 184 | `minecraft:snowy_slopes` | `#80b497` / `#60a17b` / `#0e63ab` | none | `(112,158,132)` / `(54,90,69)` / `(25,107,229)` |
+| 185 | `minecraft:grove` | `#80b497` / `#60a17b` / `#0e63ab` | none | `(112,158,132)` / `(54,90,69)` / `(25,107,229)` |
+| 186 | `minecraft:meadow` | `#83bb6d` / `#63a948` / `#0e63ab` | none | `(115,164,95)` / `(55,95,40)` / `(25,107,229)` |
+| 187 | `minecraft:lush_caves` | `#8eb971` / `#71a74d` / `#44aff5` | none | `(124,162,99)` / `(63,94,43)` / `(25,107,229)` |
+| 188 | `minecraft:dripstone_caves` | `#8ab689` / `#6da36b` / `#44aff5` | none | `(121,159,120)` / `(61,92,60)` / `(25,107,229)` |
+| 189 | `minecraft:stony_peaks` | `#9abe4b` / `#82ac1e` / `#0e63ab` | none | `(135,166,65)` / `(73,97,16)` / `(25,107,229)` |
+| 190 | `minecraft:deep_dark` | `#91bd59` / `#77ab2f` / `#44aff5` | none | `(127,166,78)` / `(67,96,26)` / `(25,107,229)` |
+| 191 | `minecraft:mangrove_swamp` | `#6a7039` / `#8db127` / `#3a7a6a` | swamp land, foliage, and water | see swamp exception below |
+| 192 | `minecraft:cherry_groves` | `#b6db61` / `#b6db61` / `#5db7ef` | none | `(159,192,85)` / `(102,123,54)` / `(25,107,229)` |
+
+For ordinary rows, "grass base" is both the small-grass result and the
+grass-block input before the later elevation overlay. It is the direct grass
+tint multiplied by gray 224 with byte truncation. Generic foliage similarly
+uses gray 144. The default classic wildcard disables direct water tint, which
+is why most visible-water values in the last column are `(25,107,229)`.
+
+ID 191 is the only land-family match in this numeric range. The substring
+`swamp` selects the classic swamp rules, which disable its direct tints. Its
+exact grass-block base, small-grass color, generic-foliage color, and water
+color are `(94,99,53)`, `(100,107,45)`, `(60,65,21)`, and `(75,102,82)`.
+The words `crimson_forest` and `warped_forest` do not select the Bedrock dark
+forest rule, because that selector specifically requires `roofed_forest`.
+
+ID 192's registered name is the plural `minecraft:cherry_groves`. Its biome
+does not select a classic family. The block `minecraft:cherry_leaves` is a
+separate block-name exception: it disables biome foliage tint and uses the
+fixed HSL color `(330,85%,75%)`, which converts by truncation to
+`(245,137,191)`. This fixed pink affects visible color only; the block remains
+foliage for cast-shadow opacity. In the separate biome-color display mode,
+deep dark is `(3,31,41)` and cherry groves is `(255,145,200)`; those colors are
+not normal terrain tints.
+
+The bundled Bedrock tint values most relevant to village and comparison areas
+are:
+
+| Biome | Grass tint | Foliage tint | Water tint |
+| --- | --- | --- | --- |
+| plains | `#91bd59` | `#77ab2f` | `#44aff5` |
+| desert | `#bfb755` | `#aea42a` | `#32a598` |
+| forest | `#79c05a` | `#59ae30` | `#1e97f2` |
+| taiga | `#86b783` | `#68a464` | `#287082` |
+| snowy plains (`ice_plains`) | `#80b497` | `#60a17b` | `#14559b` |
+| savanna | `#bfb755` | `#aea42a` | `#2c8b9c` |
+| swamp (`swampland`) | `#6a7039` | `#6a7039` | `#4c6559` |
+| meadow | `#83bb6d` | `#63a948` | `#0e63ab` |
+| ocean / deep ocean | `#8eb971` | `#71a74d` | `#1787d4` |
+| dark forest (`roofed_forest`) | `#507a32` | `#59ae30` | `#3b6cd1` |
+
+For the models-off solid-color path, a generic foliage tint is multiplied by
+gray `(144,144,144)` and a generic grass tint by `(224,224,224)`, with each
+channel truncated after multiplication by `tint / 255`. For example, plains
+small grass becomes `(127,166,78)` and generic plains foliage becomes
+`(67,96,26)` before later lighting. The equivalent forest results are
+`(106,168,79)` and `(50,98,27)`.
+
+The effective common color paths before elevation lightness, water-depth
+effects, local contours, and cast shadows are:
+
+| Biome family | Grass block | Small grass | Generic foliage | Visible water |
+| --- | --- | --- | --- | --- |
+| plains | height blend over `(127,166,78)` | `(127,166,78)` | `(67,96,26)` | `(25,107,229)` |
+| desert | height blend over `(167,160,74)` | `(167,160,74)` | `(98,92,23)` | `(25,107,229)` |
+| forest | height blend over `(106,168,79)` | `(106,168,79)` | `(50,98,27)` | `(25,107,229)` |
+| snowy plains | height blend over `(112,158,132)` | `(112,158,132)` | `(54,90,69)` | `(25,107,229)` |
+| meadow | height blend over `(115,164,95)` | `(115,164,95)` | `(55,95,40)` | `(25,107,229)` |
+| savanna | `(172,163,82)` | `(172,163,82)` | `(92,87,39)` | `(25,107,229)` |
+| taiga | `(121,163,117)` | `(73,137,66)` | `(43,89,43)` | `(25,107,229)` |
+| swamp | `(94,99,53)` | `(100,107,45)` | `(60,65,21)` | `(75,102,82)` |
+| dark forest | `(70,107,45)` | `(93,142,61)` | `(50,106,26)` | `(25,107,229)` |
+| ocean / deep ocean | height blend over `(124,162,99)` | `(124,162,99)` | `(63,94,43)` | `(25,86,229)` |
+
+`ice_plains` does not contain the words `cold` or `frozen`, so its water uses
+the ordinary inland classic color. Frozen rivers and frozen/cold oceans select
+the cold water color instead.
+
+ID 1 (`minecraft:plains`) follows the plain tint-derived values shown in the
+table. Its grass block starts from the same `(127,166,78)` result as small
+grass, then receives the altitude color overlay. The swamp foliage definition
+passes `26 * 0.65` to an integer stylesheet-builder parameter; the bundled
+Jint runtime converts 16.9 to 17. Its exact HSL input is therefore
+`(66,50%,17%)`, producing `(60,65,21)` rather than a value based on 16%.
+
+There are two important exceptions:
+
+- the enabled elevation-color gradient is applied after biome tint on ordinary
+  `#ground` grass blocks. Its brown mountain overlay has alpha 0 at sea level
+  and rises to alpha 255 at mountain level. Grass blocks therefore blend away
+  from the direct biome result with altitude; small grass and generic leaves
+  do not receive this elevation-color overlay;
+- classic family rules explicitly disable the direct tint for savanna, taiga,
+  dark forest, and swamp. Dark-forest grass block, small grass, and generic
+  foliage resolve to `(70,107,45)`, `(93,142,61)`, and `(50,106,26)` before
+  elevation lightness and shading. Spruce, birch, and cherry leaves also have
+  explicit species colors and do not use biome foliage tint.
+
+Sources: the bundled MIT `vanilla.biomenumbers.bedrock.txt`,
+`vanilla.biometints.bedrock.txt`, `vanilla.cubiomesids.bedrock.txt`,
+`cubiomes.biomecolors.bedrock.txt`, and `default.stylesheet.minecraft.js`, plus
+`BedrockChunkExtractor.Load3DBiomesFromData`,
+`FlattenedSectionData.GetBiomePaletteIndex`, `BlocksToTerrainDbConverter`,
+`BiomeNumberMap`, `HslColorConverter`, and
+`TerrainRendererState.GetBlockColor`.
 
 ## Water
 
@@ -589,6 +854,29 @@ opaque instead of using the table. The renderer alpha-composites a translucent
 water color over lower non-water slice runs until the column is opaque, then
 forces the final rendered block alpha to 255.
 
+The published defaults enable classic biome coloring. Its wildcard water rule
+first disables direct biome water tint, then later family rules replace the
+base color. The exact pre-depth RGB is therefore `(25,107,229)` for ordinary
+inland water, `(25,86,229)` for ocean, `(25,127,229)` for warm ocean,
+`(25,117,229)` for lukewarm ocean, `(8,70,215)` for cold or frozen water, and
+`(75,102,82)` for swamp. The raw water-tint table above is not the visible
+water source in the published models-off export.
+
+Water is the foreground in the column composition. For foreground alpha `a`
+over an opaque lower block, each output byte is calculated in byte RGB order:
+
+```text
+out_channel = floor(water_channel * a / 255)
+            + floor(lower_channel * (255 - a) / 255)
+out_alpha = 255
+```
+
+The implementation uses integer division at each step, so this is not
+equivalent to one final rounded weighted average. Consecutive water runs are
+skipped during this composition; the first lower non-water run supplies the
+background. Depth darkening changes the water RGB before this blend. Local and
+cast-shadow shading change the already opaque composite afterward.
+
 The darkening formula is:
 
 ```text
@@ -602,10 +890,16 @@ strength is 50%, then attenuates it linearly to zero over 12 water blocks:
 water_contour_magnitude = 0.15 * (12 - min(D, 12)) / 12
 ```
 
+At the default 120-degree sun direction, the contour compares
+`current(surfaceY - depth)` with the north and west values without sign
+inversion. A positive one-block delta brightens the current block's top or
+left row; a negative delta darkens it. After the 50% water shading strength
+and depth fade, the exact gains are `1 + magnitude` for the positive case and
+`1 / (1 + magnitude)` for the negative case. Equal bed height gives gain 1.
+
 Thus a flat water surface does not gain a grid. Relief derives from
 `surface Y - water depth`, and its remaining one-pixel bed-height contour fades
-away with depth. The style's base water color can come from the exact biome,
-but it is not spatially mixed with nearby biome water colors.
+away with depth. No water color is spatially mixed with nearby biome colors.
 
 Sources: `TerrainRendererOptions`, `TerrainRendererState.GetTerrainBlockColor`,
 `TerrainShader.ApplyDepthTranslucency`, `ElevationMapGenerator`, and
@@ -721,6 +1015,75 @@ Candidate aligned tests for the village reference tile at zoom 2:
 Sources: the bundled MIT `default.blocktags.minecraft.js` and
 `default.stylesheet.minecraft.js`, `TerrainRendererBlockStylesGenerator.Apply`,
 `HslColorConverter.HslToRgb`, and `TerrainRendererState.GetBlockColor`.
+
+### Common non-roof village materials
+
+Beds and wool use the same enabled dye palette. Modern species names and the
+Bedrock `[color:<name>]` block state both feed these tags. These are the exact
+solid pre-lighting bytes:
+
+| Dye | RGB | Dye | RGB |
+| --- | --- | --- | --- |
+| white | `(229,229,229)` | orange | `(234,136,71)` |
+| magenta | `(232,124,232)` | light blue | `(124,189,232)` |
+| yellow | `(232,210,124)` | lime | `(136,234,71)` |
+| pink | `(232,124,167)` | gray | `(89,89,89)` |
+| light gray / silver | `(127,127,127)` | cyan | `(30,173,173)` |
+| purple | `(116,30,173)` | blue | `(30,30,173)` |
+| brown | `(173,116,30)` | green | `(87,173,30)` |
+| red | `(173,30,30)` | black | `(25,25,25)` |
+
+Plain glass starts from the neutral artificial color `(216,216,216)`. Stained
+glass starts from the matching dye color. Both receive default alpha 127
+(`floor(50% * 255)`) and are composited over lower column blocks using the
+integer foreground-over operation described in the water section. Glass is
+still a full shadow voxel in `3do`; visible translucency does not imply
+translucent cast-shadow opacity.
+
+The remaining common defaults are:
+
+| Material/tag | Exact pre-lighting RGB | Geometry/shadow note |
+| --- | --- | --- |
+| hay block | `(216,216,216)` neutral artificial | full opaque voxel; no dedicated hay color |
+| wheat, beetroot, carrot, potato, crop, and farmland | `(163,126,40)` | nonblocking, but not shadeless or shadowless |
+| generic lamp, lantern, torch, glowstone, or froglight | `(255,234,50)` | torches are shadeless and shadowless; full lights are not |
+| soul torch | `(50,254,255)` | shadeless and shadowless |
+| redstone torch | `(255,50,50)` | shadeless and shadowless |
+| generic uncategorized flower | `(140,214,91)` | shadeless and shadowless |
+| red flower | `(244,61,61)` | shadeless and shadowless |
+| yellow flower | `(244,226,61)` | shadeless and shadowless |
+| blue flower | `(61,171,244)` | shadeless and shadowless |
+| purple flower | `(189,61,244)` | shadeless and shadowless |
+| white flower | `(242,242,242)` | shadeless and shadowless |
+| pink flower family | `(249,184,216)` | shadeless and shadowless |
+| cyan flower family | `(19,192,235)` | shadeless and shadowless |
+| lily pad | `(30,122,48)` | shadeless and shadowless |
+
+The flower families come from explicit tag patterns, not a full vanilla
+species table. A flower that misses those patterns keeps the generic green
+flower color. Likewise, hay has no special style in this build and inherits
+the neutral artificial color. These details are plausible sources of aligned
+village color error if Mapelix uses vanilla map colors instead.
+
+Clean-room palette tests:
+
+1. Put one Bedrock `bed` state and one `wool` state of each color in an
+   unshadowed flat synthetic world. Their models-off interiors must have the
+   same color-family centroid after identical JPEG encoding.
+2. Put clear glass and one stained glass block above a known black and white
+   checkerboard. Before shading, clear glass must use alpha 127 and the exact
+   integer foreground-over result; it must not use linear-light blending.
+3. Put hay, mature wheat, farmland, lantern, and glowstone at the same Y.
+   Hay must remain neutral `(216,216,216)`, crop/farmland brown
+   `(163,126,40)`, and both full light blocks yellow `(255,234,50)` before
+   contours and cast shadows.
+4. A torch or flower placed above a receiver must not change the `3do` shadow;
+   a lantern or hay block at the same location must.
+
+Sources: the bundled MIT `default.blocktags.minecraft.js` and
+`default.stylesheet.minecraft.js`, `SliceGeneratorBlockStateSettingsProvider`,
+`TerrainRendererState.GetTerrainBlockColor`, and
+`TerrainRendererState.AlphaBlend`.
 
 ## Why dirt paths remain distinct
 
@@ -875,6 +1238,9 @@ These are behavioral experiments, not a request to copy the implementation.
 7. **Delay the eight-neighbor mask experiment.** It is relevant only if
    Mapelix later serves 8 or more pixels per block; it did not make the public
    Amelix zoom-2 reference.
+8. **Use vertical shadow runs, not an extruded surface.** Preserve air below
+   roof overhangs and bridges. Keep the published coarse full-voxel treatment
+   for models-off stairs and slabs.
 
 The smallest high-value target is thus: solid native block squares, quiet flat
 interiors, one selective height contour, and an independent output-resolution
@@ -889,6 +1255,7 @@ The exact methods that support the main findings are:
 - `TerrainRendererState<TPixel>.RenderBlockTextured`
 - `TerrainRendererState<TPixel>.GetBlockColor`
 - `TerrainRendererState<TPixel>.GetTerrainBlockColor`
+- `TerrainRendererState<TPixel>.AlphaBlend`
 - `TerrainRendererState<TPixel>.ApplyShade`
 - `TerrainShader.ApplyShadingOnPixel`
 - `TerrainShader.CalcShading`
@@ -901,7 +1268,13 @@ The exact methods that support the main findings are:
 - `ShadowCasterPool.GetSunAngle`
 - `ShadowmapChunkProcessorRequest.Prepare`
 - `ShadowMapWithOpacity.Generate`
+- `ShadowMapWithOpacity.IsHit`
 - `SliceGeneratorBlockStateSettingsProvider.GenerateBlockStateSettings`
+- `BedrockChunkExtractor.Load2DBiomesFromData`
+- `BedrockChunkExtractor.Load3DBiomesFromData`
+- `FlattenedChunkData.GetBiomeNumber`
+- `FlattenedSectionData.GetBiomePaletteIndex`
+- `BiomeNumberMap.GetBiome`
 - `TerrainRendererChunkProcessorRequest<TPixel>.CreateShadowmapRequests`
 - `TerrainRendererChunkProcessorRequest<TPixel>.DoneAsync`
 - `WebMapExport.RenderZoomOutTiles`

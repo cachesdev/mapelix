@@ -9,6 +9,8 @@ export {
   type BlockBounds,
   type Dimension,
   type RenderedTile,
+  type RenderedSurface,
+  type ShadowOpacityRun,
   type SurfaceBlock,
   type TileCoordinates,
 } from "./tile.js";
@@ -16,6 +18,7 @@ export {
   createBedrockWorld,
   type BedrockWorld,
   type EffectiveBedrockRecord,
+  type RenderTileOptions,
   type TileCoverage,
 } from "./world.js";
 
