@@ -33,6 +33,33 @@ describe("openBedrockWorld", () => {
       await rm(worldDirectory, { recursive: true, force: true });
     }
   });
+
+  it("maps a detailed negative tile to its parent index tile", async () => {
+    const worldDirectory = await mkdtemp(join(tmpdir(), "mapelix-detail-"));
+    try {
+      const databaseDirectory = join(worldDirectory, "db");
+      await mkdir(databaseDirectory);
+      await writeFile(
+        join(databaseDirectory, "000001.log"),
+        levelDbLog([singleBlockSubchunk(-16, 0, 4, 0, 0)]),
+      );
+
+      const world = await openBedrockWorld({ directory: worldDirectory });
+      const tile = await world.renderTile({ dimension: "overworld", z: 2, x: -4, y: 0 });
+      const colors = new Set<string>();
+      for (let pixelZ = 0; pixelZ < 4; pixelZ += 1) {
+        for (let pixelX = 0; pixelX < 4; pixelX += 1) {
+          const offset = (pixelZ * 256 + pixelX) * 4;
+          colors.add(Array.from(tile.rgba.slice(offset, offset + 4)).join(","));
+        }
+      }
+
+      expect(tile.bounds).toEqual({ minX: -256, minZ: 0, maxX: -192, maxZ: 64 });
+      expect(colors.size).toBeGreaterThan(1);
+    } finally {
+      await rm(worldDirectory, { recursive: true, force: true });
+    }
+  });
 });
 
 function int32(value: number): number[] {

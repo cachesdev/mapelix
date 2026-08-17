@@ -16,7 +16,15 @@ import {
 } from "./node-tile-render.js";
 import { TileRenderWorkerPool } from "./node-worker-pool.js";
 import type { RenderSurfaceOptions } from "./render.js";
-import { floorDiv, type Dimension, type RenderedTile, type TileCoordinates } from "./tile.js";
+import {
+  TILE_SIZE,
+  floorDiv,
+  tileBounds,
+  type BlockBounds,
+  type Dimension,
+  type RenderedTile,
+  type TileCoordinates,
+} from "./tile.js";
 import type { BedrockWorld, TileCoverage } from "./world.js";
 import type { EffectiveBedrockRecord } from "./world.js";
 
@@ -137,13 +145,16 @@ class IndexedBedrockWorld implements BedrockWorld {
 
   private createRenderJob(coordinates: TileCoordinates): IndexedTileRenderJob {
     const dimension = DIMENSION_IDS[coordinates.dimension];
-    const tile = this.tiles.get(indexTileKey(dimension, coordinates.x, coordinates.y));
+    const bounds = tileBounds(coordinates);
+    const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
+    const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
+    const tile = this.tiles.get(indexTileKey(dimension, storageTileX, storageTileY));
     const biomeRecords: EffectiveBedrockRecord[] = [];
 
     for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
       for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
         const neighbor = this.tiles.get(
-          indexTileKey(dimension, coordinates.x + offsetX, coordinates.y + offsetY),
+          indexTileKey(dimension, storageTileX + offsetX, storageTileY + offsetY),
         );
         biomeRecords.push(...(neighbor?.biomeRecords ?? []));
       }
@@ -152,10 +163,53 @@ class IndexedBedrockWorld implements BedrockWorld {
     return {
       coordinates,
       databaseDirectory: this.databaseDirectory,
-      sources: tile?.sources ?? [],
+      sources:
+        coordinates.z === 0 ? (tile?.sources ?? []) : filterSources(tile?.sources ?? [], bounds),
       biomeRecords,
     };
   }
+}
+
+function filterSources(
+  sources: readonly IndexedTileSource[],
+  bounds: BlockBounds,
+): IndexedTileSource[] {
+  const minChunkX = floorDiv(bounds.minX, 16);
+  const minChunkZ = floorDiv(bounds.minZ, 16);
+  const maxChunkX = floorDiv(bounds.maxX - 1, 16);
+  const maxChunkZ = floorDiv(bounds.maxZ - 1, 16);
+  const filtered: IndexedTileSource[] = [];
+
+  for (const source of sources) {
+    const keyGroups = source.keyGroups
+      .map((group) => filterKeyGroup(group, minChunkX, minChunkZ, maxChunkX, maxChunkZ))
+      .filter((group) => group.bytes.byteLength > 0);
+    if (keyGroups.length > 0) filtered.push({ name: source.name, keyGroups });
+  }
+  return filtered;
+}
+
+function filterKeyGroup(
+  group: PackedKeyGroup,
+  minChunkX: number,
+  minChunkZ: number,
+  maxChunkX: number,
+  maxChunkZ: number,
+): PackedKeyGroup {
+  const selected = new Uint8Array(group.bytes.byteLength);
+  const view = new DataView(group.bytes.buffer, group.bytes.byteOffset, group.bytes.byteLength);
+  let outputOffset = 0;
+  for (let offset = 0; offset < group.bytes.byteLength; offset += group.keyLength) {
+    const chunkX = view.getInt32(offset, true);
+    const chunkZ = view.getInt32(offset + 4, true);
+    if (chunkX >= minChunkX && chunkX <= maxChunkX && chunkZ >= minChunkZ && chunkZ <= maxChunkZ) {
+      selected.set(group.bytes.subarray(offset, offset + group.keyLength), outputOffset);
+      outputOffset += group.keyLength;
+    }
+  }
+  return outputOffset === group.bytes.byteLength
+    ? group
+    : { bytes: selected.slice(0, outputOffset), keyLength: group.keyLength };
 }
 
 /**

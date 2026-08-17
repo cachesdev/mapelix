@@ -14,9 +14,21 @@ describe("tile coordinates", () => {
     ).toEqual({ minX: -256, minZ: 512, maxX: 0, maxZ: 768 });
   });
 
-  it("rejects zoom levels outside the prototype", () => {
-    expect(() => tileBounds({ dimension: "overworld", z: 1, x: 0, y: 0 })).toThrow(
-      "supports only zoom 0",
+  it("covers fewer world blocks at higher native zooms", () => {
+    expect(tileBounds({ dimension: "overworld", z: 2, x: -1, y: 2 })).toEqual({
+      minX: -64,
+      minZ: 128,
+      maxX: 0,
+      maxZ: 192,
+    });
+  });
+
+  it("rejects zoom levels outside the native prototype pyramid", () => {
+    expect(() => tileBounds({ dimension: "overworld", z: -1, x: 0, y: 0 })).toThrow(
+      "zoom from 0 through 3",
+    );
+    expect(() => tileBounds({ dimension: "overworld", z: 4, x: 0, y: 0 })).toThrow(
+      "zoom from 0 through 3",
     );
   });
 });

@@ -27,19 +27,25 @@ export function renderSurface(
   options: RenderSurfaceOptions = {},
   context: RenderSurfaceContext = {},
 ): Uint8Array {
-  if (samples.length !== TILE_SIZE * TILE_SIZE) {
+  const sampleSize = Math.sqrt(samples.length);
+  const pixelsPerBlock = TILE_SIZE / sampleSize;
+  if (
+    !Number.isSafeInteger(sampleSize) ||
+    !Number.isSafeInteger(pixelsPerBlock) ||
+    pixelsPerBlock < 1
+  ) {
     throw new RangeError(
-      `Expected ${TILE_SIZE * TILE_SIZE} surface samples, got ${samples.length}`,
+      `Expected a square surface that divides ${TILE_SIZE}, got ${samples.length}`,
     );
   }
 
   const resolveBlockStyle = options.resolveBlockStyle ?? defaultBlockStyle;
   const rgba = new Uint8Array(TILE_SIZE * TILE_SIZE * 4);
-  const biomeTints = createBiomeTintField(samples, context);
+  const biomeTints = createBiomeTintField(samples, context, sampleSize);
 
-  for (let z = 0; z < TILE_SIZE; z += 1) {
-    for (let x = 0; x < TILE_SIZE; x += 1) {
-      const index = z * TILE_SIZE + x;
+  for (let z = 0; z < sampleSize; z += 1) {
+    for (let x = 0; x < sampleSize; x += 1) {
+      const index = z * sampleSize + x;
       const sample = samples[index];
       if (sample === undefined) {
         continue;
@@ -50,18 +56,34 @@ export function renderSurface(
         resolveSurfaceColor(sample, resolveBlockStyle, biome),
         sample,
       );
-      const shade = calculateShade(samples, x, z, sample.y);
-      writeColor(rgba, index * 4, increaseSaturation(base, 1.08), shade);
+      const shade = calculateShade(samples, sampleSize, x, z, sample.y);
+      writeSurfaceBlock(
+        rgba,
+        samples,
+        sampleSize,
+        pixelsPerBlock,
+        x,
+        z,
+        sample,
+        increaseSaturation(base, 1.08),
+        shade,
+      );
     }
   }
   return rgba;
 }
 
-function calculateShade(samples: SurfaceSamples, x: number, z: number, height: number): number {
-  const northHeight = sampleHeight(samples, x, z - 1, height);
-  const southHeight = sampleHeight(samples, x, z + 1, height);
-  const westHeight = sampleHeight(samples, x - 1, z, height);
-  const eastHeight = sampleHeight(samples, x + 1, z, height);
+function calculateShade(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  x: number,
+  z: number,
+  height: number,
+): number {
+  const northHeight = sampleHeight(samples, sampleSize, x, z - 1, height);
+  const southHeight = sampleHeight(samples, sampleSize, x, z + 1, height);
+  const westHeight = sampleHeight(samples, sampleSize, x - 1, z, height);
+  const eastHeight = sampleHeight(samples, sampleSize, x + 1, z, height);
   const slopeX = (eastHeight - westHeight) * 0.06;
   const slopeZ = (southHeight - northHeight) * 0.06;
   const normalLength = Math.hypot(slopeX, 1, slopeZ);
@@ -69,21 +91,33 @@ function calculateShade(samples: SurfaceSamples, x: number, z: number, height: n
   const hillShade = 1 + (light - 0.78) * 0.78;
   const stepRelief = Math.sign(height - northHeight) * 0.05 + Math.sign(height - westHeight) * 0.04;
   const relief = clamp(hillShade + stepRelief, 0.62, 1.34);
-  return relief * castShadow(samples, x, z, height);
+  return relief * castShadow(samples, sampleSize, x, z, height);
 }
 
-function sampleHeight(samples: SurfaceSamples, x: number, z: number, fallback: number): number {
-  if (x < 0 || x >= TILE_SIZE || z < 0 || z >= TILE_SIZE) return fallback;
-  return samples[z * TILE_SIZE + x]?.y ?? fallback;
+function sampleHeight(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  x: number,
+  z: number,
+  fallback: number,
+): number {
+  if (x < 0 || x >= sampleSize || z < 0 || z >= sampleSize) return fallback;
+  return samples[z * sampleSize + x]?.y ?? fallback;
 }
 
-function castShadow(samples: SurfaceSamples, x: number, z: number, height: number): number {
+function castShadow(
+  samples: SurfaceSamples,
+  sampleSize: number,
+  x: number,
+  z: number,
+  height: number,
+): number {
   let shadow = 1;
   for (let distance = 1; distance <= CAST_SHADOW_DISTANCE; distance += 1) {
     const sourceX = x - distance;
     const sourceZ = z - distance;
     if (sourceX < 0 || sourceZ < 0) break;
-    const source = samples[sourceZ * TILE_SIZE + sourceX];
+    const source = samples[sourceZ * sampleSize + sourceX];
     if (source !== undefined) {
       const clearance = source.y - height - distance * 0.7;
       if (clearance > 0) {
@@ -119,9 +153,10 @@ function resolveSurfaceColor(
 function createBiomeTintField(
   samples: SurfaceSamples,
   context: RenderSurfaceContext,
+  sampleSize: number,
 ): BiomeTintField | undefined {
   if (!samples.some((sample) => sample !== undefined && usesBiomeTint(sample))) return undefined;
-  const extendedSize = TILE_SIZE + BIOME_BLEND_RADIUS * 2;
+  const extendedSize = sampleSize + BIOME_BLEND_RADIUS * 2;
   const stride = extendedSize + 1;
   const integral = new Uint32Array(stride * stride * BIOME_CHANNELS);
   const rowSums = new Uint32Array(BIOME_CHANNELS);
@@ -129,7 +164,13 @@ function createBiomeTintField(
   for (let z = 0; z < extendedSize; z += 1) {
     rowSums.fill(0);
     for (let x = 0; x < extendedSize; x += 1) {
-      const biomeId = sampleBiome(samples, x - BIOME_BLEND_RADIUS, z - BIOME_BLEND_RADIUS, context);
+      const biomeId = sampleBiome(
+        samples,
+        sampleSize,
+        x - BIOME_BLEND_RADIUS,
+        z - BIOME_BLEND_RADIUS,
+        context,
+      );
       if (biomeId !== undefined) addBiomeStyle(rowSums, legacyBiomeStyle(biomeId));
       const cell = ((z + 1) * stride + x + 1) * BIOME_CHANNELS;
       const above = (z * stride + x + 1) * BIOME_CHANNELS;
@@ -139,14 +180,14 @@ function createBiomeTintField(
     }
   }
 
-  const colors = new Uint8Array(TILE_SIZE * TILE_SIZE * BLENDED_CHANNELS);
-  const valid = new Uint8Array(TILE_SIZE * TILE_SIZE);
+  const colors = new Uint8Array(sampleSize * sampleSize * BLENDED_CHANNELS);
+  const valid = new Uint8Array(sampleSize * sampleSize);
   const windowSize = BIOME_BLEND_RADIUS * 2 + 1;
-  for (let z = 0; z < TILE_SIZE; z += 1) {
-    for (let x = 0; x < TILE_SIZE; x += 1) {
+  for (let z = 0; z < sampleSize; z += 1) {
+    for (let x = 0; x < sampleSize; x += 1) {
       const count = rectangleSum(integral, stride, x, z, windowSize, 0);
       if (count === 0) continue;
-      const pixel = z * TILE_SIZE + x;
+      const pixel = z * sampleSize + x;
       valid[pixel] = 1;
       const output = pixel * BLENDED_CHANNELS;
       for (let channel = 1; channel < BIOME_CHANNELS; channel += 1) {
@@ -210,14 +251,15 @@ function packedColor(colors: Uint8Array, offset: number): RgbaColor {
 
 function sampleBiome(
   samples: SurfaceSamples,
+  sampleSize: number,
   x: number,
   z: number,
   context: RenderSurfaceContext,
 ): number | undefined {
   const contextualBiome = context.biomeAt?.(x, z);
   if (contextualBiome !== undefined) return contextualBiome;
-  if (x >= 0 && x < TILE_SIZE && z >= 0 && z < TILE_SIZE) {
-    return samples[z * TILE_SIZE + x]?.biomeId;
+  if (x >= 0 && x < sampleSize && z >= 0 && z < sampleSize) {
+    return samples[z * sampleSize + x]?.biomeId;
   }
   return undefined;
 }
@@ -312,6 +354,89 @@ function isNaturalTerrain(name: string): boolean {
 
 function isFoliage(name: string): boolean {
   return /leaves|vine|azalea/.test(name);
+}
+
+function writeSurfaceBlock(
+  target: Uint8Array,
+  samples: SurfaceSamples,
+  sampleSize: number,
+  pixelsPerBlock: number,
+  blockX: number,
+  blockZ: number,
+  sample: NonNullable<SurfaceSamples[number]>,
+  base: RgbaColor,
+  shade: number,
+): void {
+  if (pixelsPerBlock === 1) {
+    writeColor(target, (blockZ * TILE_SIZE + blockX) * 4, base, shade);
+    return;
+  }
+
+  const north = sampleHeight(samples, sampleSize, blockX, blockZ - 1, sample.y);
+  const south = sampleHeight(samples, sampleSize, blockX, blockZ + 1, sample.y);
+  const west = sampleHeight(samples, sampleSize, blockX - 1, blockZ, sample.y);
+  const east = sampleHeight(samples, sampleSize, blockX + 1, blockZ, sample.y);
+  const detail = materialDetail(sample.name);
+  const seed = blockSeed(sample.name, blockX, blockZ);
+
+  for (let pixelZ = 0; pixelZ < pixelsPerBlock; pixelZ += 1) {
+    for (let pixelX = 0; pixelX < pixelsPerBlock; pixelX += 1) {
+      const outputX = blockX * pixelsPerBlock + pixelX;
+      const outputZ = blockZ * pixelsPerBlock + pixelZ;
+      const relief = subBlockRelief(
+        sample.y,
+        north,
+        south,
+        west,
+        east,
+        pixelsPerBlock,
+        pixelX,
+        pixelZ,
+      );
+      const texture = materialTexture(seed, detail, pixelX, pixelZ);
+      writeColor(target, (outputZ * TILE_SIZE + outputX) * 4, base, shade * relief * texture);
+    }
+  }
+}
+
+function subBlockRelief(
+  height: number,
+  north: number,
+  south: number,
+  west: number,
+  east: number,
+  size: number,
+  x: number,
+  z: number,
+): number {
+  let shade = 1;
+  if (z === 0 && height > north) shade *= 1.1;
+  if (x === 0 && height > west) shade *= 1.07;
+  if (z === size - 1 && height > south) shade *= 0.84;
+  if (x === size - 1 && height > east) shade *= 0.88;
+  return shade;
+}
+
+function materialDetail(name: string): number {
+  if (isFoliage(name)) return 0.15;
+  if (isWater(name)) return 0.07;
+  if (isNaturalTerrain(name)) return 0.08;
+  return 0.04;
+}
+
+function materialTexture(seed: number, detail: number, x: number, z: number): number {
+  const mixed =
+    Math.imul(seed ^ Math.imul(x + 1, 0x9e3779b1), 0x85ebca6b) ^ Math.imul(z + 1, 0xc2b2ae35);
+  const noise = ((mixed >>> 24) / 255 - 0.5) * 0.7;
+  return 1 + noise * detail;
+}
+
+function blockSeed(name: string, x: number, z: number): number {
+  let hash = Math.imul(x, 0x1f123bb5) ^ Math.imul(z, 0x5f356495);
+  for (const character of name) {
+    hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 16_777_619);
+  }
+  return hash;
 }
 
 function writeColor(target: Uint8Array, offset: number, base: RgbaColor, shade: number): void {

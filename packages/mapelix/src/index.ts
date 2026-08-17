@@ -2,6 +2,7 @@ export { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./bl
 export { openBedrockWorld, type BedrockWorldDirectory } from "./node-world.js";
 export { writeLeafletTile, type LeafletTileOutput } from "./node-output.js";
 export {
+  MAX_NATIVE_ZOOM,
   TILE_SIZE,
   floorDiv,
   tileBounds,

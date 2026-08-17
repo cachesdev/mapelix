@@ -17,7 +17,7 @@ await writeLeafletTile(tile, { root: "generated-tiles" });
 
 This writes `generated-tiles/0/0/0.png`. A Leaflet grid layer can request the output with `/tiles/{z}/{x}/{y}.png`.
 
-At prototype zoom 0, tile `(x, y)` covers 256 by 256 blocks. Tile `y` follows Minecraft Z. Missing chunks are transparent. Other zoom levels are rejected.
+Tiles are always 256 by 256 pixels. Native zooms 0 through 3 render blocks at 1×1, 2×2, 4×4, and 8×8 pixels, so each higher zoom covers half as many blocks per axis. Tile `y` follows Minecraft Z. Missing chunks are transparent.
 
 For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file access and accepts Bedrock key/value records directly. This is the intended Canopy seam.
 
@@ -29,6 +29,7 @@ For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file a
 - Reads legacy Data2D biome IDs used by the Stratos world. Modern Data3D biome palettes are not implemented yet.
 - Uses biome-aware grass, foliage, and water colors. A seam-safe two-block transition softens biome boundaries without hiding their block shape.
 - Uses water-depth compositing, a sea-level-relative elevation gradient, four-neighbor hill shading, directional block-edge highlights, and crisp three-block cast shadows. Foliage transmits part of the shadow light. Callers can inject a `BlockStyleResolver`.
+- Adds deterministic material variation and sub-block edge lighting at native zooms 1 through 3. It does not use resource-pack textures yet.
 - Does not validate LevelDB checksums yet.
 - Builds the index one database file at a time. It retains packed subchunk keys and only the 256/512-byte biome payload from Data2D records. Block values load on demand. More workers increase throughput and temporary memory use.
 - Does not interpret `CURRENT` or `MANIFEST` yet. Point it at a clean world snapshot without orphaned LevelDB files.

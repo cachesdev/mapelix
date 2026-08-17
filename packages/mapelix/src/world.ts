@@ -12,6 +12,7 @@ import { renderSurface, type RenderSurfaceOptions } from "./render.js";
 import {
   TILE_SIZE,
   floorDiv,
+  tileBlockSpan,
   tileBounds,
   type Dimension,
   type RenderedTile,
@@ -64,12 +65,14 @@ class RecordBedrockWorld implements BedrockWorld {
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
     const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
-    const records = this.tileRecords.get(tileRecordKey(dimension, coordinates.x, coordinates.y));
+    const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
+    const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
+    const records = this.tileRecords.get(tileRecordKey(dimension, storageTileX, storageTileY));
 
     for (let tileOffsetY = -1; tileOffsetY <= 1; tileOffsetY += 1) {
       for (let tileOffsetX = -1; tileOffsetX <= 1; tileOffsetX += 1) {
         const neighborRecords = this.tileRecords.get(
-          tileRecordKey(dimension, coordinates.x + tileOffsetX, coordinates.y + tileOffsetY),
+          tileRecordKey(dimension, storageTileX + tileOffsetX, storageTileY + tileOffsetY),
         );
         for (const record of neighborRecords ?? []) {
           const mapKey = classifyMapRecordKey(record.key);
@@ -107,8 +110,9 @@ class RecordBedrockWorld implements BedrockWorld {
       chunks.set(chunkKey, group);
     }
 
+    const blockSpan = tileBlockSpan(coordinates.z);
     const samples = Array.from(
-      { length: TILE_SIZE * TILE_SIZE },
+      { length: blockSpan * blockSpan },
       (): SurfaceBlock | undefined => undefined,
     );
     for (const subchunks of chunks.values()) {
@@ -119,6 +123,7 @@ class RecordBedrockWorld implements BedrockWorld {
       }
       writeChunkSurface(
         samples,
+        blockSpan,
         bounds.minX,
         bounds.minZ,
         key.x,
@@ -198,6 +203,7 @@ export function createBedrockWorld(records: Iterable<EffectiveBedrockRecord>): B
 
 function writeChunkSurface(
   samples: Array<SurfaceBlock | undefined>,
+  sampleSize: number,
   tileMinX: number,
   tileMinZ: number,
   chunkX: number,
@@ -213,8 +219,9 @@ function writeChunkSurface(
       }
       const pixelX = chunkX * 16 + localX - tileMinX;
       const pixelZ = chunkZ * 16 + localZ - tileMinZ;
+      if (pixelX < 0 || pixelX >= sampleSize || pixelZ < 0 || pixelZ >= sampleSize) continue;
       const biomeId = biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ);
-      samples[pixelZ * TILE_SIZE + pixelX] =
+      samples[pixelZ * sampleSize + pixelX] =
         biomeId === undefined ? surface : { ...surface, biomeId };
     }
   }

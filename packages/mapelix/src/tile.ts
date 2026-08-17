@@ -1,4 +1,5 @@
 export const TILE_SIZE = 256;
+export const MAX_NATIVE_ZOOM = 3;
 
 export type Dimension = "overworld" | "nether" | "the-end";
 
@@ -39,18 +40,29 @@ export interface SurfaceBlock {
 export type SurfaceSamples = ReadonlyArray<SurfaceBlock | undefined>;
 
 export function tileBounds(coordinates: TileCoordinates): BlockBounds {
-  if (coordinates.z !== 0) {
-    throw new RangeError(`Mapelix prototype supports only zoom 0, received ${coordinates.z}`);
-  }
+  const blockSpan = tileBlockSpan(coordinates.z);
 
-  const minX = coordinates.x * TILE_SIZE;
-  const minZ = coordinates.y * TILE_SIZE;
+  const minX = coordinates.x * blockSpan;
+  const minZ = coordinates.y * blockSpan;
   return {
     minX,
     minZ,
-    maxX: minX + TILE_SIZE,
-    maxZ: minZ + TILE_SIZE,
+    maxX: minX + blockSpan,
+    maxZ: minZ + blockSpan,
   };
+}
+
+export function pixelsPerBlockAtZoom(zoom: number): number {
+  if (!Number.isSafeInteger(zoom) || zoom < 0 || zoom > MAX_NATIVE_ZOOM) {
+    throw new RangeError(
+      `Mapelix prototype supports native zoom from 0 through ${MAX_NATIVE_ZOOM}, received ${zoom}`,
+    );
+  }
+  return 2 ** zoom;
+}
+
+export function tileBlockSpan(zoom: number): number {
+  return TILE_SIZE / pixelsPerBlockAtZoom(zoom);
 }
 
 export function floorDiv(value: number, divisor: number): number {

@@ -186,4 +186,28 @@ describe("renderSurface", () => {
     expect(solid).toBeLessThan(foliage);
     expect(foliage).toBeLessThan(exposed);
   });
+
+  it("does not add a repeated diagonal seam to flat detailed blocks", () => {
+    const sampleSize = 32;
+    const pixelsPerBlock = TILE_SIZE / sampleSize;
+    const samples = Array.from(
+      { length: sampleSize * sampleSize },
+      (): SurfaceBlock => ({ name: "minecraft:stone", y: 64 }),
+    );
+
+    const rgba = renderSurface(samples);
+    const averageAt = (localX: number, localZ: number) => {
+      let sum = 0;
+      for (let blockZ = 0; blockZ < sampleSize; blockZ += 1) {
+        for (let blockX = 0; blockX < sampleSize; blockX += 1) {
+          const x = blockX * pixelsPerBlock + localX;
+          const z = blockZ * pixelsPerBlock + localZ;
+          sum += rgba[(z * TILE_SIZE + x) * 4]!;
+        }
+      }
+      return sum / samples.length;
+    };
+
+    expect(Math.abs(averageAt(0, 0) - averageAt(7, 7))).toBeLessThan(2);
+  });
 });

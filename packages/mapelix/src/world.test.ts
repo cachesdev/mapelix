@@ -89,4 +89,21 @@ describe("createBedrockWorld", () => {
     expect(tile.rgba[pixelOffset + 1]).toBeLessThan(193);
     expect(tile.rgba[pixelOffset + 1]).toBeGreaterThan(114);
   });
+
+  it("renders genuine four-pixel block detail at zoom two", async () => {
+    const world = createBedrockWorld([singleBlockSubchunk(0, 0, 4, "minecraft:oak_leaves", 0, 0)]);
+
+    const tile = await world.renderTile({ dimension: "overworld", z: 2, x: 0, y: 0 });
+    const colors = new Set<string>();
+    for (let pixelZ = 0; pixelZ < 4; pixelZ += 1) {
+      for (let pixelX = 0; pixelX < 4; pixelX += 1) {
+        const offset = (pixelZ * 256 + pixelX) * 4;
+        colors.add(Array.from(tile.rgba.slice(offset, offset + 4)).join(","));
+      }
+    }
+
+    expect(tile.bounds).toEqual({ minX: 0, minZ: 0, maxX: 64, maxZ: 64 });
+    expect(colors.size).toBeGreaterThan(1);
+    expect(tile.rgba[(4 * 256 + 4) * 4 + 3]).toBe(0);
+  });
 });

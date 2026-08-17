@@ -15,6 +15,7 @@
   },
   "scripts": {
     "benchmark": "node --expose-gc scripts/benchmark-world.mjs",
+    "benchmark:zoom": "node --expose-gc scripts/benchmark-zoom.mjs",
     "build": "tsc --project tsconfig.build.json",
     "check": "tsc --noEmit --project tsconfig.json",
     "format": "oxfmt .",

@@ -19,6 +19,14 @@ MAPELIX_BENCH_TILES=1 \
 pnpm turbo run benchmark --filter @mapelix/core
 ```
 
+Compare the same hotspot across native zooms with:
+
+```sh
+MAPELIX_BENCH_WORLD=/tmp/mapelix-stratos-tmbcraft-pruned-v2 \
+MAPELIX_BENCH_WORKERS=1 \
+pnpm --filter @mapelix/core benchmark:zoom
+```
+
 Timing can vary with the filesystem cache. Compare repeated experiments in the same WSL session and use the JSON data rather than Turbo's total duration.
 
 ## Successful optimizations
@@ -32,8 +40,13 @@ Timing can vary with the filesystem cache. Compare repeated experiments in the s
 | Viewer-owned persistent cache | 35.96 s cold metadata | 1.26 s render | 3.1 ms disk hit after restart | Not measured in HTTP probe | Fingerprint the world from cheap file metadata. Store metadata and final PNGs outside the renderer. Warm metadata took 27.8 ms and did not open the LevelDB index; an in-process PNG hit took 2.4 ms. A complete Playwright run fell from 1.1 min cold to 7.4 s warm. |
 | Retain compact biome payloads for the render halo | 42.97 s | 1.26 s for both | 1.14 s for both | 1.60 GiB | Keep only the 256/512-byte biome payload, not the unused 512-byte Data2D height prefix. Send the halo with worker jobs instead of reopening LevelDB files. This restored repeated rendering from 3.08 s to 1.14 s and cut retained array buffers from about 230 MiB to 110 MiB. |
 | Eight workers for eight dense visual tiles | 42.68 s | 2.07 s for all eight | 1.96 s for all eight | 2.53 GiB | The process reached 4.08 tiles/s and used 9.19 CPU cores during the first batch. Compared with two workers, throughput improved 2.33× for 4× the workers, about 58% parallel efficiency. Actual Mapelix peak RSS stayed below 4 GiB. |
+| Zoom-aware packed-key filtering | 41.46 s | 1× 1.65 s; 2× 0.63 s; 4× 0.37 s; 8× 0.30 s | 1× 1.17 s; 2× 0.61 s; 4× 0.38 s; 8× 0.27 s | 1.27 GiB | Keep every PNG at 256×256, reduce its world bounds at higher zooms, and filter packed keys before worker dispatch. More detailed tiles became faster because they decoded fewer chunks. PNG size also fell from 172.5 KB at 1× to 114.7 KB at 8×. |
 
 After the biome pass, a two-worker run retained about 21 MiB of main-process JavaScript heap after an explicit GC. Most peak RSS is temporary allocation space that V8 reserves after index construction plus worker heaps, not retained tile objects.
+
+The visual comparison selected 4×4 pixels per block as the best general detail level. It makes block faces and tree crowns readable without dominating the viewport. The 8×8 level is useful for close inspection, but it exposes the limits of procedural material detail and is the point where real downsampled block textures would add the most value.
+
+An early 8×8 pass restarted the same diagonal brightness gradient inside every block. On flat terrain this made a visible grid with about 10 red-channel levels of corner-to-corner bias. Random material detail can vary inside a block, but it must not contain a non-tileable directional gradient. Height-step edge lighting remains separate and only appears when adjacent block heights differ.
 
 ## Runtime scaling observations
 
