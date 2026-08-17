@@ -40,6 +40,18 @@ Measure Sobel and Laplacian edge energy with:
 pnpm --filter @mapelix/core diagnose:sharpness path/to/tile.png
 ```
 
+Compare an aligned Mapelix PNG with a PNG or JPEG reference renderer:
+
+```sh
+pnpm --filter @mapelix/core diagnose:compare \
+  path/to/mapelix.png path/to/reference.jpeg /tmp/edge-overlay.png 4
+```
+
+The edge overlay uses cyan for Mapelix-only edges, red for reference-only
+edges, and white for exact overlap. The command also reports alignment,
+one-pixel-tolerant edge precision and recall, block-grid contrast, and
+within-block luminance variation.
+
 Timing can vary with the filesystem cache. Compare repeated experiments in the same WSL session and use the JSON data rather than Turbo's total duration.
 
 ## Successful optimizations
@@ -62,6 +74,28 @@ After the biome pass, a two-worker run retained about 21 MiB of main-process Jav
 The first visual comparison selected 4×4 pixels per block as the best general detail level. It makes tree crowns and structure edges readable without dominating the viewport. The untextured 8×8 level is useful for close inspection, but actual resource-pack top textures are the correct next source of within-block detail.
 
 An early 8×8 pass restarted a brightness gradient and seeded noise inside every block. Removing only the diagonal was insufficient: the exact flat Stratos crop still had 1.93× more luminance change across block boundaries than inside them. The final untextured rule is stricter: do not generate any within-block material detail. Use actual top-face texture assets when texture mode exists.
+
+## Current Amelix comparison workload
+
+- Archive: `Amelix-8-12-26.zip`, 2.10 GB compressed
+- World: `Amelix SMP`, about 1.2 GB with 556 table files and one log file
+- Exact native tile: zoom 2, `x=-32`, `y=-49`, covering X `[-2048,-1984)` and Z `[-3136,-3072)`
+- Mapelix with eight workers: 88.14 s cold in-memory index, 321.70 ms tile render, 1.53 GiB peak RSS
+- Published oracle: uNmINeD `zoom.2/-4/-5/tile.-32.-49.jpeg`
+
+The geometry in this exact pair aligns. At a Sobel threshold of 80, Mapelix
+has 39.27 mean edge energy and 18.28% strong-edge pixels; uNmINeD has 86.15
+and 38.14%. With one-pixel tolerance, 86.62% of Mapelix edges match uNmINeD,
+while Mapelix recalls 58.81% of uNmINeD edges. This indicates missing local
+structure more than misplaced structure. A global sharpen is not the target:
+the missing reference edges cluster around height faces, cast shadows, and
+small material features.
+
+The official uNmINeD 0.20.1 Linux CLI is usable as a local oracle, but it
+rejects this backup before rendering because its manifest references missing
+table `32439120`. Mapelix's raw record scan tolerates the backup and rendered
+the aligned tile. Use a clean Bedrock checkpoint when comparing fresh outputs
+from both renderers.
 
 ## Runtime scaling observations
 

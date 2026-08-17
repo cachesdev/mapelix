@@ -101,6 +101,9 @@ importers:
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
+      jpeg-js:
+        specifier: 0.4.4
+        version: 0.4.4
       oxfmt:
         specifier: 0.61.0
         version: 0.61.0(svelte@5.56.1)
@@ -1179,6 +1182,9 @@ packages:
 
   is-reference@3.0.3:
     resolution: {integrity: sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw==}
+
+  jpeg-js@0.4.4:
+    resolution: {integrity: sha512-WZzeDOEtTOBK4Mdsar0IqEU5sMr3vSV2RqkAIzUEV2BHnUfKGyswWFPFwK5EeDo93K3FohSHbLAjj0s1Wzd+dg==}
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -2272,6 +2278,8 @@ snapshots:
   is-reference@3.0.3:
     dependencies:
       '@types/estree': 1.0.9
+
+  jpeg-js@0.4.4: {}
 
   kleur@4.1.5: {}
 
