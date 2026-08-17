@@ -2,12 +2,13 @@
 
 Mapelix is the bastard child of
 [Mojang's Minecraft Creator Tools](https://github.com/Mojang/minecraft-creator-tools) and
-[uNmINeD](https://unmined.net/). It takes Mojang's official tooling for reading maps and combines
-it with an almost clean-room port created by reverse-engineering a uNmINeD 0.20.1-dev binary.
+[uNmINeD](https://unmined.net/). We took Mojang's official tooling for reading maps, pointed a
+decompiler at a uNmINeD 0.20.1-dev binary, and smashed the useful parts together into an almost
+clean-room TypeScript port.
 
-This slop fork brings the look of uNmINeD maps to TypeScript as a low-level, programmatic API.
-That means you can do fun stuff such as running the renderer in a browser (TODO), updating a map
-dynamically, or integrating it into web frameworks.
+This slop fork brings the look of uNmINeD maps to TypeScript as a low-level, programmatic API. That
+means you can do fun stuff such as running the renderer in a browser (TODO), updating the map live,
+or shoving it directly into whatever web framework you like.
 
 The first prototype reads a Bedrock world, renders standard 256 by 256 XYZ tiles, and writes PNGs
 that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
@@ -16,7 +17,7 @@ that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | ![A village rendered by Mapelix](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/mapelix-baseline.png) | ![The same village rendered by uNmINeD](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/unmined.png) |
 
-## What works
+## What the slop can do
 
 - Bedrock LevelDB table and log files, including sequence ordering and tombstones
 - Modern palette subchunks, negative Y levels, and Data2D and Data3D biomes
@@ -26,13 +27,14 @@ that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
 - Configurable worker concurrency for large worlds
 - A byte-oriented API for future live-world and Canopy integrations
 
-The prototype has been tested with the committed Bedrock fixture, the large Stratos world, and a
-current 1.2 GB Amelix SMP backup.
+We threw the committed Bedrock fixture, the large Stratos world, and a current 1.2 GB Amelix SMP
+backup at it. It survived all three.
 
-## Similarity to uNmINeD
+## How close did we get?
 
 The committed visual suite compares Mapelix with lossless uNmINeD renders across ten Amelix
-scenes. It checks structure, block color, shadows, and tile alignment.
+scenes. It checks structure, block color, shadows, and tile alignment. The short answer is 97.12%,
+somehow.
 
 | Signal                     |               Baseline |
 | -------------------------- | ---------------------: |
@@ -52,7 +54,7 @@ pnpm test:visual
 See the [visual regression suite](packages/mapelix-prototype/test/visual-regression/README.md) for
 the oracle, input contract, and generated reports.
 
-## Package API
+## Use it as a package
 
 The renderer is pure TypeScript and has no native image or LevelDB dependency.
 
@@ -80,7 +82,7 @@ This writes `generated-tiles/2/-32/-49.png`. Leaflet can request the output with
 See [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md) for the complete prototype
 API and its current boundaries.
 
-## Run it locally
+## Run the whole mess locally
 
 Mapelix uses Node.js 24 and pnpm 11.
 
@@ -111,7 +113,7 @@ The viewer renders visible tiles on demand and keeps a persistent PNG cache. A w
 serve explored regions without reopening the world database. Set `MAPELIX_CACHE_DIRECTORY` to
 choose another cache location.
 
-## More information
+## Receipts
 
 - [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md) records successful and failed speed, memory, and accuracy
   experiments.
