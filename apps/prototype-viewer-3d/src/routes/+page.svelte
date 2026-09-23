@@ -122,7 +122,7 @@
 
   <div class="overlay">
     <div class="top-left">
-      <StatusCard name={world?.name} loading={snapshot?.streaming.loading ?? 0} {failure} />
+      <StatusCard name={world?.name} loading={snapshot?.streaming.remaining ?? 0} {failure} />
       {#if debugVisible && snapshot !== undefined}
         <DebugPanel {snapshot} />
       {/if}

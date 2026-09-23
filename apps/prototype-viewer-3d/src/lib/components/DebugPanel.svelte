@@ -12,10 +12,7 @@
     ["Frame rate", `${snapshot.framesPerSecond.toFixed(0)} fps`],
     ["Regions drawn", String(snapshot.streaming.drawn)],
     ["Regions cached", String(snapshot.streaming.cached)],
-    [
-      "Loading",
-      `${snapshot.streaming.loading} of ${snapshot.streaming.loading + snapshot.streaming.waiting}`,
-    ],
+    ["Loading", `${snapshot.streaming.loading} of ${snapshot.streaming.remaining}`],
     ["Quad memory", `${snapshot.streaming.megabytes.toFixed(1)} MiB`],
     ["Camera distance", `${snapshot.view.distance.toFixed(0)} blocks`],
   ]);

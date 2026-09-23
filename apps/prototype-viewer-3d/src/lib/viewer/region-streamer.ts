@@ -27,7 +27,8 @@ export interface StreamingStats {
   readonly drawn: number;
   readonly cached: number;
   readonly loading: number;
-  readonly waiting: number;
+  /** Regions the view still needs, including those loading now. */
+  readonly remaining: number;
   readonly megabytes: number;
 }
 
@@ -75,7 +76,7 @@ export class RegionStreamer {
   private readonly requests = new Map<string, AbortController>();
   private readonly drawn = new Map<string, RegionMesh>();
   private readonly fades = new Map<RegionMesh, Fade>();
-  private waiting: Wanted[] = [];
+  private wanted: Wanted[] = [];
   private frame = 0;
   private bytes = 0;
   private readonly frustum = new Frustum();
@@ -100,7 +101,7 @@ export class RegionStreamer {
       drawn: this.drawn.size,
       cached: this.cache.size,
       loading: this.requests.size,
-      waiting: this.waiting.length,
+      remaining: this.wanted.length,
       megabytes: this.bytes / (1024 * 1024),
     };
   }
@@ -266,7 +267,7 @@ export class RegionStreamer {
   /** Starts the nearest requests first and cancels those the camera no longer needs. */
   private schedule(wanted: Wanted[]): void {
     wanted.sort((left, right) => left.priority - right.priority);
-    this.waiting = wanted;
+    this.wanted = wanted;
     const keep = new Set(wanted.slice(0, this.options.maxRequests * 2).map(({ node }) => node.key));
     for (const [key, controller] of this.requests) {
       if (!keep.has(key)) {
