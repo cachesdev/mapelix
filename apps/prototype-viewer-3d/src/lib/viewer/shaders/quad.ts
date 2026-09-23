@@ -27,8 +27,9 @@ export const quadColor = varyingProperty("vec3", "vQuadColor");
 export const quadOcclusion = varyingProperty("float", "vQuadOcclusion");
 /** Position inside the quad from (0, 0) to (1, 1), used by plant sprites. */
 export const quadUV = varyingProperty("vec2", "vQuadUV");
-/** `QuadMaterial` code of the face. */
-export const quadMaterial = varyingProperty("float", "vQuadMaterial");
+const materialCode = varyingProperty("float", "vQuadMaterial");
+/** `QuadMaterial` code of the face, rounded because interpolation can leave it slightly off. */
+export const quadMaterial = materialCode.round();
 /** `PlantSprite` code of the face. */
 export const quadSprite = varyingProperty("float", "vQuadSprite");
 /** 1 for covered soil sides, which draw soil below a strip of the quad color. */
@@ -112,7 +113,7 @@ export const quadPosition = Fn(() => {
   quadColor.assign(sRGBTransferEOTF(color));
   quadOcclusion.assign(select(plant, float(1), occlusionCurve(cornerOcclusion)));
   quadUV.assign(vec2(cornerU, cornerV));
-  quadMaterial.assign(bits(word0, 26, 15));
+  materialCode.assign(bits(word0, 26, 15));
   quadSprite.assign(bits(word1, 24, 7));
   quadCovered.assign(bits(word0, 30, 1));
   quadHeight.assign(height);
