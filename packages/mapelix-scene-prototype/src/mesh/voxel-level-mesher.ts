@@ -12,23 +12,21 @@ import {
 import { VoxelKind } from "./block-palette.js";
 import {
   COVER_DEPTH,
-  COVER_REACH,
   KEY_COVERED,
   NORMAL_LAYER,
   cornerOcclusion,
   faceOf,
   faceSteps,
+  findOpenAir,
   isFlatFace,
   keyBox,
   keyMaterial,
-  coverFloors,
   maskOffset,
   maskSlice,
   mergeKey,
   mergeSlice,
   slicePosition,
   sliceLayout,
-  traceCoveredAir,
   type FaceSteps,
 } from "./voxel-faces.js";
 import { isOpaqueKind, type VoxelBox } from "./voxel-box.js";
@@ -71,7 +69,7 @@ class VoxelLevelMesher {
   /** Layer of the highest voxel of any kind in each box column, or -1. */
   private readonly top: Int16Array;
   /** Lowest open layer of each box column. */
-  private readonly floor: Int16Array;
+  private readonly lowestOpen: Int16Array;
   private readonly reached: Uint8Array;
   /** Lowest layer per region column that can own a visible face. */
   private readonly columnLow: Int16Array;
@@ -96,20 +94,17 @@ class VoxelLevelMesher {
     this.roof = new Int16Array(this.area).fill(-1);
     this.top = new Int16Array(this.area).fill(-1);
     this.findColumnTops();
-    const { voxelSize } = region;
-    this.floor = coverFloors(
-      this.roof,
-      this.box.width,
-      Math.ceil(COVER_REACH / voxelSize),
-      Math.ceil(COVER_DEPTH / voxelSize),
+    const open = findOpenAir(
+      {
+        size: this.box.width,
+        layers: this.box.layers,
+        roof: this.roof,
+        isOpaque: (index) => isOpaqueKind(this.box.kind[index]!),
+      },
+      Math.ceil(COVER_DEPTH / region.voxelSize),
     );
-    this.reached = traceCoveredAir({
-      size: this.box.width,
-      layers: this.box.layers,
-      roof: this.roof,
-      floor: this.floor,
-      isOpaque: (index) => isOpaqueKind(this.box.kind[index]!),
-    });
+    this.reached = open.reached;
+    this.lowestOpen = open.lowest;
     this.columnLow = this.findColumnRanges();
   }
 
@@ -147,7 +142,7 @@ class VoxelLevelMesher {
     }
   }
 
-  /** As at level 0, open voxels lie at or above the floor of their column. */
+  /** As at level 0, the lowest open voxel around a column bounds the voxels worth testing. */
   private findColumnRanges(): Int16Array {
     const { span, margin } = this.region;
     const width = this.box.width;
@@ -159,7 +154,7 @@ class VoxelLevelMesher {
         let low = this.edgeFloor(column);
         for (const neighbor of [column, column + 1, column - 1, column + width, column - width]) {
           if (this.region.explored[neighbor] === 1) {
-            low = Math.min(low, this.floor[neighbor]! - 1);
+            low = Math.min(low, this.lowestOpen[neighbor]! - 1);
           }
         }
         low = Math.max(0, low);

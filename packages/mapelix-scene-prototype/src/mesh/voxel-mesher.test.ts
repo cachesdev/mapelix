@@ -89,11 +89,11 @@ describe("voxel mesher", () => {
     expect(underside[0]).toMatchObject({ x: 20, z: 20, width: 10, height: 1 });
   });
 
-  it("keeps the ground under a high platform", () => {
+  it("keeps the ground under a wide, high platform", () => {
     const quads = mesh((place) => {
       floor(place);
-      for (let z = 20; z < 30; z += 1) {
-        for (let x = 20; x < 30; x += 1) place(x, 140, z, "minecraft:stone");
+      for (let z = -8; z < 72; z += 1) {
+        for (let x = -8; x < 72; x += 1) place(x, 140, z, "minecraft:stone");
       }
     });
 
