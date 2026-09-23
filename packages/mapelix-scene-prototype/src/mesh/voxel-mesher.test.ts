@@ -88,4 +88,16 @@ describe("voxel mesher", () => {
     expect(underside).toHaveLength(1);
     expect(underside[0]).toMatchObject({ x: 20, z: 20, width: 10, height: 1 });
   });
+
+  it("keeps the ground under a high platform", () => {
+    const quads = mesh((place) => {
+      floor(place);
+      for (let z = 20; z < 30; z += 1) {
+        for (let x = 20; x < 30; x += 1) place(x, 140, z, "minecraft:stone");
+      }
+    });
+
+    const ground = quads.filter((quad) => quad.face === Face.PositiveY && quad.y === 60);
+    expect(ground).toEqual([expect.objectContaining({ x: 0, z: 0, width: 64, height: 64 })]);
+  });
 });

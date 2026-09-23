@@ -7,6 +7,12 @@ import { Face, QuadMaterial, type QuadBox } from "../format.js";
 
 /** How far below a column's roof, in blocks, the sky trace follows open air under eaves and trees. */
 export const COVER_DEPTH = 32;
+/**
+ * How far around a column, in blocks, the sky trace looks for lower land. Air under a
+ * platform or bridge stays open down to that land, so the ground under platforms up to
+ * twice this wide stays drawn.
+ */
+export const COVER_REACH = 32;
 
 /** Cell index steps along each face's normal and tangents, in `Face` order. */
 export interface FaceSteps {
@@ -243,22 +249,70 @@ export interface SkyVolume {
   readonly layers: number;
   /** Layer of the highest opaque cell in each column, or -1 for none. */
   readonly roof: Int16Array;
+  /** Lowest layer the trace reaches in each column, from `coverFloors`. */
+  readonly floor: Int16Array;
   isOpaque(index: number): boolean;
 }
 
+/** Stands in for columns without a roof while `coverFloors` looks for the lowest one. */
+const NO_ROOF = 0x7fff;
+
 /**
- * Flood fills air under overhangs, eaves, and canopies from the open sky beside it,
- * down to `depth` layers below each column's roof. Returns 1 for every reached cell.
+ * The lowest layer the sky trace reaches in each column: `depth` layers below its roof,
+ * or the lowest roof within `reach` columns when that lies deeper.
  */
-export function traceCoveredAir(volume: SkyVolume, depth: number): Uint8Array {
-  const { size, layers, roof } = volume;
+export function coverFloors(
+  roof: Int16Array,
+  size: number,
+  reach: number,
+  depth: number,
+): Int16Array {
+  // The lowest roof in a square splits into a pass along x and a pass along z.
+  const rows = new Int16Array(roof.length);
+  const floor = new Int16Array(roof.length);
+  lowestAlong(roof, rows, size, 1, reach);
+  lowestAlong(rows, floor, size, size, reach);
+  for (let column = 0; column < roof.length; column += 1) {
+    floor[column] = Math.min(roof[column]! - depth, floor[column]!);
+  }
+  return floor;
+}
+
+/** One pass of `coverFloors` along the axis whose cells lie `step` apart. */
+function lowestAlong(
+  source: Int16Array,
+  target: Int16Array,
+  size: number,
+  step: number,
+  reach: number,
+): void {
+  const lineStep = step === 1 ? size : 1;
+  for (let line = 0; line < size; line += 1) {
+    const start = line * lineStep;
+    for (let at = 0; at < size; at += 1) {
+      let lowest = NO_ROOF;
+      const last = Math.min(size - 1, at + reach);
+      for (let near = Math.max(0, at - reach); near <= last; near += 1) {
+        const value = source[start + near * step]!;
+        if (value >= 0 && value < lowest) lowest = value;
+      }
+      target[start + at * step] = lowest;
+    }
+  }
+}
+
+/**
+ * Flood fills air under overhangs, eaves, canopies, and platforms from the open sky
+ * beside it, down to each column's floor. Returns 1 for every reached cell.
+ */
+export function traceCoveredAir(volume: SkyVolume): Uint8Array {
+  const { size, layers, roof, floor } = volume;
   const area = size * size;
   const reached = new Uint8Array(area * layers);
   let stack = new Int32Array(4096);
   let count = 0;
   const visit = (index: number, layer: number, column: number): void => {
-    const top = roof[column]!;
-    if (layer > top || layer < top - depth || reached[index] === 1) return;
+    if (layer > roof[column]! || layer < floor[column]! || reached[index] === 1) return;
     if (volume.isOpaque(index)) return;
     reached[index] = 1;
     if (count === stack.length) {
@@ -277,7 +331,7 @@ export function traceCoveredAir(volume: SkyVolume, depth: number): Uint8Array {
       const open = roof[column]!;
       for (const step of neighbors) {
         const top = roof[column + step]!;
-        for (let layer = Math.max(open + 1, top - depth); layer < top; layer += 1) {
+        for (let layer = Math.max(open + 1, floor[column + step]!); layer < top; layer += 1) {
           visit(layer * area + column + step, layer, column + step);
         }
       }

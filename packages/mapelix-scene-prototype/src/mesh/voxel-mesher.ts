@@ -26,6 +26,7 @@ import {
 } from "./region-volume.js";
 import {
   COVER_DEPTH,
+  COVER_REACH,
   KEY_COVERED,
   NORMAL_LAYER,
   cornerOcclusion,
@@ -34,6 +35,7 @@ import {
   isFlatFace,
   keyBox,
   keyMaterial,
+  coverFloors,
   maskOffset,
   maskSlice,
   mergeKey,
@@ -68,6 +70,8 @@ class VoxelMesher {
   private readonly cells: Uint16Array;
   /** Covered air cells that connect to the sky. Open air above `topSolid` is implied. */
   private reached: Uint8Array = new Uint8Array(0);
+  /** Lowest open cell of each volume column, in layers above `WORLD_MIN_Y`. */
+  private floor: Int16Array = new Int16Array(0);
   private readonly tints: Uint32Array[];
   private readonly opaque = new QuadList();
   private readonly plants = new QuadList();
@@ -111,32 +115,32 @@ class VoxelMesher {
     };
   }
 
-  /** Finds the air under overhangs, eaves, and canopies that the open sky reaches. */
+  /** Finds the air under overhangs, eaves, canopies, and platforms that the open sky reaches. */
   private traceCoveredAir(): void {
-    this.reached = traceCoveredAir(
-      {
-        size: VOLUME_SIZE,
-        layers: VOLUME_HEIGHT,
-        roof: this.volume.topSolid.map((y) => y - WORLD_MIN_Y),
-        isOpaque: (index) => this.isOpaque(index),
-      },
-      COVER_DEPTH,
-    );
+    const roof = this.volume.topSolid.map((y) => y - WORLD_MIN_Y);
+    this.floor = coverFloors(roof, VOLUME_SIZE, COVER_REACH, COVER_DEPTH);
+    this.reached = traceCoveredAir({
+      size: VOLUME_SIZE,
+      layers: VOLUME_HEIGHT,
+      roof,
+      floor: this.floor,
+      isOpaque: (index) => this.isOpaque(index),
+    });
   }
 
   /**
    * A block can only own a visible face if an open cell touches it, and open cells lie
-   * at most `COVER_DEPTH` below their column's roof. The lowest roof around a column
-   * therefore bounds the blocks worth testing there.
+   * at or above their column's floor. The lowest floor around a column therefore bounds
+   * the blocks worth testing there.
    */
   private findColumnRanges(): void {
-    const { topSolid, topBlock } = this.volume;
+    const { topBlock } = this.volume;
     for (let z = 0; z < SPAN; z += 1) {
       for (let x = 0; x < SPAN; x += 1) {
         const column = (z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN;
-        let roof = topSolid[column]!;
-        for (const step of NEIGHBOR_COLUMNS) roof = Math.min(roof, topSolid[column + step]!);
-        const low = Math.max(WORLD_MIN_Y, roof - COVER_DEPTH - 1);
+        let floor = this.floor[column]!;
+        for (const step of NEIGHBOR_COLUMNS) floor = Math.min(floor, this.floor[column + step]!);
+        const low = Math.max(WORLD_MIN_Y, floor + WORLD_MIN_Y - 1);
         this.columnLow[z * SPAN + x] = low;
         const top = topBlock[column]!;
         if (top === NO_BLOCK) continue;
