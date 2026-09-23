@@ -20,6 +20,11 @@ const WATER_SURFACE_FILL = 14;
  */
 const COARSE_VOXEL = 4;
 const COARSE_DEPTH = 16;
+/**
+ * Ground is at least this many opaque blocks thick. Thinner floors, roofs, and platforms
+ * can float over open air, so the reader keeps reading below them.
+ */
+const GROUND_THICKNESS = 4;
 
 /**
  * The part of a chunk that can show a face: from its highest stored subchunk down to
@@ -107,17 +112,23 @@ export class ChunkVoxelReader {
     return reused;
   }
 
-  /** Records the highest ground block of each column that has none yet. Returns how many it found. */
+  /**
+   * Records the highest ground of each column that has none yet: the top of a run of
+   * `GROUND_THICKNESS` opaque blocks. Runs do not continue across subchunks, so ground
+   * at the bottom of a subchunk is found a little lower. Returns how many it found.
+   */
   private findGround(cells: Uint16Array, baseY: number, ground: Int16Array): number {
     const { voxel } = this.palette;
     let found = 0;
     for (let column = 0; column < 256; column += 1) {
       if (ground[column]! >= WORLD_MIN_Y) continue;
       const start = (column & 15) * 256 + (column >> 4) * 16;
+      let run = 0;
       for (let y = 15; y >= 0; y -= 1) {
         const kind = voxel[cells[start + y]! & PALETTE_ID_MASK]!;
-        if (!isOpaqueKind(kind) || kind === VoxelKind.Foliage) continue;
-        ground[column] = baseY + y;
+        run = isOpaqueKind(kind) && kind !== VoxelKind.Foliage ? run + 1 : 0;
+        if (run < GROUND_THICKNESS) continue;
+        ground[column] = baseY + y + GROUND_THICKNESS - 1;
         found += 1;
         break;
       }

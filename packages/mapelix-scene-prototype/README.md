@@ -35,6 +35,9 @@ as many blocks on each side, up to 2048 by 2048 at level 5.
 - Higher levels cull, merge, and shade faces as level 0 does. Walls that face unexplored land
   reach 16 blocks below the highest block, like the cut edge of a diorama. Borders reach under
   their neighbors so regions of different levels meet without gaps.
+- Higher levels read each chunk from the top down to 32 blocks below its ground, or 16 blocks
+  for voxels 4 blocks wide and wider, and treat deeper blocks as rock. Ground is the top of at
+  least 4 solid blocks, so towers of thin floors and high platforms keep the open air below them.
 
 ## Format
 
