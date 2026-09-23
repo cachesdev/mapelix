@@ -2,9 +2,18 @@ import {
   EMPTY_HEIGHT,
   MAX_REGION_LEVEL,
   decodeSceneRegion,
+  regionCellSize,
   regionSpan,
 } from "@mapelix/scene-prototype/format";
-import { Box3, Frustum, Group, Matrix4, Vector3, type PerspectiveCamera } from "three/webgpu";
+import {
+  Box3,
+  Frustum,
+  Group,
+  MathUtils,
+  Matrix4,
+  Vector3,
+  type PerspectiveCamera,
+} from "three/webgpu";
 
 import { RegionMesh } from "./region-mesh";
 import type { SceneMaterials } from "./shaders/materials";
@@ -12,8 +21,13 @@ import type { SceneMaterials } from "./shaders/materials";
 export interface StreamingOptions {
   readonly revision: string;
   readonly materials: SceneMaterials;
-  /** A node splits into its four children when the camera is nearer than `span * detail`. */
-  readonly detail: number;
+  /**
+   * Largest size of a voxel on screen, in pixels. A node splits into its four children
+   * when its nearest voxels would draw larger than this.
+   */
+  readonly voxelPixels: number;
+  /** Blocks show their full shapes once a block draws larger than this many pixels. */
+  readonly blockPixels: number;
   /** Nodes farther than this many blocks are not requested. */
   readonly viewDistance: number;
   readonly maxRequests: number;
@@ -30,6 +44,7 @@ export interface StreamingStats {
   /** Regions the view still needs, including those loading now. */
   readonly remaining: number;
   readonly megabytes: number;
+  readonly quads: number;
 }
 
 interface RegionNode {
@@ -83,6 +98,8 @@ export class RegionStreamer {
   private readonly box = new Box3();
   private readonly matrix = new Matrix4();
   private readonly cameraPosition = new Vector3();
+  /** Screen pixels covered by one block at a distance of one block. */
+  private pixelsPerBlock = 1;
   private viewDistance: number;
 
   constructor(options: StreamingOptions) {
@@ -97,18 +114,26 @@ export class RegionStreamer {
   }
 
   get stats(): StreamingStats {
+    let quadBytes = 0;
+    for (const mesh of this.drawn.values()) quadBytes += mesh.byteLength;
     return {
       drawn: this.drawn.size,
       cached: this.cache.size,
       loading: this.requests.size,
       remaining: this.wanted.length,
       megabytes: this.bytes / (1024 * 1024),
+      // Each quad packs into three 32-bit words.
+      quads: quadBytes / 12,
     };
   }
 
-  /** Recomputes the drawn set for this camera and starts the most useful requests. */
-  update(camera: PerspectiveCamera): void {
+  /**
+   * Recomputes the drawn set for this camera and starts the most useful requests.
+   * `screenHeight` is the height of the drawing buffer in device pixels.
+   */
+  update(camera: PerspectiveCamera, screenHeight: number): void {
     this.frame += 1;
+    this.pixelsPerBlock = screenHeight / (2 * Math.tan(MathUtils.degToRad(camera.fov / 2)));
     camera.updateMatrixWorld();
     this.cameraPosition.setFromMatrixPosition(camera.matrixWorld);
     this.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -193,7 +218,7 @@ export class RegionStreamer {
     const distance = this.distanceTo(target);
     if (distance > this.viewDistance) return true;
     const cached = this.cache.get(target.key);
-    const refine = target.level > 0 && distance < regionSpan(target.level) * this.options.detail;
+    const refine = target.level > 0 && distance < this.refineDistance(target.level);
 
     if (!refine) {
       if (cached !== undefined) return this.use(cached, draw);
@@ -319,6 +344,12 @@ export class RegionStreamer {
       this.bytes -= cached.mesh?.byteLength ?? 0;
       cached.mesh?.dispose();
     }
+  }
+
+  /** Distance at which a node's cells would draw larger than the pixel target. */
+  private refineDistance(level: number): number {
+    const pixels = level === 1 ? this.options.blockPixels : this.options.voxelPixels;
+    return (regionCellSize(level) * this.pixelsPerBlock) / pixels;
   }
 
   private distanceTo(target: RegionNode): number {

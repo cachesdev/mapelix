@@ -43,6 +43,8 @@ export interface Pointed {
 }
 
 const SHADOW_MAP_SIZE = 4096;
+/** Half the width of the sun's shadow map when zoomed far out, in blocks. */
+const MAX_SHADOW_EXTENT = 2048;
 const MAX_PIXEL_RATIO = 1.75;
 
 /**
@@ -85,10 +87,11 @@ export class WorldViewer {
     this.streamer = new RegionStreamer({
       revision: world.revision,
       materials,
-      detail: 1.7,
+      voxelPixels: 2.2,
+      blockPixels: 4.4,
       viewDistance: this.atmosphere.viewDistance.value,
       maxRequests: 10,
-      memoryBudget: 384 * 1024 * 1024,
+      memoryBudget: 1024 * 1024 * 1024,
       onRegion: () => {
         this.regionsChanged = true;
       },
@@ -99,8 +102,6 @@ export class WorldViewer {
 
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    this.sun.shadow.bias = -0.0004;
-    this.sun.shadow.normalBias = 0.35;
     this.sun.shadow.autoUpdate = false;
 
     this.rig = new CameraRig(this.camera, renderer.domElement, (x, z) =>
@@ -222,7 +223,9 @@ export class WorldViewer {
     const delta = Math.min(this.timer.getDelta(), 0.1);
     const moved = this.rig.update(delta);
     if (moved) this.fitViewDistance();
-    if (moved || this.regionsChanged || this.frames % 15 === 0) this.streamer.update(this.camera);
+    if (moved || this.regionsChanged || this.frames % 15 === 0) {
+      this.streamer.update(this.camera, this.renderer.domElement.height);
+    }
     if (this.streamer.animate(performance.now())) this.regionsChanged = true;
     this.updateShadow();
     this.regionsChanged = false;
@@ -245,9 +248,12 @@ export class WorldViewer {
   private updateShadow(): void {
     const focus = this.rig.focus;
     // Extents snap to steps of the square root of two, so zooming re-renders only a few times.
-    const wanted = MathUtils.clamp(this.rig.distance * 1.25, 48, 512);
+    const wanted = MathUtils.clamp(this.rig.distance * 1.25, 48, MAX_SHADOW_EXTENT);
     const extent = 2 ** (Math.round(Math.log2(wanted) * 2) / 2);
     const texel = (extent * 2) / SHADOW_MAP_SIZE;
+    // The depth range grows with the map, and the biases keep the same size in blocks.
+    const sunDistance = Math.max(900, extent * 1.5);
+    const depth = sunDistance * 2.2;
     const step = texel * 16;
     const snappedX = Math.round(focus.x / step) * step;
     const snappedZ = Math.round(focus.z / step) * step;
@@ -261,10 +267,14 @@ export class WorldViewer {
     shadowCamera.top = extent;
     shadowCamera.bottom = -extent;
     shadowCamera.near = 1;
-    shadowCamera.far = 2000;
+    shadowCamera.far = depth;
     shadowCamera.updateProjectionMatrix();
+    this.sun.shadow.bias = -0.8 / depth;
+    this.sun.shadow.normalBias = Math.max(0.35, texel * 1.4);
     this.sun.target.position.set(snappedX, focus.y, snappedZ);
-    this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, 900);
+    this.sun.position
+      .copy(this.sun.target.position)
+      .addScaledVector(this.sunDirection, sunDistance);
     this.sun.target.updateMatrixWorld();
     this.sun.updateMatrixWorld();
     this.sun.shadow.needsUpdate = true;

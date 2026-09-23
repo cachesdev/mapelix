@@ -42,12 +42,16 @@ The address bar keeps the current view, so a link opens the same place. It accep
 
 Terrain near the camera is drawn block by block. Farther away, the viewer draws cubic voxels
 that start one block wide and grow to 16 blocks wide at the horizon, so builds, bridges, and
-tree crowns keep their shape far away. It asks for the most useful regions first and keeps a coarse region on screen until
-all of its finer replacements arrive. Regions dissolve in and out as they change.
+tree crowns keep their shape far away. Like [Voxy](https://github.com/MCRcortex/voxy), it picks
+each region's voxel size by its size on screen: a region switches to finer voxels before its
+voxels grow larger than 2.2 pixels. Larger windows and high-density screens get more detail. The
+viewer asks for the most useful regions first and keeps a coarse region on screen until all of
+its finer replacements arrive. Regions dissolve in and out as they change.
 
-Lighting follows the time of day. The sun casts shadows near the camera, water refracts and
-reflects the sky, and glowing blocks bloom at night. Haze thickens with distance and hides the
+Lighting follows the time of day. The sun casts shadows from terrain at every level, up to 2,048
+blocks from the point the camera looks at. Water refracts and reflects the sky, and glowing
+blocks bloom at night. Haze thickens with distance, and terrain fades into the sky before the
 edge of the loaded area.
 
-In Chrome with an RTX 2070 at 1440×900, the viewer draws 320 to 360 frames per second
-with the frame limit off.
+In Chrome with an RTX 2070 at 1440×900, the viewer draws 170 to 320 frames per second with the
+frame limit off, from 400 to 2,400 blocks away.

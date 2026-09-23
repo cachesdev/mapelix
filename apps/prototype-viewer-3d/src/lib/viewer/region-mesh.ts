@@ -49,8 +49,7 @@ export class RegionMesh {
       new Vector3(0, low, 0),
       new Vector3(region.gridSize, high, region.gridSize),
     );
-    const detailed = region.level <= 1;
-    this.add(region.opaque, materials.terrain, bounds, { castShadow: detailed, renderOrder: 0 });
+    this.add(region.opaque, materials.terrain, bounds, { castShadow: true, renderOrder: 0 });
     // Grass and flowers do not cast shadows in Minecraft, and skipping them keeps shadows cheap.
     this.add(region.plants, materials.plants, bounds, { castShadow: false, renderOrder: 1 });
     const { water, glass } = splitGlass(region.translucent);
