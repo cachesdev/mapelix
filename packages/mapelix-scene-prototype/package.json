@@ -1,5 +1,5 @@
 {
-  "name": "@mapelix/prototype",
+  "name": "@mapelix/scene-prototype",
   "version": "0.0.0",
   "private": true,
   "files": [
@@ -12,20 +12,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./bedrock": {
-      "types": "./dist/bedrock/index.d.ts",
-      "import": "./dist/bedrock/index.js"
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "import": "./dist/format.js"
     }
   },
   "scripts": {
-    "benchmark": "node --expose-gc scripts/benchmark-world.mjs",
-    "benchmark:zoom": "node --expose-gc scripts/benchmark-zoom.mjs",
-    "diagnose:compare": "node scripts/compare-renderers.mjs",
-    "diagnose:color": "node scripts/measure-block-colors.mjs",
-    "diagnose:render": "node --expose-gc scripts/render-diagnostic-tiles.mjs",
-    "diagnose:shadows": "node scripts/measure-shadows.mjs",
-    "diagnose:grid": "node scripts/measure-tile-grid.mjs",
-    "diagnose:sharpness": "node scripts/measure-tile-sharpness.mjs",
+    "benchmark": "node scripts/benchmark-regions.mjs",
     "build": "tsc --project tsconfig.build.json",
     "check": "tsc --noEmit --project tsconfig.json",
     "format": "oxfmt .",
@@ -33,19 +26,14 @@
     "lint": "oxlint --type-aware --type-check .",
     "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
     "test": "vitest run src",
-    "test:visual": "node scripts/run-visual-regression.mjs",
     "test:unit": "vitest run src",
     "transit": "node -e \"\""
   },
   "dependencies": {
-    "pako": "2.1.0",
-    "pngjs": "7.0.0"
+    "@mapelix/prototype": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.10.13",
-    "@types/pako": "2.0.4",
-    "@types/pngjs": "6.0.5",
-    "jpeg-js": "0.4.4",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",

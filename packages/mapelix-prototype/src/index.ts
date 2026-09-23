@@ -1,3 +1,4 @@
+export { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
 export { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
 export { openBedrockWorld, type BedrockWorldDirectory } from "./node-world.js";
 export { writeLeafletTile, type LeafletTileOutput } from "./node-output.js";
