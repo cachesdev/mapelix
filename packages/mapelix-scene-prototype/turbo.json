@@ -1,0 +1,22 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "benchmark": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": [],
+      "env": [
+        "MAPELIX_BENCH_LEVEL",
+        "MAPELIX_BENCH_RADIUS",
+        "MAPELIX_BENCH_WORKERS",
+        "MAPELIX_BENCH_X",
+        "MAPELIX_BENCH_Z",
+        "MAPELIX_WORLD_DIRECTORY"
+      ]
+    }
+  }
+}

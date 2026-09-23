@@ -1,0 +1,46 @@
+{
+  "name": "@mapelix/scene-prototype",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "import": "./dist/format.js"
+    }
+  },
+  "scripts": {
+    "benchmark": "node scripts/benchmark-regions.mjs",
+    "build": "tsc --project tsconfig.build.json",
+    "check": "tsc --noEmit --project tsconfig.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --type-aware --type-check .",
+    "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
+    "test": "vitest run src",
+    "test:unit": "vitest run src",
+    "transit": "node -e \"\""
+  },
+  "dependencies": {
+    "@mapelix/prototype": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2",
+    "vitest": "4.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
