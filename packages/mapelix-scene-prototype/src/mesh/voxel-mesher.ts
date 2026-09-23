@@ -298,7 +298,6 @@ class VoxelMesher {
         const neighborCell = this.cells[neighbor]!;
         const neighborShape = this.palette.shape[neighborCell & PALETTE_ID_MASK]!;
         if (this.isWater(neighborCell) || neighborShape === Shape.Cube) return false;
-        if (neighborShape === Shape.Glass) return false;
         if (!this.isOpen(neighbor, neighborY, column + COLUMN_STEP[face]!)) return false;
       }
     }

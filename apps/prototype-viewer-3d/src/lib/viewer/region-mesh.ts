@@ -1,4 +1,4 @@
-import type { DecodedSceneRegion } from "@mapelix/scene-prototype/format";
+import { QuadMaterial, unpackQuad, type DecodedSceneRegion } from "@mapelix/scene-prototype/format";
 import {
   Box3,
   BufferAttribute,
@@ -23,7 +23,7 @@ interface Layer {
   readonly materials: MaterialPair;
 }
 
-/** One streamed region: up to three instanced meshes that share the scene materials. */
+/** One streamed region: up to four instanced meshes that share the scene materials. */
 export class RegionMesh {
   readonly region: DecodedSceneRegion;
   readonly group = new Group();
@@ -50,10 +50,10 @@ export class RegionMesh {
     this.add(region.opaque, materials.terrain, bounds, { castShadow: detailed, renderOrder: 0 });
     // Grass and flowers do not cast shadows in Minecraft, and skipping them keeps shadows cheap.
     this.add(region.plants, materials.plants, bounds, { castShadow: false, renderOrder: 1 });
-    this.add(region.translucent, materials.translucent, bounds, {
-      castShadow: false,
-      renderOrder: 2,
-    });
+    const { water, glass } = splitGlass(region.translucent);
+    this.add(water, materials.water, bounds, { castShadow: false, renderOrder: 2 });
+    // Glass draws after all water, so the water behind it shows through.
+    this.add(glass, materials.glass, bounds, { castShadow: false, renderOrder: 3 });
   }
 
   get isEmpty(): boolean {
@@ -99,4 +99,15 @@ export class RegionMesh {
     this.group.add(mesh);
     this.layers.push({ mesh, materials });
   }
+}
+
+/** Separates the glass quads of a translucent list from its water quads. */
+function splitGlass(quads: Uint32Array): { water: Uint32Array; glass: Uint32Array } {
+  const water: number[] = [];
+  const glass: number[] = [];
+  for (let index = 0; index < quads.length / 3; index += 1) {
+    const target = unpackQuad(quads, index).material === QuadMaterial.Glass ? glass : water;
+    target.push(...quads.subarray(index * 3, index * 3 + 3));
+  }
+  return { water: Uint32Array.from(water), glass: Uint32Array.from(glass) };
 }

@@ -71,14 +71,16 @@ export interface MaterialPair {
 export interface SceneMaterials {
   readonly terrain: MaterialPair;
   readonly plants: MaterialPair;
-  readonly translucent: MaterialPair;
+  readonly water: MaterialPair;
+  readonly glass: MaterialPair;
 }
 
 export function createSceneMaterials(atmosphere: Atmosphere): SceneMaterials {
   return {
     terrain: withFading(createTerrainMaterial(atmosphere)),
     plants: withFading(createPlantMaterial(), plantMask()),
-    translucent: withFading(createTranslucentMaterial(atmosphere)),
+    water: withFading(createWaterMaterial(atmosphere)),
+    glass: withFading(createGlassMaterial(atmosphere)),
   };
 }
 
@@ -218,17 +220,34 @@ function createPlantMaterial(): MeshLambertNodeMaterial {
   return material;
 }
 
+/** Schlick's approximation: a surface reflects more as the view grazes it. */
+const fresnel = (normal: Node<"vec3">, toCamera: Node<"vec3">) =>
+  float(0.02).add(
+    float(0.98).mul(
+      float(1)
+        .sub(max(dot(normal, toCamera), 0))
+        .pow(5),
+    ),
+  );
+
+/** The sky mirrored in a surface, and the sun's glint on it. */
+function reflection(atmosphere: Atmosphere, normal: Node<"vec3">, toCamera: Node<"vec3">) {
+  const reflected = reflect(toCamera.negate(), normal);
+  const sky = atmosphere.sky(normalize(vec3(reflected.x, max(reflected.y, 0.02), reflected.z)));
+  const glint = max(dot(reflected, atmosphere.sunDirection), 0).pow(500).mul(6);
+  return { sky, glint: atmosphere.sunColor.mul(glint) };
+}
+
 /**
- * Water and glass. Water refracts the terrain behind it and absorbs light with
- * depth, so shallows show the bed and deep water turns to the biome's color.
+ * Water refracts the terrain behind it and absorbs light with depth, so shallows
+ * show the bed and deep water turns to the biome's color.
  */
-function createTranslucentMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
+function createWaterMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: true });
   material.positionNode = quadPosition();
 
   material.colorNode = Fn(() => {
-    const isGlass = quadMaterial.equal(QuadMaterial.Glass);
-    const top = normalWorld.y.greaterThan(0.5).and(isGlass.not());
+    const top = normalWorld.y.greaterThan(0.5);
 
     // Two drifting wave layers give the surface normal.
     const p = positionWorld.xz;
@@ -258,37 +277,33 @@ function createTranslucentMaterial(atmosphere: Atmosphere): MeshBasicNodeMateria
     const thickness = max(depthAt(sampleUV).sub(surfaceDepth), 0);
     const behind = viewportSharedTexture(sampleUV).rgb;
 
-    // Red fades first, then green, like real water. Glass barely absorbs.
-    const extinction = select(isGlass, vec3(0.02), vec3(0.42, 0.13, 0.085));
-    const transmitted = exp(extinction.mul(thickness).negate());
+    // Red fades first, then green, like real water.
+    const transmitted = exp(vec3(0.42, 0.13, 0.085).mul(thickness).negate());
     // Water has no lighting of its own, so its body color follows the daylight.
-    const deep = quadColor
-      .mul(select(isGlass, float(0.9), float(0.22)))
-      .mul(mix(float(0.05), float(1), atmosphere.daylight));
-    const body = mix(
-      deep,
-      behind.mul(select(isGlass, quadColor.mul(0.85).add(0.15), vec3(1))),
-      transmitted,
-    );
+    const deep = quadColor.mul(0.22).mul(mix(float(0.05), float(1), atmosphere.daylight));
+    const body = mix(deep, behind, transmitted);
 
-    const fresnel = float(0.02).add(
-      float(0.98).mul(
-        float(1)
-          .sub(max(dot(normal, toCamera), 0))
-          .pow(5),
-      ),
-    );
-    const reflected = reflect(toCamera.negate(), normal);
-    const skyReflection = atmosphere.sky(
-      normalize(vec3(reflected.x, max(reflected.y, 0.02), reflected.z)),
-    );
-    const glint = max(dot(reflected, atmosphere.sunDirection), 0).pow(500).mul(6);
+    const { sky, glint } = reflection(atmosphere, normal, toCamera);
     const foam = float(1)
       .sub(smoothstep(0.05, 0.55, thickness))
       .mul(select(top, float(0.35), float(0)));
-
-    const surface = mix(body, skyReflection, fresnel.mul(select(isGlass, float(0.5), float(0.85))));
-    return surface.add(atmosphere.sunColor.mul(glint)).add(vec3(foam));
+    return mix(body, sky, fresnel(normal, toCamera).mul(0.85)).add(glint).add(vec3(foam));
   })();
+  return material;
+}
+
+/**
+ * Glass blends over what is already drawn, water included, like Minecraft's stained
+ * glass. It turns more opaque toward grazing angles, where it mirrors the sky.
+ */
+function createGlassMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
+  const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
+  material.positionNode = quadPosition();
+
+  const toCamera = normalize(cameraPosition.sub(positionWorld));
+  const reflectance = fresnel(normalWorld, toCamera);
+  const { sky, glint } = reflection(atmosphere, normalWorld, toCamera);
+  material.colorNode = mix(quadColor, sky, reflectance).add(glint);
+  material.opacityNode = mix(float(0.22), float(0.9), reflectance);
   return material;
 }
