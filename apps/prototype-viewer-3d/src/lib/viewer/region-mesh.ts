@@ -11,6 +11,7 @@ import {
   Vector3,
 } from "three/webgpu";
 
+import { QuadCollider } from "./quad-collider";
 import type { MaterialPair, SceneMaterials } from "./shaders/materials";
 
 // Every quad instance reuses one unit square. The shader turns its corners into the face.
@@ -32,6 +33,7 @@ export class RegionMesh {
   /** The screen noise range this region draws while fading. See `SceneMaterials`. */
   private readonly fade = new Vector2(0, 1);
   private readonly layers: Layer[] = [];
+  private quadCollider: QuadCollider | undefined;
 
   constructor(region: DecodedSceneRegion, materials: SceneMaterials) {
     this.region = region;
@@ -60,6 +62,12 @@ export class RegionMesh {
 
   get isEmpty(): boolean {
     return this.layers.length === 0;
+  }
+
+  /** Ray tests against this region's quads, built the first time a ray reaches the region. */
+  get collider(): QuadCollider {
+    this.quadCollider ??= new QuadCollider(this.region);
+    return this.quadCollider;
   }
 
   /** Draws only the part of the screen noise from `low` to `high`, or everything when unset. */

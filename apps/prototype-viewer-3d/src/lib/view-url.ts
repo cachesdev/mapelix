@@ -10,7 +10,7 @@ export interface UrlView {
 
 const DEGREES = Math.PI / 180;
 
-/** Reads a shared view such as `?x=120&z=-40&distance=90&heading=45&pitch=35&hour=17`. */
+/** Reads a shared view such as `?x=120&y=70&z=-40&distance=90&heading=45&pitch=35&hour=17`. */
 export function readViewFromUrl(url: URL): UrlView {
   const number = (name: string): number | undefined => {
     const raw = url.searchParams.get(name);
@@ -38,6 +38,7 @@ export function readViewFromUrl(url: URL): UrlView {
 export function writeViewToUrl(view: CameraView, hour: number): void {
   const url = new URL(window.location.href);
   url.searchParams.set("x", view.x.toFixed(0));
+  url.searchParams.set("y", view.y.toFixed(0));
   url.searchParams.set("z", view.z.toFixed(0));
   url.searchParams.set("distance", view.distance.toFixed(0));
   url.searchParams.set("heading", (view.heading / DEGREES).toFixed(0));

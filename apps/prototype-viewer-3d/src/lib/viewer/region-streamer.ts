@@ -15,6 +15,7 @@ import {
   type PerspectiveCamera,
 } from "three/webgpu";
 
+import { regionEntry, type SurfaceHit } from "./quad-collider";
 import { RegionMesh } from "./region-mesh";
 import type { SceneMaterials } from "./shaders/materials";
 
@@ -183,6 +184,24 @@ export class RegionStreamer {
       }
     }
     return removed;
+  }
+
+  /** The nearest drawn surface along a ray, with `radius` blocks of room around the ray. */
+  raycast(origin: Vector3, direction: Vector3, far: number, radius = 0): SurfaceHit | undefined {
+    const crossed: { readonly mesh: RegionMesh; readonly entry: number }[] = [];
+    for (const mesh of this.drawn.values()) {
+      const entry = regionEntry(mesh.region, origin, direction, far, radius);
+      if (entry < far) crossed.push({ mesh, entry });
+    }
+    crossed.sort((left, right) => left.entry - right.entry);
+
+    let hit: SurfaceHit | undefined;
+    for (const { mesh, entry } of crossed) {
+      const reach = hit?.distance ?? far;
+      if (entry >= reach) break;
+      hit = mesh.collider.raycast(origin, direction, reach, radius) ?? hit;
+    }
+    return hit;
   }
 
   /** Height of the highest block at a world column, from the finest region drawn there. */

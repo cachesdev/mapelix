@@ -5,11 +5,9 @@ import {
   NeutralToneMapping,
   PCFShadowMap,
   PerspectiveCamera,
-  Ray,
   RenderPipeline,
   Scene,
   Timer,
-  Vector2,
   Vector3,
   WebGPURenderer,
 } from "three/webgpu";
@@ -17,7 +15,7 @@ import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { normalWorldGeometry, pass } from "three/tsl";
 
 import { Atmosphere } from "./atmosphere";
-import { CameraRig, ZOOM_LIMIT, type CameraView } from "./camera-rig";
+import { CameraRig, ZOOM_LIMIT, pointerRay, type CameraView } from "./camera-rig";
 import { RegionStreamer, type StreamingStats } from "./region-streamer";
 import { createSceneMaterials } from "./shaders/materials";
 
@@ -108,18 +106,19 @@ export class WorldViewer {
     this.sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     this.sun.shadow.autoUpdate = false;
 
-    this.rig = new CameraRig(this.camera, renderer.domElement, (x, z) =>
-      this.streamer.heightAt(x, z),
+    this.rig = new CameraRig(this.camera, renderer.domElement, this.streamer);
+    this.rig.setView(
+      {
+        x: world.spawn.x,
+        y: world.spawn.y,
+        z: world.spawn.z,
+        distance: 160,
+        heading: MathUtils.degToRad(35),
+        pitch: MathUtils.degToRad(42),
+        ...start,
+      },
+      { settle: start.y === undefined },
     );
-    this.rig.setView({
-      x: world.spawn.x,
-      y: world.spawn.y,
-      z: world.spawn.z,
-      distance: 160,
-      heading: MathUtils.degToRad(35),
-      pitch: MathUtils.degToRad(42),
-      ...start,
-    });
 
     // Only very bright light blooms: the sun, glints on water, and lamps after dark.
     const color = pass(this.scene, this.camera, { samples: 4 }).getTextureNode("output");
@@ -219,17 +218,15 @@ export class WorldViewer {
     this.rig.faceNorth();
   }
 
-  /** The block under a canvas position, found by marching the view ray over loaded heights. */
+  /** The block under a canvas position: the first loaded surface along the pointer ray. */
   pick(clientX: number, clientY: number): Pointed | undefined {
-    const bounds = this.renderer.domElement.getBoundingClientRect();
-    const pointer = new Vector2(
-      ((clientX - bounds.left) / bounds.width) * 2 - 1,
-      -((clientY - bounds.top) / bounds.height) * 2 + 1,
-    );
-    const ray = new Ray();
-    ray.origin.setFromMatrixPosition(this.camera.matrixWorld);
-    ray.direction.set(pointer.x, pointer.y, 0.5).unproject(this.camera).sub(ray.origin).normalize();
-    return marchHeights(ray, this.camera.far, (x, z) => this.streamer.heightAt(x, z));
+    const ray = pointerRay(this.camera, this.renderer.domElement, clientX, clientY);
+    const hit = this.streamer.raycast(ray.origin, ray.direction, this.camera.far);
+    if (hit === undefined) return undefined;
+    // Half a block behind the face lies the block it belongs to.
+    const point = ray.at(hit.distance, new Vector3());
+    point.setComponent(hit.axis, point.getComponent(hit.axis) - hit.sign * 0.5);
+    return { x: Math.floor(point.x), y: Math.floor(point.y), z: Math.floor(point.z) };
   }
 
   dispose(): void {
@@ -332,35 +329,4 @@ export class WorldViewer {
       this.frameWindowStart = now;
     }
   }
-}
-
-/** Steps along a ray until it dips below the terrain, then bisects to the block. */
-function marchHeights(
-  ray: Ray,
-  reach: number,
-  heightAt: (x: number, z: number) => number | undefined,
-): Pointed | undefined {
-  const point = new Vector3();
-  let previous = 0;
-  for (let distance = 1; distance < reach; distance += Math.max(0.5, distance * 0.004)) {
-    ray.at(distance, point);
-    const height = heightAt(point.x, point.z);
-    if (height !== undefined && point.y <= height) {
-      let low = previous;
-      let high = distance;
-      for (let step = 0; step < 12; step += 1) {
-        const middle = (low + high) / 2;
-        ray.at(middle, point);
-        const middleHeight = heightAt(point.x, point.z);
-        if (middleHeight !== undefined && point.y <= middleHeight) high = middle;
-        else low = middle;
-      }
-      ray.at(high, point);
-      const x = Math.floor(point.x);
-      const z = Math.floor(point.z);
-      return { x, y: (heightAt(point.x, point.z) ?? Math.ceil(point.y)) - 1, z };
-    }
-    previous = distance;
-  }
-  return undefined;
 }

@@ -28,7 +28,7 @@ region response has `x-mapelix-cache: memory`, `disk`, or `build` and a `server-
 
 ## Controls
 
-- Drag to move. Right-drag to turn and tilt. Scroll to zoom.
+- Drag to move. Right-drag to turn and tilt. Scroll to zoom toward the point under the cursor.
 - W, A, S, and D move. Q and E turn. R and F zoom.
 - Enter X and Z coordinates to fly there. The house button returns to spawn.
 - The compass turns the view to face north.
@@ -37,8 +37,13 @@ region response has `x-mapelix-cache: memory`, `disk`, or `build` and a `server-
   edge fog and two experimental options: zooming out to 20,000 blocks and a custom render
   distance from 2,000 to 100,000 blocks.
 
-The address bar keeps the current view, so a link opens the same place. It accepts `x`, `z`,
-`distance`, `heading`, and `pitch` in blocks and degrees, and `hour` from 0 to 24.
+The camera turns around the surface in the middle of the view. It can go anywhere with open
+air, such as under bridges and between the floors of a build. It slides along surfaces it runs
+into and climbs over walls and steps.
+
+The address bar keeps the current view, so a link opens the same place. It accepts `x`, `y`,
+`z`, `distance`, `heading`, and `pitch` in blocks and degrees, and `hour` from 0 to 24. A link
+without `y` looks at the highest block at `x` and `z`.
 
 ## How it draws the world
 
