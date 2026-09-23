@@ -60,7 +60,7 @@ export interface SceneMaterials {
 
 export function createSceneMaterials(atmosphere: Atmosphere): SceneMaterials {
   return {
-    terrain: createTerrainMaterial(),
+    terrain: createTerrainMaterial(atmosphere),
     plants: createPlantMaterial(),
     translucent: createTranslucentMaterial(atmosphere),
   };
@@ -105,7 +105,7 @@ const coveredSoil = Fn(() => {
   return select(inSoil, soil, quadColor);
 });
 
-function createTerrainMaterial(): MeshStandardNodeMaterial {
+function createTerrainMaterial(atmosphere: Atmosphere): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
   material.positionNode = quadPosition();
   const foliage = quadMaterial.equal(QuadMaterial.Foliage);
@@ -119,7 +119,9 @@ function createTerrainMaterial(): MeshStandardNodeMaterial {
   const bevel = select(glowing, float(1), blockBevel());
   material.colorNode = coveredSoil().mul(variation).mul(bevel).mul(contact);
   material.aoNode = quadOcclusion;
-  material.emissiveNode = select(glowing, quadColor.mul(1.6), vec3(0));
+  // Lamps glow harder at night, bright enough for the bloom pass to pick them up.
+  const glow = mix(float(4.2), float(1.4), atmosphere.daylight);
+  material.emissiveNode = select(glowing, quadColor.mul(glow), vec3(0));
   return material;
 }
 
@@ -223,7 +225,10 @@ function createTranslucentMaterial(atmosphere: Atmosphere): MeshBasicNodeMateria
     // Red fades first, then green, like real water. Glass barely absorbs.
     const extinction = select(isGlass, vec3(0.02), vec3(0.42, 0.13, 0.085));
     const transmitted = exp(extinction.mul(thickness).negate());
-    const deep = quadColor.mul(select(isGlass, float(0.9), float(0.22)));
+    // Water has no lighting of its own, so its body color follows the daylight.
+    const deep = quadColor
+      .mul(select(isGlass, float(0.9), float(0.22)))
+      .mul(mix(float(0.05), float(1), atmosphere.daylight));
     const body = mix(
       deep,
       behind.mul(select(isGlass, quadColor.mul(0.85).add(0.15), vec3(1))),

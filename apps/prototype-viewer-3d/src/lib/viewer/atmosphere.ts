@@ -6,6 +6,7 @@ import {
   exp,
   float,
   fog,
+  hash,
   max,
   mix,
   normalize,
@@ -35,11 +36,11 @@ const SKY_KEYS: ReadonlyArray<readonly [number, SkyState]> = [
   [
     -12,
     {
-      zenith: new Color(0x050814),
-      horizon: new Color(0x0d1426),
-      sun: new Color(0x6b83c9),
-      sunIntensity: 0.18,
-      ambient: 0.22,
+      zenith: new Color(0x070d1f),
+      horizon: new Color(0x16203a),
+      sun: new Color(0x8ea6e6),
+      sunIntensity: 0.55,
+      ambient: 0.34,
     },
   ],
   [
@@ -102,6 +103,7 @@ export interface Daylight {
   readonly skyColor: Color;
   readonly groundColor: Color;
   readonly ambientIntensity: number;
+  readonly daylight: number;
 }
 
 /**
@@ -115,6 +117,8 @@ export class Atmosphere {
   readonly horizon = uniform(new Color(0xb9d3ec));
   /** Blocks from the camera where streamed terrain ends and fully fades into the sky. */
   readonly viewDistance = uniform(2400);
+  /** 1 in daylight and 0 at night, for effects that change with the light, like glowing blocks. */
+  readonly daylight = uniform(1);
 
   /** Sky radiance in a world direction. The sun disc is bright enough to bloom. */
   readonly sky = Fn(([direction]: [Node<"vec3">]) => {
@@ -129,7 +133,16 @@ export class Atmosphere {
     const toSun = max(dot(direction, this.sunDirection), 0);
     const glow = this.sunColor.mul(toSun.pow(6).mul(0.28).add(toSun.pow(80).mul(0.9)));
     const disc = this.sunColor.mul(smoothstep(0.99955, 0.99975, toSun).mul(24));
-    return base.add(glow).add(disc);
+
+    // After dusk, stars and a pale moon opposite the sun fade in.
+    const night = float(1).sub(this.daylight).pow(2);
+    const cell = direction.mul(360).floor();
+    const star = hash(cell.x.add(cell.y.mul(113)).add(cell.z.mul(769)));
+    const stars = smoothstep(0.9975, 1, star).mul(3).mul(up.mul(4).clamp(0, 1));
+    const toMoon = max(dot(direction, this.sunDirection.negate()), 0);
+    const moon = smoothstep(0.99965, 0.9998, toMoon).mul(2.2).add(toMoon.pow(40).mul(0.12));
+    const nightSky = vec3(0.85, 0.9, 1).mul(stars.add(moon)).mul(night);
+    return base.add(glow).add(disc).add(nightSky);
   });
 
   /** Haze color along a view direction, flattened toward the horizon and without the disc. */
@@ -181,6 +194,8 @@ export class Atmosphere {
     const lightDirection = elevation < -4 ? direction.clone().multiplyScalar(-1) : direction;
     const state = skyAt(elevation);
 
+    const daylight = MathUtils.smoothstep(elevation, -10, 8);
+    this.daylight.value = daylight;
     this.sunDirection.value.copy(direction);
     this.sunColor.value.copy(state.sun);
     this.zenith.value.copy(state.zenith);
@@ -189,10 +204,14 @@ export class Atmosphere {
       direction: lightDirection,
       sunColor: state.sun,
       sunIntensity: state.sunIntensity,
-      // Sky light is paler than the sky itself, so shaded faces keep their own color.
-      skyColor: state.zenith.clone().lerp(state.horizon, 0.5).lerp(WHITE, 0.4),
+      // Daytime sky light is paler than the sky, so shaded faces keep their own color.
+      skyColor: state.zenith
+        .clone()
+        .lerp(state.horizon, 0.5)
+        .lerp(WHITE, 0.4 * daylight),
       groundColor: new Color(0xb09c80).multiplyScalar(Math.max(0.15, state.ambient)),
       ambientIntensity: state.ambient,
+      daylight,
     };
   }
 }

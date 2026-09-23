@@ -13,6 +13,7 @@ import {
   Vector3,
   WebGPURenderer,
 } from "three/webgpu";
+import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { normalWorldGeometry, pass } from "three/tsl";
 
 import { Atmosphere } from "./atmosphere";
@@ -53,6 +54,7 @@ export class WorldViewer {
   private readonly container: HTMLElement;
   private readonly renderer: WebGPURenderer;
   private readonly pipeline: RenderPipeline;
+  private readonly glow: ReturnType<typeof bloom>;
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(50, 1, 1, 12000);
   private readonly atmosphere = new Atmosphere();
@@ -100,7 +102,6 @@ export class WorldViewer {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.35;
     this.sun.shadow.autoUpdate = false;
-    this.setTimeOfDay(15.5);
 
     this.rig = new CameraRig(this.camera, renderer.domElement, (x, z) =>
       this.streamer.heightAt(x, z),
@@ -115,8 +116,12 @@ export class WorldViewer {
       ...start,
     });
 
+    // Only very bright light blooms: the sun, glints on water, and lamps after dark.
+    const color = pass(this.scene, this.camera, { samples: 4 }).getTextureNode("output");
+    this.glow = bloom(color, 0.5, 0.45, 1.4);
     this.pipeline = new RenderPipeline(renderer);
-    this.pipeline.outputNode = pass(this.scene, this.camera, { samples: 4 });
+    this.pipeline.outputNode = color.add(this.glow);
+    this.setTimeOfDay(15.5);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -173,6 +178,7 @@ export class WorldViewer {
     this.sky.groundColor.copy(daylight.groundColor);
     this.sky.intensity = daylight.ambientIntensity * 3.1;
     this.sunDirection.copy(daylight.direction);
+    this.glow.strength.value = MathUtils.lerp(0.9, 0.45, daylight.daylight);
     this.shadowKey = "";
   }
 
