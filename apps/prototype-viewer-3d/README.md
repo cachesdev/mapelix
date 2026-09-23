@@ -33,7 +33,9 @@ region response has `x-mapelix-cache: memory`, `disk`, or `build` and a `server-
 - Enter X and Z coordinates to fly there. The house button returns to spawn.
 - The compass turns the view to face north.
 - The slider sets the time of day.
-- F3 shows the frame rate, the backend, and streaming statistics.
+- F3 shows the frame rate, the backend, and streaming statistics. It also has switches for the
+  edge fog and two experimental options: zooming out to 20,000 blocks and a custom render
+  distance from 2,000 to 100,000 blocks.
 
 The address bar keeps the current view, so a link opens the same place. It accepts `x`, `z`,
 `distance`, `heading`, and `pitch` in blocks and degrees, and `hour` from 0 to 24.

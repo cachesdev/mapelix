@@ -17,7 +17,7 @@ import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { normalWorldGeometry, pass } from "three/tsl";
 
 import { Atmosphere } from "./atmosphere";
-import { CameraRig, type CameraView } from "./camera-rig";
+import { CameraRig, ZOOM_LIMIT, type CameraView } from "./camera-rig";
 import { RegionStreamer, type StreamingStats } from "./region-streamer";
 import { createSceneMaterials } from "./shaders/materials";
 
@@ -46,6 +46,8 @@ const SHADOW_MAP_SIZE = 4096;
 /** Half the width of the sun's shadow map when zoomed far out, in blocks. */
 const MAX_SHADOW_EXTENT = 2048;
 const MAX_PIXEL_RATIO = 1.75;
+/** Farthest the view grows on its own as the camera zooms out, in blocks. */
+const AUTO_VIEW_LIMIT = 32_768;
 
 /**
  * The 3D world view: renderer, lights, atmosphere, streaming, and camera. It
@@ -69,6 +71,8 @@ export class WorldViewer {
   private readonly sunDirection = new Vector3(0.4, 0.7, 0.3);
   private shadowKey = "";
   private regionsChanged = true;
+  /** A fixed render distance in blocks, or undefined to follow the zoom. */
+  private renderDistance: number | undefined;
   private frames = 0;
   private frameWindowStart = performance.now();
   private framesPerSecond = 0;
@@ -183,6 +187,26 @@ export class WorldViewer {
     this.shadowKey = "";
   }
 
+  /** Fades terrain into the sky before the edge of the loaded area, or lets the edge show. */
+  setEdgeFade(enabled: boolean): void {
+    this.atmosphere.edgeFade.value = enabled ? 1 : 0;
+  }
+
+  /**
+   * Streams terrain out to `distance` blocks at any zoom, or picks the distance from the
+   * zoom when undefined. The haze keeps its thickness either way.
+   */
+  setRenderDistance(distance: number | undefined): void {
+    this.renderDistance = distance;
+    this.fitViewDistance();
+    this.regionsChanged = true;
+  }
+
+  /** Lets the camera zoom out far past the usual limit, with the view growing to match. */
+  setZoomUnlocked(unlocked: boolean): void {
+    this.rig.setZoomUnlocked(unlocked);
+  }
+
   flyTo(x: number, z: number): void {
     this.rig.flyTo(x, z);
   }
@@ -205,7 +229,7 @@ export class WorldViewer {
     const ray = new Ray();
     ray.origin.setFromMatrixPosition(this.camera.matrixWorld);
     ray.direction.set(pointer.x, pointer.y, 0.5).unproject(this.camera).sub(ray.origin).normalize();
-    return marchHeights(ray, (x, z) => this.streamer.heightAt(x, z));
+    return marchHeights(ray, this.camera.far, (x, z) => this.streamer.heightAt(x, z));
   }
 
   dispose(): void {
@@ -235,10 +259,20 @@ export class WorldViewer {
 
   /** Sees farther from higher up, in steps so streaming does not churn while zooming. */
   private fitViewDistance(): void {
-    const wanted = MathUtils.clamp(1400 + this.rig.distance * 3, 1600, 6000);
-    const distance = Math.round(wanted / 200) * 200;
-    this.streamer.setViewDistance(distance);
-    this.atmosphere.viewDistance.value = distance;
+    const zoom = this.rig.distance;
+    // Past the usual zoom limit, the view keeps growing so the ground stays in reach.
+    const beyond = Math.max(0, zoom - ZOOM_LIMIT) * 3;
+    const wanted = MathUtils.clamp(1400 + zoom * 3, 1600, 6000) + beyond;
+    const distance = Math.round(Math.min(wanted, AUTO_VIEW_LIMIT) / 200) * 200;
+    const reach = this.renderDistance ?? distance;
+    this.streamer.setViewDistance(reach);
+    this.atmosphere.viewDistance.value = reach;
+    this.atmosphere.hazeDistance.value = distance;
+    // Far from the world, a farther near plane keeps the depth buffer precise.
+    this.camera.near = MathUtils.clamp(zoom / 400, 1, 50);
+    // Regions start within reach, and their far corners can lie a few thousand blocks beyond.
+    this.camera.far = reach * 1.2 + 4000;
+    this.camera.updateProjectionMatrix();
   }
 
   /**
@@ -303,11 +337,12 @@ export class WorldViewer {
 /** Steps along a ray until it dips below the terrain, then bisects to the block. */
 function marchHeights(
   ray: Ray,
+  reach: number,
   heightAt: (x: number, z: number) => number | undefined,
 ): Pointed | undefined {
   const point = new Vector3();
   let previous = 0;
-  for (let distance = 1; distance < 6000; distance += Math.max(0.5, distance * 0.004)) {
+  for (let distance = 1; distance < reach; distance += Math.max(0.5, distance * 0.004)) {
     ray.at(distance, point);
     const height = heightAt(point.x, point.z);
     if (height !== undefined && point.y <= height) {

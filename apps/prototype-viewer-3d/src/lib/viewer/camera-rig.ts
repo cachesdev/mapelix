@@ -26,6 +26,10 @@ interface Flight {
 
 const UP = new Vector3(0, 1, 0);
 const CLEARANCE = 2.5;
+/** Farthest the camera orbits from the point it looks at, in blocks. */
+export const ZOOM_LIMIT = 2600;
+/** The zoom limit while zooming out is unlocked. */
+const UNLOCKED_ZOOM_LIMIT = 20_000;
 
 /**
  * Map-style camera: left drag pans across the ground, right drag orbits, and the
@@ -50,7 +54,7 @@ export class CameraRig {
     this.controls.screenSpacePanning = false;
     this.controls.zoomToCursor = true;
     this.controls.minDistance = 6;
-    this.controls.maxDistance = 2600;
+    this.controls.maxDistance = ZOOM_LIMIT;
     this.controls.minPolarAngle = 0.04;
     this.controls.maxPolarAngle = 1.42;
     this.controls.rotateSpeed = 0.55;
@@ -98,6 +102,11 @@ export class CameraRig {
       view.z + Math.cos(azimuth) * Math.cos(pitch) * view.distance,
     );
     this.controls.update();
+  }
+
+  /** Lets the camera zoom out past the usual limit. Locking again brings it back within it. */
+  setZoomUnlocked(unlocked: boolean): void {
+    this.controls.maxDistance = unlocked ? UNLOCKED_ZOOM_LIMIT : ZOOM_LIMIT;
   }
 
   /** Glides to a column, arcing higher for longer trips so the terrain stays readable. */

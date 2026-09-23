@@ -115,8 +115,12 @@ export class Atmosphere {
   readonly sunColor = uniform(new Color(0xfff1dc));
   readonly zenith = uniform(new Color(0x3d7ad8));
   readonly horizon = uniform(new Color(0xb9d3ec));
-  /** Blocks from the camera where streamed terrain ends and fully fades into the sky. */
+  /** Blocks from the camera where streamed terrain ends. */
   readonly viewDistance = uniform(2400);
+  /** Sets how thick the haze is. It grows as the camera zooms out, so high views reach farther. */
+  readonly hazeDistance = uniform(2400);
+  /** 1 while terrain fades into the sky before the edge of the loaded area, 0 to show the edge. */
+  readonly edgeFade = uniform(1);
   /** 1 in daylight and 0 at night, for effects that change with the light, like glowing blocks. */
   readonly daylight = uniform(1);
 
@@ -155,8 +159,9 @@ export class Atmosphere {
 
   /**
    * Height fog: haze is densest at sea level and thins with altitude, so a view from
-   * high above stays clear while the horizon still fades. Terrain also fades out
-   * before the streaming distance, so the world never ends at a visible edge.
+   * high above stays clear while the horizon still fades. While `edgeFade` is on,
+   * terrain also fades out before the streaming distance, so the world never ends at
+   * a visible edge.
    */
   readonly fogNode = Fn(() => {
     const distance = positionView.length();
@@ -170,9 +175,10 @@ export class Atmosphere {
       exp(cameraHeight.negate()).sub(exp(pointHeight.negate())).div(rise),
     );
     const haze = float(1).sub(
-      exp(distance.mul(meanDensity).mul(2.1).div(this.viewDistance).negate()),
+      exp(distance.mul(meanDensity).mul(2.1).div(this.hazeDistance).negate()),
     );
-    const edge = smoothstep(this.viewDistance.mul(0.7), this.viewDistance.mul(0.97), distance);
+    const edgeStart = this.viewDistance.mul(0.7);
+    const edge = smoothstep(edgeStart, this.viewDistance.mul(0.97), distance).mul(this.edgeFade);
     const direction = normalize(positionWorld.sub(cameraPosition));
     return fog(this.haze(direction), max(haze, edge).clamp(0, 1));
   })();

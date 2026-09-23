@@ -19,10 +19,26 @@
   let failure = $state<string>();
   let hour = $state(DEFAULT_HOUR);
   let debugVisible = $state(false);
+  let edgeFade = $state(true);
+  let customRenderDistance = $state(false);
+  let renderDistance = $state(32_000);
+  let zoomUnlocked = $state(false);
   let hintVisible = $state(true);
 
   $effect(() => {
     viewer?.setTimeOfDay(hour);
+  });
+
+  $effect(() => {
+    viewer?.setEdgeFade(edgeFade);
+  });
+
+  $effect(() => {
+    viewer?.setRenderDistance(customRenderDistance ? renderDistance : undefined);
+  });
+
+  $effect(() => {
+    viewer?.setZoomUnlocked(zoomUnlocked);
   });
 
   const attachViewer: Attachment<HTMLDivElement> = (element) => {
@@ -124,7 +140,13 @@
     <div class="top-left">
       <StatusCard name={world?.name} loading={snapshot?.streaming.remaining ?? 0} {failure} />
       {#if debugVisible && snapshot !== undefined}
-        <DebugPanel {snapshot} />
+        <DebugPanel
+          {snapshot}
+          bind:edgeFade
+          bind:customRenderDistance
+          bind:renderDistance
+          bind:zoomUnlocked
+        />
       {/if}
     </div>
 
