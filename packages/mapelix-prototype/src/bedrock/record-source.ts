@@ -46,10 +46,36 @@ export interface LevelDbRecordIndex {
   records(): LevelDbRecordIndexEntry[];
 }
 
-interface BlockHandle {
+/** The location of a block inside a LevelDB table, excluding its five-byte trailer. */
+export interface BlockHandle {
   offset: number;
   size: number;
 }
+
+/** A table block entry. The key is a LevelDB internal key with its eight-byte sequence tag. */
+export interface TableBlockEntry {
+  readonly key: Uint8Array;
+  readonly value: Uint8Array;
+}
+
+/** A user key split from its LevelDB sequence tag. Deleted keys are tombstones. */
+export interface InternalKey {
+  readonly key: Uint8Array;
+  readonly sequence: bigint;
+  readonly deleted: boolean;
+}
+
+export type LevelDbRecordVisitor = (
+  key: Uint8Array,
+  value: Uint8Array | undefined,
+  sequence: bigint,
+  source: string,
+) => void;
+
+/** Byte length of the fixed LevelDB table footer. */
+export const TABLE_FOOTER_SIZE = 48;
+/** Byte length of the compression type and checksum after each table block. */
+export const TABLE_BLOCK_TRAILER_SIZE = 5;
 
 const LOG_BLOCK_SIZE = 32 * 1024;
 const LDB_MAGIC = [0x57, 0xfb, 0x80, 0x8b, 0x24, 0x75, 0x47, 0xdb];
@@ -171,10 +197,15 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
   };
 }
 
-function parseFile(
-  file: NamedLevelDbFile,
-  add: (key: Uint8Array, value: Uint8Array | undefined, sequence: bigint, source: string) => void,
-): void {
+/**
+ * Visits every record version in one `.log`, `.ldb`, or `.sst` file, including tombstones.
+ * Callers own last-write-wins resolution across files.
+ */
+export function visitLevelDbRecords(file: NamedLevelDbFile, visit: LevelDbRecordVisitor): void {
+  parseFile(file, visit);
+}
+
+function parseFile(file: NamedLevelDbFile, add: LevelDbRecordVisitor): void {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith(".log")) {
     parseLog(file.bytes, file.name, add);
@@ -183,11 +214,7 @@ function parseFile(
   }
 }
 
-function parseLog(
-  bytes: Uint8Array,
-  source: string,
-  add: (key: Uint8Array, value: Uint8Array | undefined, sequence: bigint, source: string) => void,
-): void {
+function parseLog(bytes: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
   let offset = 0;
   let fragments: Uint8Array[] | undefined;
 
@@ -240,11 +267,7 @@ function parseLog(
   if (fragments) throw new Error(`${source}: incomplete fragmented LevelDB log record`);
 }
 
-function parseWriteBatch(
-  batch: Uint8Array,
-  source: string,
-  add: (key: Uint8Array, value: Uint8Array | undefined, sequence: bigint, source: string) => void,
-): void {
+function parseWriteBatch(batch: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
   if (batch.length < 12) throw new Error(`${source}: truncated LevelDB write batch`);
   const startSequence = fixed64(batch, 0);
   const count = fixed32(batch, 8);
@@ -268,57 +291,91 @@ function parseWriteBatch(
   if (offset !== batch.length) throw new Error(`${source}: trailing bytes in LevelDB write batch`);
 }
 
-function parseTable(
-  bytes: Uint8Array,
-  source: string,
-  add: (key: Uint8Array, value: Uint8Array | undefined, sequence: bigint, source: string) => void,
-): void {
-  if (
-    bytes.length < 48 ||
-    !LDB_MAGIC.every((byte, index) => bytes[bytes.length - 8 + index] === byte)
-  ) {
+function parseTable(bytes: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
+  if (bytes.length < TABLE_FOOTER_SIZE) {
     throw new Error(`${source}: invalid LevelDB table footer`);
   }
-  let footerOffset = bytes.length - 48;
-  footerOffset = readVarint(bytes, footerOffset, source).next;
-  footerOffset = readVarint(bytes, footerOffset, source).next;
-  const indexOffset = readVarint(bytes, footerOffset, source);
-  footerOffset = indexOffset.next;
-  const indexSize = readVarint(bytes, footerOffset, source);
-  const indexBlock = readBlock(bytes, { offset: indexOffset.value, size: indexSize.value }, source);
+  const indexHandle = readTableFooter(bytes.subarray(bytes.length - TABLE_FOOTER_SIZE), source);
+  const indexBlock = readBlock(bytes, indexHandle, source);
 
-  for (const entry of parseBlock(indexBlock, source)) {
-    const handleOffset = readVarint(entry.value, 0, source);
-    const handleSize = readVarint(entry.value, handleOffset.next, source);
-    if (handleSize.next !== entry.value.length)
-      throw new Error(`${source}: malformed LevelDB block handle`);
-    const dataBlock = readBlock(
-      bytes,
-      { offset: handleOffset.value, size: handleSize.value },
-      source,
-    );
-    for (const record of parseBlock(dataBlock, source)) {
-      if (record.key.length < 8) throw new Error(`${source}: LevelDB internal key is too short`);
-      const tag = fixed64(record.key, record.key.length - 8);
-      const type = Number(tag & 0xffn);
-      const sequence = tag >> 8n;
-      const key = record.key.subarray(0, record.key.length - 8);
-      if (type === 1) add(key, record.value, sequence, source);
-      else if (type === 0) add(key, undefined, sequence, source);
-      else throw new Error(`${source}: unknown LevelDB internal key type ${type}`);
+  for (const entry of parseTableBlock(indexBlock, source)) {
+    const dataBlock = readBlock(bytes, readBlockHandle(entry.value, source), source);
+    for (const record of parseTableBlock(dataBlock, source)) {
+      const internal = parseInternalKey(record.key, source);
+      add(internal.key, internal.deleted ? undefined : record.value, internal.sequence, source);
     }
   }
 }
 
+/** Reads the index block handle from the last 48 bytes of a LevelDB table. */
+export function readTableFooter(footer: Uint8Array, source: string): BlockHandle {
+  if (
+    footer.length !== TABLE_FOOTER_SIZE ||
+    !LDB_MAGIC.every((byte, index) => footer[footer.length - 8 + index] === byte)
+  ) {
+    throw new Error(`${source}: invalid LevelDB table footer`);
+  }
+  let offset = readVarint(footer, 0, source).next;
+  offset = readVarint(footer, offset, source).next;
+  const indexOffset = readVarint(footer, offset, source);
+  const indexSize = readVarint(footer, indexOffset.next, source);
+  return { offset: indexOffset.value, size: indexSize.value };
+}
+
+/** Decodes an index block entry value into the data block it points at. */
+export function readBlockHandle(encoded: Uint8Array, source: string): BlockHandle {
+  const offset = readVarint(encoded, 0, source);
+  const size = readVarint(encoded, offset.next, source);
+  if (size.next !== encoded.length) throw new Error(`${source}: malformed LevelDB block handle`);
+  return { offset: offset.value, size: size.value };
+}
+
+/** Splits a LevelDB internal key into its user key, sequence, and tombstone flag. */
+export function parseInternalKey(internalKey: Uint8Array, source: string): InternalKey {
+  if (internalKey.length < 8) throw new Error(`${source}: LevelDB internal key is too short`);
+  const tag = fixed64(internalKey, internalKey.length - 8);
+  const type = Number(tag & 0xffn);
+  if (type !== 0 && type !== 1) {
+    throw new Error(`${source}: unknown LevelDB internal key type ${type}`);
+  }
+  return {
+    key: internalKey.subarray(0, internalKey.length - 8),
+    sequence: tag >> 8n,
+    deleted: type === 0,
+  };
+}
+
+/**
+ * Decompresses one table block read together with its five-byte trailer.
+ * This lets seekable readers load a single block without the rest of the file.
+ */
+export function readTableBlock(blockWithTrailer: Uint8Array, source: string): Uint8Array {
+  const size = blockWithTrailer.length - TABLE_BLOCK_TRAILER_SIZE;
+  if (size < 0) throw new Error(`${source}: truncated LevelDB block trailer`);
+  return decompressBlock(blockWithTrailer.subarray(0, size), blockWithTrailer[size], source);
+}
+
 function readBlock(bytes: Uint8Array, handle: BlockHandle, source: string): Uint8Array {
-  if (handle.offset < 0 || handle.size < 0 || handle.offset + handle.size > bytes.length - 48) {
+  if (
+    handle.offset < 0 ||
+    handle.size < 0 ||
+    handle.offset + handle.size > bytes.length - TABLE_FOOTER_SIZE
+  ) {
     throw new Error(`${source}: LevelDB block handle is outside the table`);
   }
   const raw = bytes.subarray(handle.offset, handle.offset + handle.size);
   const compression =
-    handle.offset + handle.size + 5 <= bytes.length
+    handle.offset + handle.size + TABLE_BLOCK_TRAILER_SIZE <= bytes.length
       ? bytes[handle.offset + handle.size]
       : undefined;
+  return decompressBlock(raw, compression, source);
+}
+
+function decompressBlock(
+  raw: Uint8Array,
+  compression: number | undefined,
+  source: string,
+): Uint8Array {
   if (compression === 1) return uncompressSnappy(raw, source);
   if (compression === 0) return tryInflateBlock(raw) ?? raw;
 
@@ -349,10 +406,8 @@ function looksLikeBlock(block: Uint8Array): boolean {
   return restarts <= (block.length - 4) / 4;
 }
 
-function parseBlock(
-  block: Uint8Array,
-  source: string,
-): Array<{ key: Uint8Array; value: Uint8Array }> {
+/** Parses the prefix-compressed entries of a decompressed table block. */
+export function parseTableBlock(block: Uint8Array, source: string): TableBlockEntry[] {
   if (block.length < 4) throw new Error(`${source}: truncated LevelDB block`);
   const restartCount = fixed32(block, block.length - 4);
   const entriesEnd = block.length - 4 - restartCount * 4;
@@ -360,7 +415,7 @@ function parseBlock(
 
   let offset = 0;
   let previousKey = new Uint8Array();
-  const entries: Array<{ key: Uint8Array; value: Uint8Array }> = [];
+  const entries: TableBlockEntry[] = [];
   while (offset < entriesEnd) {
     const shared = readVarint(block, offset, source);
     const unshared = readVarint(block, shared.next, source);

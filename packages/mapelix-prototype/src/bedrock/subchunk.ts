@@ -1,5 +1,11 @@
 import { classifyChunkKey, type BedrockSubchunkKey } from "./chunk-key.js";
-import { blockNameFromPaletteEntry, readLittleEndianNbtCompound } from "./little-endian-nbt.js";
+import {
+  blockNameFromPaletteEntry,
+  isNbtCompound,
+  readLittleEndianNbtCompound,
+  type LittleEndianNbtCompound,
+  type LittleEndianNbtCompoundValue,
+} from "./little-endian-nbt.js";
 
 const blockCount = 16 * 16 * 16;
 const maxPaletteEntries = blockCount;
@@ -10,6 +16,13 @@ export interface DecodedSubchunkStorage {
   readonly palette: readonly string[];
   /** Palette indexes in Bedrock's x-major, z-middle, y-minor order. */
   readonly indexes: Uint16Array;
+  /** Block state compounds in palette order, present when requested with `includeStates`. */
+  readonly states?: readonly LittleEndianNbtCompoundValue[];
+}
+
+export interface DecodeSubchunkOptions {
+  /** Keep each palette entry's `states` compound, for renderers that need block shapes. */
+  readonly includeStates?: boolean;
 }
 
 export interface DecodedSubchunk {
@@ -58,10 +71,14 @@ function decodeIndexes(
 
   const view = new DataView(bytes.buffer, bytes.byteOffset + offset, byteLength);
   const valueMask = bitsPerBlock === 32 ? 0xffffffff : (1 << bitsPerBlock) - 1;
-  for (let index = 0; index < blockCount; index += 1) {
-    const wordIndex = Math.floor(index / blocksPerWord);
-    const shift = (index % blocksPerWord) * bitsPerBlock;
-    indexes[index] = (view.getUint32(wordIndex * 4, true) >>> shift) & valueMask;
+  let index = 0;
+  for (let word = 0; word < wordCount; word += 1) {
+    // Read each packed word once and peel its blocks from the low bits upward.
+    let bits = view.getUint32(word * 4, true);
+    for (let slot = 0; slot < blocksPerWord && index < blockCount; slot += 1) {
+      indexes[index++] = bits & valueMask;
+      bits >>>= bitsPerBlock;
+    }
   }
   return { indexes, nextOffset: offset + byteLength };
 }
@@ -69,6 +86,7 @@ function decodeIndexes(
 function decodeStorage(
   bytes: Uint8Array,
   offset: number,
+  includeStates: boolean,
 ): { storage: DecodedSubchunkStorage; nextOffset: number } {
   const header = bytes[offset];
   if (header === undefined) {
@@ -88,6 +106,7 @@ function decodeStorage(
           bitsPerBlock,
           palette: [blockNameFromPaletteEntry(entry)],
           indexes: packed.indexes,
+          ...(includeStates ? { states: [paletteStates(entry)] } : {}),
         },
         nextOffset: entry.nextOffset,
       };
@@ -104,10 +123,12 @@ function decodeStorage(
 
   let nextOffset = packed.nextOffset + 4;
   const palette: string[] = [];
+  const states: LittleEndianNbtCompoundValue[] = [];
   for (let index = 0; index < paletteLength; index += 1) {
     try {
       const entry = readLittleEndianNbtCompound(bytes, nextOffset);
       palette.push(blockNameFromPaletteEntry(entry));
+      if (includeStates) states.push(paletteStates(entry));
       nextOffset = entry.nextOffset;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -122,7 +143,22 @@ function decodeStorage(
       );
     }
   }
-  return { storage: { bitsPerBlock, palette, indexes: packed.indexes }, nextOffset };
+  return {
+    storage: {
+      bitsPerBlock,
+      palette,
+      indexes: packed.indexes,
+      ...(includeStates ? { states } : {}),
+    },
+    nextOffset,
+  };
+}
+
+const NO_STATES: LittleEndianNbtCompoundValue = {};
+
+function paletteStates(entry: LittleEndianNbtCompound): LittleEndianNbtCompoundValue {
+  const states = entry.value.states;
+  return isNbtCompound(states) ? states : NO_STATES;
 }
 
 /**
@@ -132,6 +168,7 @@ function decodeStorage(
 export function decodeSubchunk(
   keyBytes: Uint8Array,
   valueBytes: Uint8Array,
+  options: DecodeSubchunkOptions = {},
 ): DecodedSubchunk | undefined {
   const key = classifyChunkKey(keyBytes);
   if (key === undefined) {
@@ -159,7 +196,7 @@ export function decodeSubchunk(
 
   const storages: DecodedSubchunkStorage[] = [];
   for (let storageIndex = 0; storageIndex < storageCount; storageIndex += 1) {
-    const decoded = decodeStorage(valueBytes, offset);
+    const decoded = decodeStorage(valueBytes, offset, options.includeStates === true);
     storages.push(decoded.storage);
     offset = decoded.nextOffset;
   }

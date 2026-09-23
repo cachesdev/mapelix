@@ -232,6 +232,13 @@ export function readLittleEndianNbtCompound(
   return { value: readCompoundValue(reader, 0), nextOffset: reader.offset };
 }
 
+/** Narrows an NBT value to a compound. Lists and byte arrays are also JavaScript objects. */
+export function isNbtCompound(
+  value: LittleEndianNbtValue | undefined,
+): value is LittleEndianNbtCompoundValue {
+  return typeof value === "object" && !(value instanceof Uint8Array) && !Array.isArray(value);
+}
+
 /** Extracts the block name from a Bedrock palette compound. */
 export function blockNameFromPaletteEntry(entry: LittleEndianNbtCompound): string {
   const name = entry.value.name;

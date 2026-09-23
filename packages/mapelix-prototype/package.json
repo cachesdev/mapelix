@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./bedrock": {
+      "types": "./dist/bedrock/index.d.ts",
+      "import": "./dist/bedrock/index.js"
     }
   },
   "scripts": {
