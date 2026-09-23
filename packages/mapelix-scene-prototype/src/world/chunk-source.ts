@@ -4,16 +4,14 @@ import {
   SUBCHUNK_TAG,
   classifyMapRecordKey,
   data2DBiomeAt,
-  data3DBiomeAt,
   decodeData2D,
-  decodeData3D,
   decodeSubchunk,
   type DecodedData2D,
-  type DecodedData3D,
   type DecodedSubchunk,
 } from "@mapelix/prototype/bedrock";
 
 import type { LiveRecord, WorldDatabase } from "../leveldb/world-database.js";
+import { Data3DBiomes } from "./data-3d-biomes.js";
 
 export type Dimension = "overworld" | "nether" | "the-end";
 
@@ -50,27 +48,17 @@ export interface DecodedChunk {
  * only have the Data2D column biome, which stays the fallback.
  */
 export class ChunkBiomes {
-  private readonly data3D: DecodedData3D | undefined;
+  private readonly data3D: Data3DBiomes | undefined;
   private readonly data2D: DecodedData2D | undefined;
-  private readonly sectionYs: readonly number[];
 
-  constructor(
-    data3D: DecodedData3D | undefined,
-    data2D: DecodedData2D | undefined,
-    sectionYs: readonly number[],
-  ) {
+  constructor(data3D: Data3DBiomes | undefined, data2D: DecodedData2D | undefined) {
     this.data3D = data3D;
     this.data2D = data2D;
-    this.sectionYs = sectionYs;
   }
 
   at(localX: number, y: number, localZ: number): number | undefined {
-    const biome3D =
-      this.data3D === undefined
-        ? undefined
-        : data3DBiomeAt(this.data3D, this.sectionYs, localX, y, localZ);
     return (
-      biome3D ??
+      this.data3D?.at(localX, y, localZ) ??
       (this.data2D === undefined ? undefined : data2DBiomeAt(this.data2D, localX, localZ))
     );
   }
@@ -92,23 +80,19 @@ export class ChunkSource {
   /** Reads the raw records of a chunk. Returns undefined for chunks the world never stored. */
   records(chunkX: number, chunkZ: number): ChunkRecords | undefined {
     const sections: SectionRecord[] = [];
-    let data3D: DecodedData3D | undefined;
+    let data3D: Data3DBiomes | undefined;
     let data2D: DecodedData2D | undefined;
     for (const record of this.database.readPrefix(this.prefix(chunkX, chunkZ))) {
       const key = classifyMapRecordKey(record.key);
       if (key === undefined || key.dimension !== this.dimension) continue;
       if (key.tag === SUBCHUNK_TAG) sections.push({ y: key.y, record });
-      else if (key.tag === DATA_3D_TAG) data3D = decodeData3D(record.key, record.value);
+      else if (key.tag === DATA_3D_TAG) data3D = new Data3DBiomes(record.value);
       else if (key.tag === DATA_2D_TAG) data2D = decodeData2D(record.key, record.value);
     }
     if (sections.length === 0) return undefined;
 
     sections.sort((left, right) => right.y - left.y);
-    const sectionYs = sections
-      .map((section) => section.y)
-      .filter((y) => y >= -4 && y <= 19)
-      .sort((left, right) => left - right);
-    return { x: chunkX, z: chunkZ, sections, biomes: new ChunkBiomes(data3D, data2D, sectionYs) };
+    return { x: chunkX, z: chunkZ, sections, biomes: new ChunkBiomes(data3D, data2D) };
   }
 
   /** Decodes every subchunk of a chunk, including palette states for block shapes. */

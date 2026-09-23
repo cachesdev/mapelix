@@ -89,8 +89,9 @@ function gatherCells(
   let stored = false;
 
   const chunksPerSide = span / 16;
-  for (let chunkRow = -1; chunkRow <= chunksPerSide; chunkRow += 1) {
-    for (let chunkColumn = -1; chunkColumn <= chunksPerSide; chunkColumn += 1) {
+  // Chunk keys sort by x first, so walking z inside x reuses cached table blocks.
+  for (let chunkColumn = -1; chunkColumn <= chunksPerSide; chunkColumn += 1) {
+    for (let chunkRow = -1; chunkRow <= chunksPerSide; chunkRow += 1) {
       const chunkX = (regionX * span) / 16 + chunkColumn;
       const chunkZ = (regionZ * span) / 16 + chunkRow;
       const surface = surfaces.surface(chunkX, chunkZ);

@@ -46,6 +46,8 @@ export class SeekableTable {
   private readonly file: TableFile;
   private readonly index: readonly IndexEntry[];
   private readonly smallestKey: Uint8Array;
+  /** The last index separator, which is at least as large as every key in the table. */
+  private readonly largestKey: Uint8Array;
   private readonly blocks: BlockCache;
   private readonly decode: DecodeTableBlock;
 
@@ -60,6 +62,7 @@ export class SeekableTable {
     this.file = file;
     this.index = index;
     this.smallestKey = smallestKey;
+    this.largestKey = index[index.length - 1]!.lastKey;
     this.blocks = blocks;
     this.decode = decode;
   }
@@ -88,13 +91,14 @@ export class SeekableTable {
   /** Visits every version of every key that starts with `prefix`, in key order. */
   scanPrefix(prefix: Uint8Array, visit: (version: RecordVersion) => void): void {
     if (comparePrefix(this.smallestKey, prefix) > 0) return;
+    if (comparePrefix(this.largestKey, prefix) < 0) return;
     const start = this.firstBlockAtOrAfter(prefix);
     for (let blockIndex = start; blockIndex < this.index.length; blockIndex += 1) {
-      for (const entry of this.readBlock(blockIndex)) {
-        const version = parseInternalKey(entry.key, this.name);
-        const order = comparePrefix(version.key, prefix);
-        if (order > 0) return;
-        if (order === 0) visit({ ...version, value: entry.value });
+      const entries = this.readBlock(blockIndex);
+      for (let entry = firstEntryAtOrAfter(entries, prefix); entry < entries.length; entry += 1) {
+        const { key, value } = entries[entry]!;
+        if (compareUserKey(key, prefix) > 0) return;
+        visit({ ...parseInternalKey(key, this.name), value });
       }
     }
   }
@@ -151,6 +155,23 @@ export class BlockCache {
   }
 }
 
+/** Binary-searches a block for the first entry whose user key is at or after `prefix`. */
+function firstEntryAtOrAfter(entries: readonly TableBlockEntry[], prefix: Uint8Array): number {
+  let low = 0;
+  let high = entries.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (compareUserKey(entries[middle]!.key, prefix) < 0) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+/** `comparePrefix` for the user key inside an internal key, which ends in an 8-byte tag. */
+function compareUserKey(internalKey: Uint8Array, prefix: Uint8Array): number {
+  return comparePrefix(internalKey, prefix, internalKey.length - 8);
+}
+
 function readHandle(file: TableFile, handle: BlockHandle, decode: DecodeTableBlock): Uint8Array {
   return decode(file.read(handle.offset, handle.size + TABLE_BLOCK_TRAILER_SIZE), file.name);
 }
@@ -165,6 +186,11 @@ export function compareBytes(left: Uint8Array, right: Uint8Array): number {
 }
 
 /** Compares only the first `prefix.length` bytes, so every key with the prefix compares equal. */
-export function comparePrefix(key: Uint8Array, prefix: Uint8Array): number {
-  return compareBytes(key.subarray(0, prefix.length), prefix);
+export function comparePrefix(key: Uint8Array, prefix: Uint8Array, keyLength = key.length): number {
+  const length = Math.min(keyLength, prefix.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = key[index]! - prefix[index]!;
+    if (difference !== 0) return difference;
+  }
+  return keyLength < prefix.length ? -1 : 0;
 }
