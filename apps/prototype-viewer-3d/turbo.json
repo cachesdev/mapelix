@@ -1,0 +1,31 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["build/**", ".svelte-kit/**", "!.svelte-kit/cache/**"],
+      "env": ["MAPELIX_CACHE_DIRECTORY", "MAPELIX_SCENE_WORKERS", "MAPELIX_WORLD_DIRECTORY"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["MAPELIX_CACHE_DIRECTORY", "MAPELIX_SCENE_WORKERS", "MAPELIX_WORLD_DIRECTORY"]
+    },
+    "preview": {
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "HOST",
+        "MAPELIX_CACHE_DIRECTORY",
+        "MAPELIX_SCENE_WORKERS",
+        "MAPELIX_WORLD_DIRECTORY",
+        "PORT"
+      ]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    }
+  }
+}
