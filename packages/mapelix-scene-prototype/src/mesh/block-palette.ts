@@ -80,6 +80,8 @@ export class BlockPalette {
   boxInset = new Uint8Array(256);
   boxTop = new Uint8Array(256);
   sprite = new Uint8Array(256);
+  /** 1 when the block's sides are soil under a strip of its top color. */
+  covered = new Uint8Array(256);
   /** Face colors, six per id in `Face` order. */
   colors = new Uint32Array(256 * 6);
   /** Face tint codes, six per id in `Face` order. */
@@ -145,6 +147,7 @@ export class BlockPalette {
       }
     }
 
+    this.covered[id] = appearance.coveredSides ? 1 : 0;
     const tint = TINT_CODES[appearance.tint];
     for (let face = 0; face < 6; face += 1) {
       const end = faceAxis(face) === appearance.axis;
@@ -174,6 +177,7 @@ export class BlockPalette {
     this.boxInset = grow(this.boxInset, capacity);
     this.boxTop = grow(this.boxTop, capacity);
     this.sprite = grow(this.sprite, capacity);
+    this.covered = grow(this.covered, capacity);
     this.tints = grow(this.tints, capacity * 6);
     const colors = new Uint32Array(capacity * 6);
     colors.set(this.colors);

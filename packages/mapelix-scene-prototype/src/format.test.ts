@@ -20,7 +20,7 @@ describe("scene region format", () => {
     const quads = new QuadList();
     const box = { size: 8, inset: 6, anchoredTop: true };
     quads.push(
-      packQuadWord0(127, -64, 3, Face.NegativeZ, QuadMaterial.Plant),
+      packQuadWord0(127, -64, 3, Face.NegativeZ, QuadMaterial.Plant, true),
       packQuadWord1(128, 384, box, PlantSprite.Mushroom),
       packQuadWord2(0xa1b2c3, 0b11_10_01_00),
     );
@@ -31,6 +31,7 @@ describe("scene region format", () => {
       z: 3,
       face: Face.NegativeZ,
       material: QuadMaterial.Plant,
+      coveredSoil: true,
       width: 128,
       height: 384,
       box,

@@ -7,13 +7,15 @@
  * region as one instanced quad and rebuild each corner in the vertex shader.
  *
  * Word 0: cell x (7) | cell z (7) << 7 | block y + 64 (9) << 14 | face (3) << 23 |
- *         material (4) << 26
+ *         material (4) << 26 | covered soil (1) << 30
  * Word 1: width - 1 (7) | height - 1 (9) << 7 | box size - 1 (4) << 16 |
  *         box inset (3) << 20 | box anchored to top (1) << 23 | sprite (3) << 24
  * Word 2: sRGB color (24) | corner occlusion (4 × 2) << 24
  *
  * Width and height run along the face's two tangent axes. Boxes are measured in
  * sixteenths of a block, so slabs, carpets, snow, and fence posts share one quad type.
+ * A covered-soil side, such as a grass block's, is `SOIL_COLOR` with a thin strip of
+ * the quad's color along its top edge.
  */
 
 export const REGION_MAGIC = 0x3153_584d; // "MXS1" in little-endian byte order.
@@ -24,6 +26,8 @@ export const EMPTY_HEIGHT = -32768;
 /** Lowest overworld block. Quads store `y - WORLD_MIN_Y` in nine bits. */
 export const WORLD_MIN_Y = -64;
 export const WORLD_MAX_Y = 320;
+/** Packed sRGB soil color under the cover strip of covered-soil sides. */
+export const SOIL_COLOR = 0x866043;
 /** Blocks covered by one level 0 region along each axis. */
 export const BASE_REGION_SPAN = 64;
 /** The coarsest level the viewer requests. Level 5 covers 2048 by 2048 blocks. */
@@ -79,6 +83,8 @@ export interface Quad {
   readonly z: number;
   readonly face: Face;
   readonly material: QuadMaterial;
+  /** A side of soil under a cover, drawn with a strip of `color` along its top edge. */
+  readonly coveredSoil: boolean;
   readonly width: number;
   readonly height: number;
   readonly box: QuadBox;
@@ -97,8 +103,10 @@ export function packQuadWord0(
   z: number,
   face: Face,
   material: QuadMaterial,
+  coveredSoil = false,
 ): number {
-  return (x | (z << 7) | ((y - WORLD_MIN_Y) << 14) | (face << 23) | (material << 26)) >>> 0;
+  const soil = coveredSoil ? 1 << 30 : 0;
+  return (x | (z << 7) | ((y - WORLD_MIN_Y) << 14) | (face << 23) | (material << 26) | soil) >>> 0;
 }
 
 export function packQuadWord1(
@@ -133,6 +141,7 @@ export function unpackQuad(words: Uint32Array, index: number): Quad {
     y: ((word0 >>> 14) & 0x1ff) + WORLD_MIN_Y,
     face: asFace((word0 >>> 23) & 0x7),
     material: asMaterial((word0 >>> 26) & 0xf),
+    coveredSoil: ((word0 >>> 30) & 1) === 1,
     width: (word1 & 0x7f) + 1,
     height: ((word1 >>> 7) & 0x1ff) + 1,
     box: {

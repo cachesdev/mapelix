@@ -56,6 +56,7 @@ const KEY_PRESENT = 1 << 31;
 const KEY_SINGLE = 1 << 30;
 const KEY_STACKS = 1 << 29;
 const KEY_NARROW = 1 << 28;
+const KEY_COVERED = 1 << 27;
 const WATER_SURFACE_SIZE = 14;
 
 /**
@@ -266,8 +267,12 @@ class VoxelMesher {
     const occlusion = boundary
       ? this.occlusion(face, neighbor, neighborY)
       : this.occlusion(face, index, y);
-    keys[mask] = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
-    colors[mask] = packQuadWord2(this.colorOf(id, face, column), occlusion);
+    // Grass sides carry the tinted top color; the shader draws soil below its strip.
+    const covered = this.palette.covered[id] === 1 && !isFlatFace(face);
+    const color = this.colorOf(id, covered ? Face.PositiveY : face, column);
+    const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
+    keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
+    colors[mask] = packQuadWord2(color, occlusion);
     return true;
   }
 
@@ -366,7 +371,7 @@ class VoxelMesher {
     };
     const translucent = material === QuadMaterial.Water || material === QuadMaterial.Glass;
     (translucent ? this.translucent : this.opaque).push(
-      packQuadWord0(x, y, z, faceOf(face), material),
+      packQuadWord0(x, y, z, faceOf(face), material, (key & KEY_COVERED) !== 0),
       packQuadWord1(width, height, box, 0),
       color,
     );

@@ -16,6 +16,8 @@ export interface ChunkSurface {
   readonly top: Uint32Array;
   readonly side: Uint32Array;
   readonly foliage: Uint8Array;
+  /** 1 where the top block's sides are soil under a strip of its top color. */
+  readonly covered: Uint8Array;
   /** Water surface height, or `EMPTY_HEIGHT` for dry columns. */
   readonly water: Int16Array;
   readonly waterColor: Uint32Array;
@@ -54,6 +56,7 @@ export class SurfaceSource {
       top: new Uint32Array(256),
       side: new Uint32Array(256),
       foliage: new Uint8Array(256),
+      covered: new Uint8Array(256),
       water: new Int16Array(256).fill(EMPTY_HEIGHT),
       waterColor: new Uint32Array(256),
     };
@@ -115,6 +118,7 @@ export class SurfaceSource {
     surface.top[column] = this.faceColor(id, Face.PositiveY, biome);
     surface.side[column] = this.faceColor(id, Face.PositiveX, biome);
     surface.foliage[column] = this.palette.material[id] === QuadMaterial.Foliage ? 1 : 0;
+    surface.covered[column] = this.palette.covered[id]!;
     return true;
   }
 

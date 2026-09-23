@@ -14,7 +14,7 @@ const workers = positiveInteger(
   process.env.MAPELIX_SCENE_WORKERS ?? String(Math.min(8, Math.max(2, availableParallelism() - 2))),
 );
 /** Bump when mesh output changes without a format change, so stale disk caches are ignored. */
-const meshRevision = 2;
+const meshRevision = 3;
 const maxMemoryRegions = 384;
 
 export type CacheStatus = "memory" | "disk" | "build";

@@ -18,6 +18,7 @@ import {
 } from "three/tsl";
 
 const SEA_LEVEL = 62;
+const WHITE = new Color(0xffffff);
 /** Altitude over which the haze thins by a factor of e. */
 const HAZE_HEIGHT = 140;
 
@@ -57,7 +58,7 @@ const SKY_KEYS: ReadonlyArray<readonly [number, SkyState]> = [
       zenith: new Color(0x2f5aa8),
       horizon: new Color(0xffb27a),
       sun: new Color(0xffa25e),
-      sunIntensity: 1.9,
+      sunIntensity: 1.6,
       ambient: 0.74,
     },
   ],
@@ -67,7 +68,7 @@ const SKY_KEYS: ReadonlyArray<readonly [number, SkyState]> = [
       zenith: new Color(0x3b73cf),
       horizon: new Color(0xd9c2a8),
       sun: new Color(0xffd5a1),
-      sunIntensity: 2.7,
+      sunIntensity: 2.15,
       ambient: 0.84,
     },
   ],
@@ -77,7 +78,7 @@ const SKY_KEYS: ReadonlyArray<readonly [number, SkyState]> = [
       zenith: new Color(0x3d7ad8),
       horizon: new Color(0xb9d3ec),
       sun: new Color(0xfff1dc),
-      sunIntensity: 3.1,
+      sunIntensity: 2.4,
       ambient: 0.9,
     },
   ],
@@ -87,7 +88,7 @@ const SKY_KEYS: ReadonlyArray<readonly [number, SkyState]> = [
       zenith: new Color(0x3a76d6),
       horizon: new Color(0xb3cfee),
       sun: new Color(0xfff6ea),
-      sunIntensity: 3.2,
+      sunIntensity: 2.5,
       ambient: 0.92,
     },
   ],
@@ -156,7 +157,7 @@ export class Atmosphere {
       exp(cameraHeight.negate()).sub(exp(pointHeight.negate())).div(rise),
     );
     const haze = float(1).sub(
-      exp(distance.mul(meanDensity).mul(2.6).div(this.viewDistance).negate()),
+      exp(distance.mul(meanDensity).mul(2.1).div(this.viewDistance).negate()),
     );
     const edge = smoothstep(this.viewDistance.mul(0.7), this.viewDistance.mul(0.97), distance);
     const direction = normalize(positionWorld.sub(cameraPosition));
@@ -188,8 +189,9 @@ export class Atmosphere {
       direction: lightDirection,
       sunColor: state.sun,
       sunIntensity: state.sunIntensity,
-      skyColor: state.zenith.clone().lerp(state.horizon, 0.35),
-      groundColor: new Color(0x9a8a70).multiplyScalar(Math.max(0.15, state.ambient)),
+      // Sky light is paler than the sky itself, so shaded faces keep their own color.
+      skyColor: state.zenith.clone().lerp(state.horizon, 0.5).lerp(WHITE, 0.4),
+      groundColor: new Color(0xb09c80).multiplyScalar(Math.max(0.15, state.ambient)),
       ambientIntensity: state.ambient,
     };
   }

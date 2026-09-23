@@ -171,7 +171,7 @@ export class WorldViewer {
     this.sun.intensity = daylight.sunIntensity;
     this.sky.color.copy(daylight.skyColor);
     this.sky.groundColor.copy(daylight.groundColor);
-    this.sky.intensity = daylight.ambientIntensity * 1.7;
+    this.sky.intensity = daylight.ambientIntensity * 3.1;
     this.sunDirection.copy(daylight.direction);
     this.shadowKey = "";
   }

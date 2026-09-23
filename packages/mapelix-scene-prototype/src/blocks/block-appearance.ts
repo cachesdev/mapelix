@@ -32,6 +32,8 @@ export interface BlockAppearance {
   readonly tint: BiomeTint;
   /** Grass blocks tint only their top face. Leaves, plants, and water tint every face. */
   readonly tintTopOnly: boolean;
+  /** Soil sides that show a strip of the top color, like grass, podzol, and mycelium. */
+  readonly coveredSides: boolean;
 }
 
 const EMPTY: BlockShape = { kind: "empty" };
@@ -245,12 +247,15 @@ export function resolveBlockAppearance(
       axis: "y",
       tint: "ground",
       tintTopOnly: true,
+      coveredSides: true,
     };
   }
   if (FOLIAGE_TINTED.test(block)) return uniform(shape, rgb(62, 118, 48), "foliage");
 
   for (const [pattern, top, side] of COLORS) {
-    if (pattern.test(block)) return { ...uniform(shape, side ?? top), top, bottom: side ?? top };
+    if (!pattern.test(block)) continue;
+    const covered = side === DIRT && top !== DIRT && block !== "farmland";
+    return { ...uniform(shape, side ?? top), top, bottom: side ?? top, coveredSides: covered };
   }
   return uniform(shape, styled);
 }
@@ -392,7 +397,16 @@ function pillarAxis(states: LittleEndianNbtCompoundValue): "x" | "y" | "z" {
 }
 
 function uniform(shape: BlockShape, color: number, tint: BiomeTint = "none"): BlockAppearance {
-  return { shape, top: color, side: color, bottom: color, axis: "y", tint, tintTopOnly: false };
+  return {
+    shape,
+    top: color,
+    side: color,
+    bottom: color,
+    axis: "y",
+    tint,
+    tintTopOnly: false,
+    coveredSides: false,
+  };
 }
 
 function localName(name: string): string {

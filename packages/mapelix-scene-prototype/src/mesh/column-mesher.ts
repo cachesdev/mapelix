@@ -6,6 +6,7 @@ import {
   FULLY_LIT,
   QuadList,
   QuadMaterial,
+  SOIL_COLOR,
   WORLD_MIN_Y,
   packQuadWord0,
   packQuadWord1,
@@ -24,7 +25,7 @@ const FACE_STEPS: Readonly<Record<number, readonly [number, number]>> = {
   [Face.PositiveZ]: [0, 1],
   [Face.NegativeZ]: [0, -1],
 };
-const SOIL = rgb(134, 96, 67);
+const SOIL = SOIL_COLOR;
 const DEEP_ROCK = rgb(118, 116, 112);
 /** Soil walls show dirt near the top and rock below, like a cut through a hill. */
 const SOIL_DEPTH = 3;
@@ -42,6 +43,8 @@ interface CellGrid {
   readonly top: Uint32Array;
   readonly side: Uint32Array;
   readonly foliage: Uint8Array;
+  /** 1 where most columns have soil sides under a strip of their top color. */
+  readonly covered: Uint8Array;
   readonly water: Int16Array;
   readonly waterColor: Uint32Array;
 }
@@ -79,6 +82,7 @@ function gatherCells(
   const ground = new Float64Array(cells);
   const colors = new Float64Array(cells * 6);
   const foliage = new Uint16Array(cells);
+  const covered = new Uint16Array(cells);
   const waterCount = new Uint16Array(cells);
   const waterHeight = new Float64Array(cells);
   const waterColors = new Float64Array(cells * 3);
@@ -109,6 +113,7 @@ function gatherCells(
         addColor(colors, cell * 6, surface.top[column]!);
         addColor(colors, cell * 6 + 3, surface.side[column]!);
         foliage[cell] = foliage[cell]! + surface.foliage[column]!;
+        covered[cell] = covered[cell]! + surface.covered[column]!;
         if (surface.water[column] !== EMPTY_HEIGHT) {
           waterCount[cell] = waterCount[cell]! + 1;
           waterHeight[cell] = waterHeight[cell]! + surface.water[column]!;
@@ -125,6 +130,7 @@ function gatherCells(
     top: new Uint32Array(cells),
     side: new Uint32Array(cells),
     foliage: new Uint8Array(cells),
+    covered: new Uint8Array(cells),
     water: new Int16Array(cells).fill(EMPTY_HEIGHT),
     waterColor: new Uint32Array(cells),
   };
@@ -135,6 +141,7 @@ function gatherCells(
     grid.top[cell] = averageColor(colors, cell * 6, samples);
     grid.side[cell] = averageColor(colors, cell * 6 + 3, samples);
     grid.foliage[cell] = foliage[cell]! * 2 > samples ? 1 : 0;
+    grid.covered[cell] = covered[cell]! * 2 > samples ? 1 : 0;
     const wet = waterCount[cell]!;
     if (wet * 2 > samples) {
       grid.water[cell] = Math.round(waterHeight[cell]! / wet);
@@ -142,6 +149,15 @@ function gatherCells(
     }
   }
   return grid;
+}
+
+/** A run of equal wall faces along one row of cells. */
+interface Wall {
+  readonly start: number;
+  readonly bottom: number;
+  readonly top: number;
+  readonly color: number;
+  readonly covered: boolean;
 }
 
 class ColumnMesher {
@@ -225,11 +241,11 @@ class ColumnMesher {
    * the neighbor, so a coarser or finer region beside this one never leaves a gap.
    */
   private meshWalls(face: Face): void {
-    const { size, ground, side } = this.cells;
+    const { size, ground, side, top, covered } = this.cells;
     const [dx, dz] = FACE_STEPS[face]!;
     const alongX = dz !== 0;
     for (let row = 0; row < size; row += 1) {
-      let run: { start: number; bottom: number; top: number; color: number } | undefined;
+      let run: Wall | undefined;
       const flush = (end: number): void => {
         if (run !== undefined) this.pushWall(face, alongX, row, run.start, end - run.start, run);
         run = undefined;
@@ -243,15 +259,19 @@ class ColumnMesher {
           flush(step);
           continue;
         }
-        const color = side[at(this.cells, x, z)]!;
-        if (
-          run === undefined ||
-          run.bottom !== bottom ||
-          run.top !== height ||
-          run.color !== color
-        ) {
+        const cell = at(this.cells, x, z);
+        const cover = covered[cell] === 1;
+        // Covered walls carry the top color for their strip; the shader draws soil below it.
+        const color = cover ? top[cell]! : side[cell]!;
+        const same =
+          run !== undefined &&
+          run.bottom === bottom &&
+          run.top === height &&
+          run.color === color &&
+          run.covered === cover;
+        if (!same) {
           flush(step);
-          run = { start: step, bottom, top: height, color };
+          run = { start: step, bottom, top: height, color, covered: cover };
         }
       }
       flush(size);
@@ -271,11 +291,11 @@ class ColumnMesher {
     row: number,
     start: number,
     length: number,
-    wall: { readonly bottom: number; readonly top: number; readonly color: number },
+    wall: Wall,
   ): void {
     const x = alongX ? start : row;
     const z = alongX ? row : start;
-    const soil = wall.color === SOIL && wall.top - wall.bottom > SOIL_DEPTH + 1;
+    const soil = (wall.covered || wall.color === SOIL) && wall.top - wall.bottom > SOIL_DEPTH + 1;
     const split = soil ? wall.top - SOIL_DEPTH : wall.bottom;
     if (split > wall.bottom) {
       this.push(
@@ -289,7 +309,7 @@ class ColumnMesher {
     }
     this.push(
       this.opaque,
-      packQuadWord0(x, split, z, face, QuadMaterial.Solid),
+      packQuadWord0(x, split, z, face, QuadMaterial.Solid, wall.covered),
       packQuadWord1(length, wall.top - split, FULL_BOX, 0),
       packQuadWord2(wall.color, FULLY_LIT),
       split,

@@ -68,7 +68,7 @@ describe("voxel mesher", () => {
     });
     const pillar = quads.filter((quad) => quad.x === 10 && quad.z === 10 && quad.y === 61);
 
-    expect(pillar.map((quad) => quad.face).sort()).toEqual([
+    expect(pillar.map((quad) => quad.face).sort((left, right) => left - right)).toEqual([
       Face.PositiveX,
       Face.NegativeX,
       Face.PositiveY,

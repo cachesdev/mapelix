@@ -31,6 +31,10 @@ export const quadUV = varyingProperty("vec2", "vQuadUV");
 export const quadMaterial = varyingProperty("float", "vQuadMaterial");
 /** `PlantSprite` code of the face. */
 export const quadSprite = varyingProperty("float", "vQuadSprite");
+/** 1 for covered soil sides, which draw soil below a strip of the quad color. */
+export const quadCovered = varyingProperty("float", "vQuadCovered");
+/** Quad size in blocks along its second tangent, which is height for side faces. */
+export const quadHeight = varyingProperty("float", "vQuadHeight");
 
 const bits = (word: Node<"uint">, shift: number, mask: number) =>
   float(word.shiftRight(uint(shift)).bitAnd(uint(mask)));
@@ -110,6 +114,8 @@ export const quadPosition = Fn(() => {
   quadUV.assign(vec2(cornerU, cornerV));
   quadMaterial.assign(bits(word0, 26, 15));
   quadSprite.assign(bits(word1, 24, 7));
+  quadCovered.assign(bits(word0, 30, 1));
+  quadHeight.assign(height);
 
   return select(plant, crossPosition, boxPosition);
 });

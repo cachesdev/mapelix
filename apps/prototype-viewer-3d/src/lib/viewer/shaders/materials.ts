@@ -1,4 +1,4 @@
-import { QuadMaterial } from "@mapelix/scene-prototype/format";
+import { QuadMaterial, SOIL_COLOR } from "@mapelix/scene-prototype/format";
 import {
   DoubleSide,
   MeshBasicNodeMaterial,
@@ -12,6 +12,7 @@ import {
   cameraFar,
   cameraNear,
   cameraPosition,
+  color,
   dot,
   exp,
   float,
@@ -32,6 +33,7 @@ import {
   sin,
   smoothstep,
   time,
+  transformNormalToView,
   vec2,
   vec3,
   viewportDepthTexture,
@@ -39,7 +41,16 @@ import {
 } from "three/tsl";
 
 import type { Atmosphere } from "../atmosphere";
-import { quadColor, quadMaterial, quadOcclusion, quadPosition, quadSprite, quadUV } from "./quad";
+import {
+  quadColor,
+  quadCovered,
+  quadHeight,
+  quadMaterial,
+  quadOcclusion,
+  quadPosition,
+  quadSprite,
+  quadUV,
+} from "./quad";
 
 export interface SceneMaterials {
   readonly terrain: MeshStandardNodeMaterial;
@@ -77,6 +88,23 @@ const blockBevel = Fn(() => {
   return mix(float(1), mix(float(0.88), float(1), line), visible);
 });
 
+/** `color()` converts the sRGB hex to linear, like the decoded quad colors. */
+const soil = color(SOIL_COLOR);
+
+/**
+ * Grass, podzol, and mycelium sides show soil under a ragged strip of their top
+ * color, like Minecraft's grass block side, instead of a flat band of dirt.
+ */
+const coveredSoil = Fn(() => {
+  const n = abs(normalWorld);
+  const along = select(n.x.greaterThan(0.5), positionWorld.z, positionWorld.x);
+  const pixel = along.mul(16).floor().add(positionWorld.y.floor().mul(131));
+  const strip = float(2).add(hash(pixel).mul(3).floor()).div(16);
+  const fromTop = float(1).sub(quadUV.y).mul(quadHeight);
+  const inSoil = quadCovered.greaterThan(0.5).and(fromTop.greaterThan(strip));
+  return select(inSoil, soil, quadColor);
+});
+
 function createTerrainMaterial(): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
   material.positionNode = quadPosition();
@@ -89,7 +117,7 @@ function createTerrainMaterial(): MeshStandardNodeMaterial {
   const contact = mix(float(0.8), float(1), quadOcclusion);
   const glowing = quadMaterial.equal(QuadMaterial.Emissive);
   const bevel = select(glowing, float(1), blockBevel());
-  material.colorNode = quadColor.mul(variation).mul(bevel).mul(contact);
+  material.colorNode = coveredSoil().mul(variation).mul(bevel).mul(contact);
   material.aoNode = quadOcclusion;
   material.emissiveNode = select(glowing, quadColor.mul(1.6), vec3(0));
   return material;
@@ -147,6 +175,8 @@ function createPlantMaterial(): MeshLambertNodeMaterial {
   const shade = mix(float(0.78), float(1.12), quadUV.y);
   material.colorNode = base.mul(shade).mul(blockNoise().mul(0.2).add(0.9));
   material.maskNode = plantMask();
+  // A fixed view-space up normal, so the back sides of the planes are lit like the front.
+  material.normalNode = transformNormalToView(vec3(0, 1, 0));
   return material;
 }
 
