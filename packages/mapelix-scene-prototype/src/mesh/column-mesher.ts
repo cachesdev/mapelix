@@ -32,9 +32,13 @@ const DEEP_ROCK = rgb(118, 116, 112);
 const SOIL_DEPTH = 3;
 /** Walls facing unexplored land reach this far below the cell, like the cut edge of a diorama. */
 const EDGE_DEPTH = 16;
+/** Trunks stand under crowns in cells up to this wide; wider cells would turn them into pillars. */
+const MAX_TRUNK_CELL = 2;
+/** Columns this close below a cell's highest column share in its color. */
+const TOP_TOLERANCE = 1;
 
 /**
- * Averaged surfaces of a region's cells plus a one-cell ring of its neighbors at the
+ * Surfaces of a region's cells plus a one-cell ring of its neighbors at the
  * same level. The ring lets border walls stop at the neighbor's height instead of
  * dropping to the region floor. Index cells with `at(x, z)` for x and z in [-1, size].
  */
@@ -73,6 +77,49 @@ export function meshColumnRegion(
   return new ColumnMesher(cells, regionCellSize(level)).mesh(level, regionX, regionZ);
 }
 
+/**
+ * The highest ground in each cell and the average colors of the columns near it. Keeping
+ * the top, as Distant Horizons does, lets thin spires, walls, and ridges survive coarse
+ * cells instead of melting into their surroundings.
+ */
+class HighestGround {
+  readonly height: Int16Array;
+  readonly count: Uint16Array;
+  /** Summed top and side colors, six channels per cell. */
+  readonly colors: Float64Array;
+  readonly covered: Uint16Array;
+
+  constructor(cells: number) {
+    this.height = new Int16Array(cells).fill(EMPTY_HEIGHT);
+    this.count = new Uint16Array(cells);
+    this.colors = new Float64Array(cells * 6);
+    this.covered = new Uint16Array(cells);
+  }
+
+  add(cell: number, height: number, top: number, side: number, covered: number): void {
+    if (height > this.height[cell]!) {
+      // A new highest column restarts the colors, so a peak keeps its own color.
+      this.height[cell] = height;
+      this.count[cell] = 0;
+      this.colors.fill(0, cell * 6, cell * 6 + 6);
+      this.covered[cell] = 0;
+    }
+    if (height < this.height[cell]! - TOP_TOLERANCE) return;
+    this.count[cell] = this.count[cell]! + 1;
+    addColor(this.colors, cell * 6, top);
+    addColor(this.colors, cell * 6 + 3, side);
+    this.covered[cell] = this.covered[cell]! + covered;
+  }
+
+  write(grid: CellGrid, cell: number): void {
+    const samples = this.count[cell]!;
+    grid.ground[cell] = this.height[cell]!;
+    grid.top[cell] = averageColor(this.colors, cell * 6, samples);
+    grid.side[cell] = averageColor(this.colors, cell * 6 + 3, samples);
+    grid.covered[cell] = this.covered[cell]! * 2 > samples ? 1 : 0;
+  }
+}
+
 function gatherCells(
   surfaces: SurfaceSource,
   level: number,
@@ -84,11 +131,11 @@ function gatherCells(
   const size = regionGridSize(level);
   const cells = (size + 2) ** 2;
   const count = new Uint16Array(cells);
-  const ground = new Float64Array(cells);
-  const colors = new Float64Array(cells * 6);
-  const covered = new Uint16Array(cells);
+  const land = new HighestGround(cells);
+  // Beds under water, so a mostly wet cell keeps its seabed and the shore stays in place.
+  const bed = new HighestGround(cells);
   const canopyCount = new Uint16Array(cells);
-  const canopyTop = new Float64Array(cells);
+  const canopyTop = new Int16Array(cells).fill(EMPTY_HEIGHT);
   const canopyBottom = new Float64Array(cells);
   const canopyColors = new Float64Array(cells * 3);
   const waterCount = new Uint16Array(cells);
@@ -117,14 +164,20 @@ function gatherCells(
         const cellZ = Math.floor((chunkRow * 16 + (column >> 4)) / cellSize);
         if (cellX < -1 || cellZ < -1 || cellX > size || cellZ > size) continue;
         const cell = at({ size }, cellX, cellZ);
+        const top = surface.top[column]!;
+        const side = surface.side[column]!;
+        const covered = surface.covered[column]!;
         count[cell] = count[cell]! + 1;
-        ground[cell] = ground[cell]! + height;
-        addColor(colors, cell * 6, surface.top[column]!);
-        addColor(colors, cell * 6 + 3, surface.side[column]!);
-        covered[cell] = covered[cell]! + surface.covered[column]!;
+        const trunk = surface.trunk[column]!;
+        if (trunk !== EMPTY_HEIGHT && cellSize <= MAX_TRUNK_CELL) {
+          const bark = surface.trunkColor[column]!;
+          land.add(cell, trunk, bark, bark, 0);
+        } else {
+          land.add(cell, height, top, side, covered);
+        }
         if (surface.canopy[column] !== EMPTY_HEIGHT) {
           canopyCount[cell] = canopyCount[cell]! + 1;
-          canopyTop[cell] = canopyTop[cell]! + surface.canopy[column]!;
+          canopyTop[cell] = Math.max(canopyTop[cell]!, surface.canopy[column]!);
           canopyBottom[cell] = canopyBottom[cell]! + surface.canopyBottom[column]!;
           addColor(canopyColors, cell * 3, surface.canopyColor[column]!);
         }
@@ -132,6 +185,7 @@ function gatherCells(
           waterCount[cell] = waterCount[cell]! + 1;
           waterHeight[cell] = waterHeight[cell]! + surface.water[column]!;
           addColor(waterColors, cell * 3, surface.waterColor[column]!);
+          bed.add(cell, height, top, side, covered);
         }
       }
     }
@@ -153,22 +207,21 @@ function gatherCells(
   for (let cell = 0; cell < cells; cell += 1) {
     const samples = count[cell]!;
     if (samples === 0) continue;
-    grid.ground[cell] = Math.round(ground[cell]! / samples);
-    grid.top[cell] = averageColor(colors, cell * 6, samples);
-    grid.side[cell] = averageColor(colors, cell * 6 + 3, samples);
-    grid.covered[cell] = covered[cell]! * 2 > samples ? 1 : 0;
-    // Scattered trees are too small to show at this size; a forest keeps its crowns.
+    const wet = waterCount[cell]!;
+    if (wet * 2 > samples) {
+      bed.write(grid, cell);
+      grid.water[cell] = Math.round(waterHeight[cell]! / wet);
+      grid.waterColor[cell] = averageColor(waterColors, cell * 3, wet);
+    } else {
+      land.write(grid, cell);
+    }
+    // A quarter of the cell in leaves is enough for a crown, so tree lines stay visible.
     const leaves = canopyCount[cell]!;
-    if (leaves * 2 > samples) {
-      const top = Math.round(canopyTop[cell]! / leaves);
+    if (leaves * 4 >= samples) {
+      const top = canopyTop[cell]!;
       grid.canopyTop[cell] = top;
       grid.canopyBottom[cell] = Math.min(Math.round(canopyBottom[cell]! / leaves), top - 1);
       grid.canopyColor[cell] = averageColor(canopyColors, cell * 3, leaves);
-    }
-    const wet = waterCount[cell]!;
-    if (wet * 2 > samples) {
-      grid.water[cell] = Math.round(waterHeight[cell]! / wet);
-      grid.waterColor[cell] = averageColor(waterColors, cell * 3, wet);
     }
   }
   return grid;

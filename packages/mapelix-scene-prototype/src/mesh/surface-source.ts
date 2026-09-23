@@ -23,6 +23,9 @@ export interface ChunkSurface {
   /** The y of the lowest leaf block above the ground. */
   readonly canopyBottom: Int16Array;
   readonly canopyColor: Uint32Array;
+  /** Top of the trunk under the leaves, or `EMPTY_HEIGHT` where no trunk holds them up. */
+  readonly trunk: Int16Array;
+  readonly trunkColor: Uint32Array;
   /** Water surface height, or `EMPTY_HEIGHT` for dry columns. */
   readonly water: Int16Array;
   readonly waterColor: Uint32Array;
@@ -66,6 +69,8 @@ export class SurfaceSource {
       canopy: new Int16Array(256).fill(EMPTY_HEIGHT),
       canopyBottom: new Int16Array(256),
       canopyColor: new Uint32Array(256),
+      trunk: new Int16Array(256).fill(EMPTY_HEIGHT),
+      trunkColor: new Uint32Array(256),
       water: new Int16Array(256).fill(EMPTY_HEIGHT),
       waterColor: new Uint32Array(256),
     };
@@ -112,6 +117,14 @@ export class SurfaceSource {
   ): boolean {
     const shape = this.palette.shape[id]!;
     if (shape === Shape.Empty || shape === Shape.Plant) return false;
+    // Trunks under leaves belong to the tree, so the ground is where they stand.
+    if (this.palette.trunk[id] === 1 && surface.canopy[column] !== EMPTY_HEIGHT) {
+      if (surface.trunk[column] === EMPTY_HEIGHT) {
+        surface.trunk[column] = y + 1;
+        surface.trunkColor[column] = this.faceColor(id, Face.PositiveX, biome);
+      }
+      return false;
+    }
     // Thin layers such as snow and carpets color the block they rest on.
     if (shape === Shape.Box && this.palette.boxSize[id]! < 8) {
       if (this.layerColor[column] === -1) {

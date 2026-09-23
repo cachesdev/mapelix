@@ -69,6 +69,8 @@ const APPEARANCE_STATES = [
   "dirt_type",
 ];
 
+const TRUNK_NAME = /^minecraft:(?:log2?|\w+_log|\w+_stem)$/;
+
 /**
  * Flat, id-indexed tables of block appearances. Id 0 is air. The mesher's inner
  * loops read only these typed arrays, never the appearance objects.
@@ -82,6 +84,8 @@ export class BlockPalette {
   sprite = new Uint8Array(256);
   /** 1 when the block's sides are soil under a strip of its top color. */
   covered = new Uint8Array(256);
+  /** 1 for logs and stems, which hold up tree crowns. */
+  trunk = new Uint8Array(256);
   /** Face colors, six per id in `Face` order. */
   colors = new Uint32Array(256 * 6);
   /** Face tint codes, six per id in `Face` order. */
@@ -101,6 +105,7 @@ export class BlockPalette {
     this.size += 1;
     this.ensureCapacity(this.size);
     this.write(id, resolveBlockAppearance(name, states ?? {}));
+    this.trunk[id] = TRUNK_NAME.test(name) ? 1 : 0;
     this.ids.set(key, id);
     return id;
   }
@@ -178,6 +183,7 @@ export class BlockPalette {
     this.boxTop = grow(this.boxTop, capacity);
     this.sprite = grow(this.sprite, capacity);
     this.covered = grow(this.covered, capacity);
+    this.trunk = grow(this.trunk, capacity);
     this.tints = grow(this.tints, capacity * 6);
     const colors = new Uint32Array(capacity * 6);
     colors.set(this.colors);
