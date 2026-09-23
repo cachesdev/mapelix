@@ -49,14 +49,24 @@ interface Wanted {
   readonly priority: number;
 }
 
+interface Fade {
+  readonly entering: boolean;
+  /** Time in milliseconds when the fade would have started from nothing. */
+  readonly start: number;
+}
+
 /** Terrain height range assumed for nodes that are not loaded yet. */
 const TYPICAL_LOW = 40;
 const TYPICAL_HIGH = 140;
 
+/** How long a region takes to dissolve in or out, in milliseconds. */
+const FADE_DURATION = 450;
+
 /**
  * Chooses and streams regions around the camera. Each area is drawn at one level:
  * a node refines into its children only when all four are ready, so the terrain
- * never has holes or overlapping levels while detail arrives.
+ * never has holes or overlapping levels while detail arrives. Regions dissolve in
+ * and out, so new detail replaces the old without a visible pop.
  */
 export class RegionStreamer {
   readonly root = new Group();
@@ -64,6 +74,7 @@ export class RegionStreamer {
   private readonly cache = new Map<string, CachedRegion>();
   private readonly requests = new Map<string, AbortController>();
   private readonly drawn = new Map<string, RegionMesh>();
+  private readonly fades = new Map<RegionMesh, Fade>();
   private waiting: Wanted[] = [];
   private frame = 0;
   private bytes = 0;
@@ -126,6 +137,28 @@ export class RegionStreamer {
     this.evict();
   }
 
+  /**
+   * Advances the dissolves. Returns true when a region finished fading out, so its
+   * shadow can be cleared from the shadow map.
+   */
+  animate(now: number): boolean {
+    let removed = false;
+    for (const [mesh, fade] of this.fades) {
+      const progress = Math.min((now - fade.start) / FADE_DURATION, 1);
+      if (progress < 1) {
+        mesh.setFade(fade.entering ? { low: 0, high: progress } : { low: progress, high: 1 });
+        continue;
+      }
+      mesh.setFade();
+      this.fades.delete(mesh);
+      if (!fade.entering) {
+        this.root.remove(mesh.group);
+        removed = true;
+      }
+    }
+    return removed;
+  }
+
   /** Height of the highest block at a world column, from the finest region drawn there. */
   heightAt(x: number, z: number): number | undefined {
     for (let level = 0; level <= MAX_REGION_LEVEL; level += 1) {
@@ -147,6 +180,7 @@ export class RegionStreamer {
     for (const cached of this.cache.values()) cached.mesh?.dispose();
     this.cache.clear();
     this.drawn.clear();
+    this.fades.clear();
     this.root.clear();
   }
 
@@ -203,14 +237,30 @@ export class RegionStreamer {
     const next = new Map(
       draw.map((mesh) => [regionKey(mesh.region.level, mesh.region.x, mesh.region.z), mesh]),
     );
+    const now = performance.now();
     for (const [key, mesh] of this.drawn) {
-      if (!next.has(key)) this.root.remove(mesh.group);
+      if (!next.has(key)) this.startFade(mesh, false, now);
     }
     for (const [key, mesh] of next) {
-      if (!this.drawn.has(key)) this.root.add(mesh.group);
+      if (this.drawn.has(key)) continue;
+      if (!this.fades.has(mesh)) this.root.add(mesh.group);
+      this.startFade(mesh, true, now);
     }
     this.drawn.clear();
     for (const [key, mesh] of next) this.drawn.set(key, mesh);
+  }
+
+  /** A region that turns around mid-fade keeps the share of the screen it already had. */
+  private startFade(mesh: RegionMesh, entering: boolean, now: number): void {
+    const current = this.fades.get(mesh);
+    const shown = current === undefined ? (entering ? 0 : 1) : this.shownShare(current, now);
+    const elapsed = entering ? shown : 1 - shown;
+    this.fades.set(mesh, { entering, start: now - elapsed * FADE_DURATION });
+  }
+
+  private shownShare(fade: Fade, now: number): number {
+    const progress = Math.min((now - fade.start) / FADE_DURATION, 1);
+    return fade.entering ? progress : 1 - progress;
   }
 
   /** Starts the nearest requests first and cancels those the camera no longer needs. */
@@ -260,7 +310,7 @@ export class RegionStreamer {
   private evict(): void {
     if (this.bytes <= this.options.memoryBudget) return;
     const stale = [...this.cache.entries()]
-      .filter(([key]) => !this.drawn.has(key))
+      .filter(([key, { mesh }]) => !this.drawn.has(key) && !(mesh && this.fades.has(mesh)))
       .sort(([, left], [, right]) => left.lastDrawn - right.lastDrawn);
     for (const [key, cached] of stale) {
       if (this.bytes <= this.options.memoryBudget * 0.85) break;

@@ -4,11 +4,15 @@ import {
   MeshBasicNodeMaterial,
   MeshLambertNodeMaterial,
   MeshStandardNodeMaterial,
+  Vector2,
+  type Material,
   type Node,
+  type NodeMaterial,
 } from "three/webgpu";
 import {
   Fn,
   abs,
+  bool,
   cameraFar,
   cameraNear,
   cameraPosition,
@@ -19,6 +23,7 @@ import {
   fract,
   fwidth,
   hash,
+  interleavedGradientNoise,
   max,
   min,
   mix,
@@ -28,12 +33,14 @@ import {
   positionView,
   positionWorld,
   reflect,
+  screenCoordinate,
   screenUV,
   select,
   sin,
   smoothstep,
   time,
   transformNormalToView,
+  uniform,
   vec2,
   vec3,
   viewportDepthTexture,
@@ -52,18 +59,48 @@ import {
   quadUV,
 } from "./quad";
 
+/**
+ * A material and its cross-fading twin. Regions draw with `fading` only while they
+ * appear or disappear, so steady terrain keeps a shader without discards.
+ */
+export interface MaterialPair {
+  readonly steady: Material;
+  readonly fading: Material;
+}
+
 export interface SceneMaterials {
-  readonly terrain: MeshStandardNodeMaterial;
-  readonly plants: MeshLambertNodeMaterial;
-  readonly translucent: MeshBasicNodeMaterial;
+  readonly terrain: MaterialPair;
+  readonly plants: MaterialPair;
+  readonly translucent: MaterialPair;
 }
 
 export function createSceneMaterials(atmosphere: Atmosphere): SceneMaterials {
   return {
-    terrain: createTerrainMaterial(atmosphere),
-    plants: createPlantMaterial(),
-    translucent: createTranslucentMaterial(atmosphere),
+    terrain: withFading(createTerrainMaterial(atmosphere)),
+    plants: withFading(createPlantMaterial(), plantMask()),
+    translucent: withFading(createTranslucentMaterial(atmosphere)),
   };
+}
+
+/**
+ * The range of screen noise each mesh draws, read from `mesh.userData.fade`. A region
+ * fading in draws [0, t) while the one it replaces draws [t, 1), so every pixel shows
+ * exactly one of them.
+ */
+const fadeRange = uniform(new Vector2(0, 1)).onObjectUpdate(
+  ({ object }) => object?.userData.fade as Vector2 | undefined,
+);
+
+/** Pairs `material` with a fading copy. `mask` is the material's own cutout, if any. */
+function withFading(material: NodeMaterial, mask?: Node<"bool">): MaterialPair {
+  const noise = interleavedGradientNoise(screenCoordinate);
+  const inRange = noise.greaterThanEqual(fadeRange.x).and(noise.lessThan(fadeRange.y));
+  material.maskNode = mask ?? null;
+  const fading = material.clone();
+  fading.maskNode = mask === undefined ? inRange : mask.and(inRange);
+  // Shadows ignore the fade, so the shadow map stays whole if it refreshes mid-fade.
+  fading.maskShadowNode = mask ?? bool(true);
+  return { steady: material, fading };
 }
 
 /** A stable random value per block, so flat colors read as individual blocks. */
@@ -176,7 +213,6 @@ function createPlantMaterial(): MeshLambertNodeMaterial {
   // Plants darken slightly toward the ground, where neighbors shade them.
   const shade = mix(float(0.78), float(1.12), quadUV.y);
   material.colorNode = base.mul(shade).mul(blockNoise().mul(0.2).add(0.9));
-  material.maskNode = plantMask();
   // A fixed view-space up normal, so the back sides of the planes are lit like the front.
   material.normalNode = transformNormalToView(vec3(0, 1, 0));
   return material;

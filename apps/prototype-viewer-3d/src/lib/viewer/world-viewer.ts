@@ -223,6 +223,7 @@ export class WorldViewer {
     const moved = this.rig.update(delta);
     if (moved) this.fitViewDistance();
     if (moved || this.regionsChanged || this.frames % 15 === 0) this.streamer.update(this.camera);
+    if (this.streamer.animate(performance.now())) this.regionsChanged = true;
     this.updateShadow();
     this.regionsChanged = false;
     this.pipeline.render();

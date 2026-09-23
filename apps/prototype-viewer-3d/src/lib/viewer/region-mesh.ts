@@ -7,16 +7,21 @@ import {
   InstancedBufferGeometry,
   Mesh,
   Sphere,
+  Vector2,
   Vector3,
-  type Material,
 } from "three/webgpu";
 
-import type { SceneMaterials } from "./shaders/materials";
+import type { MaterialPair, SceneMaterials } from "./shaders/materials";
 
 // Every quad instance reuses one unit square. The shader turns its corners into the face.
 const corners = new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]), 3);
 const normals = new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]), 3);
 const triangles = new BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1);
+
+interface Layer {
+  readonly mesh: Mesh;
+  readonly materials: MaterialPair;
+}
 
 /** One streamed region: up to three instanced meshes that share the scene materials. */
 export class RegionMesh {
@@ -24,6 +29,9 @@ export class RegionMesh {
   readonly group = new Group();
   /** GPU bytes held by the quad buffers, for the streaming memory budget. */
   readonly byteLength: number;
+  /** The screen noise range this region draws while fading. See `SceneMaterials`. */
+  private readonly fade = new Vector2(0, 1);
+  private readonly layers: Layer[] = [];
 
   constructor(region: DecodedSceneRegion, materials: SceneMaterials) {
     this.region = region;
@@ -49,19 +57,26 @@ export class RegionMesh {
   }
 
   get isEmpty(): boolean {
-    return this.group.children.length === 0;
+    return this.layers.length === 0;
+  }
+
+  /** Draws only the part of the screen noise from `low` to `high`, or everything when unset. */
+  setFade(range?: { readonly low: number; readonly high: number }): void {
+    this.fade.set(range?.low ?? 0, range?.high ?? 1);
+    for (const { mesh, materials } of this.layers) {
+      mesh.material = range === undefined ? materials.steady : materials.fading;
+    }
   }
 
   dispose(): void {
-    for (const child of this.group.children) {
-      if (child instanceof Mesh) child.geometry.dispose();
-    }
+    for (const { mesh } of this.layers) mesh.geometry.dispose();
+    this.layers.length = 0;
     this.group.clear();
   }
 
   private add(
     quads: Uint32Array,
-    material: Material,
+    materials: MaterialPair,
     bounds: Box3,
     options: { readonly castShadow: boolean; readonly renderOrder: number },
   ): void {
@@ -75,11 +90,13 @@ export class RegionMesh {
     geometry.boundingBox = bounds;
     geometry.boundingSphere = bounds.getBoundingSphere(new Sphere());
 
-    const mesh = new Mesh(geometry, material);
+    const mesh = new Mesh(geometry, materials.steady);
     mesh.castShadow = options.castShadow;
     mesh.receiveShadow = true;
     mesh.renderOrder = options.renderOrder;
     mesh.matrixAutoUpdate = false;
+    mesh.userData.fade = this.fade;
     this.group.add(mesh);
+    this.layers.push({ mesh, materials });
   }
 }
