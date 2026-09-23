@@ -21,11 +21,6 @@
         "MAPELIX_WORLD_DIRECTORY",
         "PORT"
       ]
-    },
-    "test:e2e": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "outputs": []
     }
   }
 }

@@ -13,7 +13,6 @@
     "format:check": "prettier --check .",
     "lint": "svelte-check --tsconfig ./tsconfig.json",
     "quality": "pnpm run check && pnpm run format:check",
-    "test:e2e": "playwright test",
     "transit": "node -e \"\""
   },
   "engines": {
@@ -24,7 +23,6 @@
     "three": "0.186.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
     "@sveltejs/adapter-node": "5.5.4",
     "@sveltejs/kit": "2.63.0",
     "@sveltejs/vite-plugin-svelte": "7.1.2",
