@@ -138,6 +138,8 @@ Append entries. Do not rewrite earlier results.
 | --- | --- | --- | --- | --- |
 | 2026-08-17 | Baseline | Freeze `ee4275e` as the production rewrite reference. | 145 unit tests and 10 lossless visual scenes; 97.12% aggregate similarity. | Accepted |
 | 2026-08-17 | Repository | Archive the completed implementation and its dependants inside the Mapelix monorepo; reserve `@mapelix/core` for production work. | Prototype behavior and evidence remain runnable as `@mapelix/prototype`. | Accepted |
+| 2026-09-23 | LevelDB | In the 3D scene prototype, open tables by their footer and index block and inflate only the data blocks a lookup needs. | The 556-table, 1.1 GB Amelix database opened in 0.5 s with a warm file cache and 167 MiB RSS, and one chunk lookup took 1.9 ms. The archived full index scan took 45.64 s. A fixture test matches a full scan for every chunk. | Prototype evidence |
+| 2026-09-23 | Biomes | In the 3D scene prototype, read Data3D storage `i` as subchunk `i - 4` and treat header `0xff` as a copy of the storage below. | On 683 sampled Amelix chunks, 4,416 of 365,312 voxel lookups that the archived decoder left empty now return a biome. Six lookups in one chunk with a missing subchunk return a different biome. | Open: confirm the layout before changing the archived decoder |
 
 ## Open production questions
 

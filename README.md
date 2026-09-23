@@ -121,6 +121,22 @@ The viewer renders visible tiles on demand and keeps a persistent PNG cache. A w
 serve explored regions without reopening the world database. Set `MAPELIX_CACHE_DIRECTORY` to
 choose another cache location. Set a higher render worker amount if you have the CPU power.
 
+## 3D viewer
+
+The second prototype draws the world in 3D in the browser, with three.js and WebGPU. Terrain near
+the camera is drawn block by block, and simpler terrain streams in out to the horizon.
+
+![A village at golden hour in the 3D viewer](apps/prototype-viewer-3d/docs/village.jpg)
+
+```sh
+MAPELIX_WORLD_DIRECTORY=/path/to/world \
+pnpm --filter @mapelix/prototype-viewer-3d dev
+```
+
+See [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md) for its settings and controls,
+and [`packages/mapelix-scene-prototype`](packages/mapelix-scene-prototype/README.md) for the
+region builder.
+
 ## More information
 
 - [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md) records successful and failed speed, memory, and accuracy
