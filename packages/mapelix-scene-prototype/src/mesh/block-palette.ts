@@ -4,6 +4,8 @@ import {
   resolveBlockAppearance,
   type BiomeTint,
   type BlockAppearance,
+  type BlockShape,
+  type SurfaceMaterial,
 } from "../blocks/block-appearance.js";
 import { Face, PlantSprite, QuadMaterial } from "../format.js";
 
@@ -16,6 +18,21 @@ export const Shape = {
   Glass: 4,
   Plant: 5,
 } as const;
+
+/** What a block becomes in the voxel levels, which draw every block as a cube. */
+export const VoxelKind = {
+  Air: 0,
+  Solid: 1,
+  Foliage: 2,
+  Emissive: 3,
+  Water: 4,
+  Glass: 5,
+  /** A thin layer, such as snow or a carpet, that colors the top of the block below. */
+  Layer: 6,
+} as const;
+
+/** Boxes that fill at least this share of their block become whole voxels. */
+const MIN_VOXEL_VOLUME = 1 / 16;
 
 /** Tint codes stored per face, matching the columns of `BiomeTints`. */
 export const TintCode = {
@@ -69,8 +86,6 @@ const APPEARANCE_STATES = [
   "dirt_type",
 ];
 
-const TRUNK_NAME = /^minecraft:(?:log2?|\w+_log|\w+_stem)$/;
-
 /**
  * Flat, id-indexed tables of block appearances. Id 0 is air. The mesher's inner
  * loops read only these typed arrays, never the appearance objects.
@@ -84,8 +99,8 @@ export class BlockPalette {
   sprite = new Uint8Array(256);
   /** 1 when the block's sides are soil under a strip of its top color. */
   covered = new Uint8Array(256);
-  /** 1 for logs and stems, which hold up tree crowns. */
-  trunk = new Uint8Array(256);
+  /** `VoxelKind` of each block in the coarse voxel levels. */
+  voxel = new Uint8Array(256);
   /** Face colors, six per id in `Face` order. */
   colors = new Uint32Array(256 * 6);
   /** Face tint codes, six per id in `Face` order. */
@@ -105,7 +120,6 @@ export class BlockPalette {
     this.size += 1;
     this.ensureCapacity(this.size);
     this.write(id, resolveBlockAppearance(name, states ?? {}));
-    this.trunk[id] = TRUNK_NAME.test(name) ? 1 : 0;
     this.ids.set(key, id);
     return id;
   }
@@ -152,6 +166,7 @@ export class BlockPalette {
       }
     }
 
+    this.voxel[id] = voxelKindOf(shape);
     this.covered[id] = appearance.coveredSides ? 1 : 0;
     const tint = TINT_CODES[appearance.tint];
     for (let face = 0; face < 6; face += 1) {
@@ -183,12 +198,40 @@ export class BlockPalette {
     this.boxTop = grow(this.boxTop, capacity);
     this.sprite = grow(this.sprite, capacity);
     this.covered = grow(this.covered, capacity);
-    this.trunk = grow(this.trunk, capacity);
+    this.voxel = grow(this.voxel, capacity);
     this.tints = grow(this.tints, capacity * 6);
     const colors = new Uint32Array(capacity * 6);
     colors.set(this.colors);
     this.colors = colors;
   }
+}
+
+function voxelKindOf(shape: BlockShape): number {
+  switch (shape.kind) {
+    case "cube":
+      return solidKind(shape.material);
+    case "box": {
+      const { size, inset } = shape.box;
+      if (inset === 0 && size < 8) return VoxelKind.Layer;
+      // Torches and lanterns stay lit, so villages still glow far away at night.
+      if (shape.material === QuadMaterial.Emissive) return VoxelKind.Emissive;
+      const width = 16 - 2 * inset;
+      return (size * width * width) / 16 ** 3 >= MIN_VOXEL_VOLUME
+        ? solidKind(shape.material)
+        : VoxelKind.Air;
+    }
+    case "water":
+      return VoxelKind.Water;
+    case "glass":
+      return VoxelKind.Glass;
+    default:
+      return VoxelKind.Air;
+  }
+}
+
+function solidKind(material: SurfaceMaterial): number {
+  if (material === QuadMaterial.Foliage) return VoxelKind.Foliage;
+  return material === QuadMaterial.Emissive ? VoxelKind.Emissive : VoxelKind.Solid;
 }
 
 function faceAxis(face: number): "x" | "y" | "z" {

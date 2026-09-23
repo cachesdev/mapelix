@@ -2,28 +2,29 @@
  * The binary scene region format shared by the Node mesher and the browser viewer.
  *
  * A region is a square of cells. Level 0 regions are full voxel meshes with one cell
- * per block. Higher levels are column heightfields whose cells cover more blocks.
+ * per block. Higher levels are voxel meshes of cubic cells from 1 to 16 blocks wide,
+ * and quad positions count in cells along every axis, height included.
  * Every visible surface is a packed quad of three `uint32` words, so a GPU can draw a
  * region as one instanced quad and rebuild each corner in the vertex shader.
  *
- * Word 0: cell x (7) | cell z (7) << 7 | block y + 64 (9) << 14 | face (3) << 23 |
+ * Word 0: cell x (7) | cell z (7) << 7 | cell y + 64 (9) << 14 | face (3) << 23 |
  *         material (4) << 26 | covered soil (1) << 30
  * Word 1: width - 1 (7) | height - 1 (9) << 7 | box size - 1 (4) << 16 |
  *         box inset (3) << 20 | box anchored to top (1) << 23 | sprite (3) << 24
  * Word 2: sRGB color (24) | corner occlusion (4 × 2) << 24
  *
  * Width and height run along the face's two tangent axes. Boxes are measured in
- * sixteenths of a block, so slabs, carpets, snow, and fence posts share one quad type.
+ * sixteenths of a cell, so slabs, carpets, snow, and fence posts share one quad type.
  * A covered-soil side, such as a grass block's, is `SOIL_COLOR` with a thin strip of
  * the quad's color along its top edge.
  */
 
 export const REGION_MAGIC = 0x3153_584d; // "MXS1" in little-endian byte order.
-export const REGION_FORMAT_VERSION = 1;
+export const REGION_FORMAT_VERSION = 2;
 export const REGION_HEADER_BYTES = 40;
 /** Height map value for a cell without any stored blocks. */
 export const EMPTY_HEIGHT = -32768;
-/** Lowest overworld block. Quads store `y - WORLD_MIN_Y` in nine bits. */
+/** Lowest overworld block. Quads store their cell y minus `WORLD_MIN_Y` in nine bits. */
 export const WORLD_MIN_Y = -64;
 export const WORLD_MAX_Y = 320;
 /** Packed sRGB soil color under the cover strip of covered-soil sides. */
@@ -188,6 +189,7 @@ export interface SceneRegion {
   readonly z: number;
   /** Top of the highest visible block in each cell, row-major by z then x. */
   readonly heights: Int16Array;
+  /** Lowest and highest block y that any quad reaches. */
   readonly minY: number;
   readonly maxY: number;
   readonly opaque: Uint32Array;

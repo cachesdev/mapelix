@@ -37,14 +37,17 @@ export class RegionMesh {
     this.region = region;
     this.byteLength =
       region.opaque.byteLength + region.plants.byteLength + region.translucent.byteLength;
+    // Quads count in cells, and cells are cubes, so one scale places every axis.
     this.group.position.set(region.originX, 0, region.originZ);
-    this.group.scale.set(region.cellSize, 1, region.cellSize);
+    this.group.scale.setScalar(region.cellSize);
     this.group.matrixAutoUpdate = false;
     this.group.updateMatrix();
 
+    const low = region.minY / region.cellSize;
+    const high = Math.max(region.maxY, region.minY + 1) / region.cellSize;
     const bounds = new Box3(
-      new Vector3(0, region.minY, 0),
-      new Vector3(region.gridSize, Math.max(region.maxY, region.minY + 1), region.gridSize),
+      new Vector3(0, low, 0),
+      new Vector3(region.gridSize, high, region.gridSize),
     );
     const detailed = region.level <= 1;
     this.add(region.opaque, materials.terrain, bounds, { castShadow: detailed, renderOrder: 0 });

@@ -1,10 +1,11 @@
 import { EMPTY_HEIGHT, encodeSceneRegion, regionGridSize, type SceneRegion } from "../format.js";
 import { WorldDatabase } from "../leveldb/world-database.js";
 import { BlockPalette } from "../mesh/block-palette.js";
-import { meshColumnRegion } from "../mesh/column-mesher.js";
+import { ChunkVoxelReader } from "../mesh/chunk-voxels.js";
 import { buildRegionVolume } from "../mesh/region-volume.js";
-import { SurfaceSource } from "../mesh/surface-source.js";
+import { meshVoxelRegion } from "../mesh/voxel-level-mesher.js";
 import { meshRegionVolume } from "../mesh/voxel-mesher.js";
+import { buildVoxelRegion } from "../mesh/voxel-region.js";
 import { ChunkSource, type Dimension } from "../world/chunk-source.js";
 
 export interface RegionRequest {
@@ -25,13 +26,13 @@ export interface RegionBuilderOptions {
 export class RegionBuilder {
   private readonly database: WorldDatabase;
   private readonly chunks: ChunkSource;
-  private readonly surfaces: SurfaceSource;
+  private readonly voxels: ChunkVoxelReader;
   private readonly palette = new BlockPalette();
 
   constructor(options: RegionBuilderOptions) {
     this.database = WorldDatabase.open(options.directory);
     this.chunks = new ChunkSource(this.database, options.dimension);
-    this.surfaces = new SurfaceSource(this.chunks, this.palette);
+    this.voxels = new ChunkVoxelReader(this.chunks, this.palette);
   }
 
   build(request: RegionRequest): Uint8Array {
@@ -49,7 +50,8 @@ export class RegionBuilder {
         ? emptyRegion(level, x, z)
         : meshRegionVolume(volume, this.palette, x, z);
     }
-    return meshColumnRegion(this.surfaces, level, x, z) ?? emptyRegion(level, x, z);
+    const voxels = buildVoxelRegion(this.voxels, level, x, z);
+    return voxels === undefined ? emptyRegion(level, x, z) : meshVoxelRegion(voxels);
   }
 }
 

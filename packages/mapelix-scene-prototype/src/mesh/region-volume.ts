@@ -99,6 +99,22 @@ function writeSection(
   offsetZ: number,
 ): void {
   if (section.y < WORLD_MIN_Y / 16 || section.y >= WORLD_MAX_Y / 16) return;
+  const blocks = sectionCells(section, palette);
+  const baseY = section.y * 16;
+  for (let index = 0; index < 4096; index += 1) {
+    const cell = blocks[index]!;
+    if (cell === 0) continue;
+    const x = offsetX + (index >> 8);
+    const z = offsetZ + ((index >> 4) & 15);
+    cells[cellIndex(x, baseY + (index & 15), z)] = cell;
+  }
+}
+
+/**
+ * The palette ids of a subchunk's blocks in Bedrock's order, `x * 256 + z * 16 + y`,
+ * with `WATERLOGGED` set on blocks that hold water.
+ */
+export function sectionCells(section: DecodedSubchunk, palette: BlockPalette): Uint16Array {
   const storage = section.primary;
   const ids = Uint16Array.from(storage.palette, (name, index) =>
     palette.idFor(name, storage.states?.[index]),
@@ -106,17 +122,13 @@ function writeSection(
   // Bedrock keeps the water of waterlogged blocks in a second storage layer.
   const waterLayer = section.storages[1];
   const waterIds = waterLayer?.palette.map((name) => /(?:^|:)(?:flowing_)?water$/.test(name));
-
-  const baseY = section.y * 16;
+  const cells = new Uint16Array(4096);
   for (let index = 0; index < 4096; index += 1) {
     const logged =
       waterLayer !== undefined && waterIds?.[waterLayer.indexes[index]!] === true ? WATERLOGGED : 0;
-    const id = ids[storage.indexes[index]!]!;
-    if (id === 0 && logged === 0) continue;
-    const x = offsetX + (index >> 8);
-    const z = offsetZ + ((index >> 4) & 15);
-    cells[cellIndex(x, baseY + (index & 15), z)] = id | logged;
+    cells[index] = ids[storage.indexes[index]!]! | logged;
   }
+  return cells;
 }
 
 function scanColumn(

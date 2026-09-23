@@ -27,6 +27,7 @@ import {
   max,
   min,
   mix,
+  modelScale,
   normalWorld,
   normalize,
   perspectiveDepthToViewZ,
@@ -105,19 +106,25 @@ function withFading(material: NodeMaterial, mask?: Node<"bool">): MaterialPair {
   return { steady: material, fading };
 }
 
-/** A stable random value per block, so flat colors read as individual blocks. */
+/**
+ * World position in cells. Cells are blocks up close and wider cubes farther out, so
+ * noise, bevels, and grass strips follow each voxel the way they follow a block.
+ */
+const positionCell = positionWorld.div(modelScale.x);
+
+/** A stable random value per cell, so flat colors read as individual blocks. */
 const blockNoise = Fn(() => {
-  const block = positionWorld.sub(normalWorld.mul(0.01)).floor();
+  const block = positionCell.sub(normalWorld.mul(0.01)).floor();
   return hash(block.x.mul(12.9898).add(block.y.mul(78.233)).add(block.z.mul(37.719)));
 });
 
-/** Soft darkening along block edges while blocks are large on screen. */
+/** Soft darkening along cell edges while cells are large on screen. */
 const blockBevel = Fn(() => {
   const n = abs(normalWorld);
   const planar = select(
     n.y.greaterThan(0.5),
-    positionWorld.xz,
-    select(n.x.greaterThan(0.5), positionWorld.zy, positionWorld.xy),
+    positionCell.xz,
+    select(n.x.greaterThan(0.5), positionCell.zy, positionCell.xy),
   );
   const inside = fract(planar);
   const edge = min(min(inside.x, inside.y), min(float(1).sub(inside.x), float(1).sub(inside.y)));
@@ -136,8 +143,8 @@ const soil = color(SOIL_COLOR);
  */
 const coveredSoil = Fn(() => {
   const n = abs(normalWorld);
-  const along = select(n.x.greaterThan(0.5), positionWorld.z, positionWorld.x);
-  const pixel = along.mul(16).floor().add(positionWorld.y.floor().mul(131));
+  const along = select(n.x.greaterThan(0.5), positionCell.z, positionCell.x);
+  const pixel = along.mul(16).floor().add(positionCell.y.floor().mul(131));
   const strip = float(2).add(hash(pixel).mul(3).floor()).div(16);
   const fromTop = float(1).sub(quadUV.y).mul(quadHeight);
   const inSoil = quadCovered.greaterThan(0.5).and(fromTop.greaterThan(strip));

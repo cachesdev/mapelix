@@ -40,14 +40,14 @@ The address bar keeps the current view, so a link opens the same place. It accep
 
 ## How it draws the world
 
-Terrain near the camera is drawn block by block. Farther away, the viewer draws columns that
-start one block wide and grow to 16 blocks wide at the horizon, with tree crowns as slabs over
-the ground. It asks for the most useful regions first and keeps a coarse region on screen until
+Terrain near the camera is drawn block by block. Farther away, the viewer draws cubic voxels
+that start one block wide and grow to 16 blocks wide at the horizon, so builds, bridges, and
+tree crowns keep their shape far away. It asks for the most useful regions first and keeps a coarse region on screen until
 all of its finer replacements arrive. Regions dissolve in and out as they change.
 
 Lighting follows the time of day. The sun casts shadows near the camera, water refracts and
 reflects the sky, and glowing blocks bloom at night. Haze thickens with distance and hides the
 edge of the loaded area.
 
-In Chrome with an RTX 2070 at 1440×900, the viewer draws 350 to 390 frames per second
+In Chrome with an RTX 2070 at 1440×900, the viewer draws 320 to 360 frames per second
 with the frame limit off.
