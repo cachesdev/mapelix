@@ -8,16 +8,21 @@ const MAX_WATER_DEPTH = 32;
 const OCEAN_FLOOR = 0x3c4436;
 
 /**
- * The visible top of every column in one chunk, indexed `localZ * 16 + localX`.
+ * The visible layers of every column in one chunk, indexed `localZ * 16 + localX`.
  * Heights are the y of the top face, so a grass block at y = 70 has height 71.
  */
 export interface ChunkSurface {
+  /** The terrain, below any leaves. */
   readonly ground: Int16Array;
   readonly top: Uint32Array;
   readonly side: Uint32Array;
-  readonly foliage: Uint8Array;
-  /** 1 where the top block's sides are soil under a strip of its top color. */
+  /** 1 where the ground block's sides are soil under a strip of its top color. */
   readonly covered: Uint8Array;
+  /** Top of the highest leaves above the ground, or `EMPTY_HEIGHT` under open sky. */
+  readonly canopy: Int16Array;
+  /** The y of the lowest leaf block above the ground. */
+  readonly canopyBottom: Int16Array;
+  readonly canopyColor: Uint32Array;
   /** Water surface height, or `EMPTY_HEIGHT` for dry columns. */
   readonly water: Int16Array;
   readonly waterColor: Uint32Array;
@@ -29,6 +34,8 @@ export class SurfaceSource {
   private readonly palette: BlockPalette;
   private readonly cache = new Map<string, ChunkSurface | undefined>();
   private readonly maxCachedChunks: number;
+  /** Color of a snow layer or carpet waiting for the block it rests on, or -1. */
+  private readonly layerColor = new Int32Array(256);
 
   constructor(chunks: ChunkSource, palette: BlockPalette, maxCachedChunks = 8192) {
     this.chunks = chunks;
@@ -55,11 +62,14 @@ export class SurfaceSource {
       ground: new Int16Array(256).fill(EMPTY_HEIGHT),
       top: new Uint32Array(256),
       side: new Uint32Array(256),
-      foliage: new Uint8Array(256),
       covered: new Uint8Array(256),
+      canopy: new Int16Array(256).fill(EMPTY_HEIGHT),
+      canopyBottom: new Int16Array(256),
+      canopyColor: new Uint32Array(256),
       water: new Int16Array(256).fill(EMPTY_HEIGHT),
       waterColor: new Uint32Array(256),
     };
+    this.layerColor.fill(-1);
 
     let unresolved = 256;
     for (const section of records.sections) {
@@ -89,7 +99,10 @@ export class SurfaceSource {
     return surface;
   }
 
-  /** Records one block of a column scan. Returns true once the column's ground is known. */
+  /**
+   * Records one block of a column scan, from the top down. Leaves and water are
+   * noted on the way, and the scan ends at the ground. Returns true once it is known.
+   */
   private resolve(
     surface: ChunkSurface,
     column: number,
@@ -99,6 +112,27 @@ export class SurfaceSource {
   ): boolean {
     const shape = this.palette.shape[id]!;
     if (shape === Shape.Empty || shape === Shape.Plant) return false;
+    // Thin layers such as snow and carpets color the block they rest on.
+    if (shape === Shape.Box && this.palette.boxSize[id]! < 8) {
+      if (this.layerColor[column] === -1) {
+        this.layerColor[column] = this.faceColor(id, Face.PositiveY, biome);
+      }
+      return false;
+    }
+    const layer = this.layerColor[column]!;
+    this.layerColor[column] = -1;
+
+    if (this.palette.material[id] === QuadMaterial.Foliage) {
+      // Leaves under water are part of the water bed.
+      if (surface.water[column] !== EMPTY_HEIGHT) return false;
+      if (surface.canopy[column] === EMPTY_HEIGHT) {
+        surface.canopy[column] = y + 1;
+        surface.canopyColor[column] =
+          layer === -1 ? this.faceColor(id, Face.PositiveY, biome) : layer;
+      }
+      surface.canopyBottom[column] = y;
+      return false;
+    }
     if (shape === Shape.Water) {
       if (surface.water[column] === EMPTY_HEIGHT) {
         surface.water[column] = y + 1;
@@ -112,12 +146,9 @@ export class SurfaceSource {
       return false;
     }
 
-    // Thin layers such as snow and carpets color the block they rest on.
-    const thin = shape === Shape.Box && this.palette.boxSize[id]! < 8;
-    surface.ground[column] = thin ? y : y + 1;
-    surface.top[column] = this.faceColor(id, Face.PositiveY, biome);
+    surface.ground[column] = y + 1;
+    surface.top[column] = layer === -1 ? this.faceColor(id, Face.PositiveY, biome) : layer;
     surface.side[column] = this.faceColor(id, Face.PositiveX, biome);
-    surface.foliage[column] = this.palette.material[id] === QuadMaterial.Foliage ? 1 : 0;
     surface.covered[column] = this.palette.covered[id]!;
     return true;
   }

@@ -19,6 +19,7 @@ import {
 import type { SurfaceSource } from "./surface-source.js";
 
 const WATER_SURFACE = { size: 14, inset: 0, anchoredTop: false } as const;
+const SIDES = [Face.PositiveX, Face.NegativeX, Face.PositiveZ, Face.NegativeZ] as const;
 const FACE_STEPS: Readonly<Record<number, readonly [number, number]>> = {
   [Face.PositiveX]: [1, 0],
   [Face.NegativeX]: [-1, 0],
@@ -29,8 +30,8 @@ const SOIL = SOIL_COLOR;
 const DEEP_ROCK = rgb(118, 116, 112);
 /** Soil walls show dirt near the top and rock below, like a cut through a hill. */
 const SOIL_DEPTH = 3;
-/** Walls facing unexplored land reach this far below the lowest cell. */
-const EDGE_DEPTH = 6;
+/** Walls facing unexplored land reach this far below the cell, like the cut edge of a diorama. */
+const EDGE_DEPTH = 16;
 
 /**
  * Averaged surfaces of a region's cells plus a one-cell ring of its neighbors at the
@@ -42,9 +43,12 @@ interface CellGrid {
   readonly ground: Int16Array;
   readonly top: Uint32Array;
   readonly side: Uint32Array;
-  readonly foliage: Uint8Array;
   /** 1 where most columns have soil sides under a strip of their top color. */
   readonly covered: Uint8Array;
+  /** Tree crowns where most columns have leaves: a slab from its bottom to its top. */
+  readonly canopyTop: Int16Array;
+  readonly canopyBottom: Int16Array;
+  readonly canopyColor: Uint32Array;
   readonly water: Int16Array;
   readonly waterColor: Uint32Array;
 }
@@ -54,8 +58,9 @@ function at(grid: { readonly size: number }, x: number, z: number): number {
 }
 
 /**
- * Meshes a coarse region as blocky columns: merged tops, walls where a neighbor
- * is lower, skirts along the border, and a separate water surface.
+ * Meshes a coarse region as blocky columns: merged ground tops, walls where a
+ * neighbor is lower, skirts along the border, tree crowns as floating slabs, and
+ * a separate water surface.
  */
 export function meshColumnRegion(
   surfaces: SurfaceSource,
@@ -81,8 +86,11 @@ function gatherCells(
   const count = new Uint16Array(cells);
   const ground = new Float64Array(cells);
   const colors = new Float64Array(cells * 6);
-  const foliage = new Uint16Array(cells);
   const covered = new Uint16Array(cells);
+  const canopyCount = new Uint16Array(cells);
+  const canopyTop = new Float64Array(cells);
+  const canopyBottom = new Float64Array(cells);
+  const canopyColors = new Float64Array(cells * 3);
   const waterCount = new Uint16Array(cells);
   const waterHeight = new Float64Array(cells);
   const waterColors = new Float64Array(cells * 3);
@@ -113,8 +121,13 @@ function gatherCells(
         ground[cell] = ground[cell]! + height;
         addColor(colors, cell * 6, surface.top[column]!);
         addColor(colors, cell * 6 + 3, surface.side[column]!);
-        foliage[cell] = foliage[cell]! + surface.foliage[column]!;
         covered[cell] = covered[cell]! + surface.covered[column]!;
+        if (surface.canopy[column] !== EMPTY_HEIGHT) {
+          canopyCount[cell] = canopyCount[cell]! + 1;
+          canopyTop[cell] = canopyTop[cell]! + surface.canopy[column]!;
+          canopyBottom[cell] = canopyBottom[cell]! + surface.canopyBottom[column]!;
+          addColor(canopyColors, cell * 3, surface.canopyColor[column]!);
+        }
         if (surface.water[column] !== EMPTY_HEIGHT) {
           waterCount[cell] = waterCount[cell]! + 1;
           waterHeight[cell] = waterHeight[cell]! + surface.water[column]!;
@@ -130,8 +143,10 @@ function gatherCells(
     ground: new Int16Array(cells).fill(EMPTY_HEIGHT),
     top: new Uint32Array(cells),
     side: new Uint32Array(cells),
-    foliage: new Uint8Array(cells),
     covered: new Uint8Array(cells),
+    canopyTop: new Int16Array(cells).fill(EMPTY_HEIGHT),
+    canopyBottom: new Int16Array(cells),
+    canopyColor: new Uint32Array(cells),
     water: new Int16Array(cells).fill(EMPTY_HEIGHT),
     waterColor: new Uint32Array(cells),
   };
@@ -141,8 +156,15 @@ function gatherCells(
     grid.ground[cell] = Math.round(ground[cell]! / samples);
     grid.top[cell] = averageColor(colors, cell * 6, samples);
     grid.side[cell] = averageColor(colors, cell * 6 + 3, samples);
-    grid.foliage[cell] = foliage[cell]! * 2 > samples ? 1 : 0;
     grid.covered[cell] = covered[cell]! * 2 > samples ? 1 : 0;
+    // Scattered trees are too small to show at this size; a forest keeps its crowns.
+    const leaves = canopyCount[cell]!;
+    if (leaves * 2 > samples) {
+      const top = Math.round(canopyTop[cell]! / leaves);
+      grid.canopyTop[cell] = top;
+      grid.canopyBottom[cell] = Math.min(Math.round(canopyBottom[cell]! / leaves), top - 1);
+      grid.canopyColor[cell] = averageColor(canopyColors, cell * 3, leaves);
+    }
     const wet = waterCount[cell]!;
     if (wet * 2 > samples) {
       grid.water[cell] = Math.round(waterHeight[cell]! / wet);
@@ -158,15 +180,20 @@ interface Wall {
   readonly bottom: number;
   readonly top: number;
   readonly color: number;
+  /** Leaf walls are one face. Ground walls show soil and rock below their top. */
+  readonly leaves: boolean;
   readonly covered: boolean;
 }
+
+type WallFace = Omit<Wall, "start">;
+
+/** The wall a cell shows toward its neighbor at (`nx`, `nz`), if any. */
+type WallAt = (x: number, z: number, nx: number, nz: number) => WallFace | undefined;
 
 class ColumnMesher {
   private readonly cells: CellGrid;
   private readonly opaque = new QuadList();
   private readonly translucent = new QuadList();
-  /** Bottom of walls that face unexplored land. */
-  private readonly edgeBottom: number;
   /** How far border walls reach below the neighbor, covering seams between detail levels. */
   private readonly overlap: number;
   private minY = Number.POSITIVE_INFINITY;
@@ -174,26 +201,27 @@ class ColumnMesher {
 
   constructor(cells: CellGrid, cellSize: number) {
     this.cells = cells;
-    let lowest = Number.POSITIVE_INFINITY;
-    for (const height of cells.ground) {
-      if (height !== EMPTY_HEIGHT) lowest = Math.min(lowest, height);
-    }
-    this.edgeBottom = Math.max(WORLD_MIN_Y, lowest - EDGE_DEPTH);
     this.overlap = 2 + cellSize / 2;
   }
 
   mesh(level: number, regionX: number, regionZ: number): SceneRegion {
-    this.meshTops();
-    for (const face of [Face.PositiveX, Face.NegativeX, Face.PositiveZ, Face.NegativeZ]) {
-      this.meshWalls(face);
+    const { ground, canopyTop } = this.cells;
+    this.meshTops(ground, (cell) => this.cells.top[cell]!, QuadMaterial.Solid);
+    this.meshTops(canopyTop, (cell) => this.cells.canopyColor[cell]!, QuadMaterial.Foliage);
+    this.meshCanopyUndersides();
+    for (const face of SIDES) {
+      this.meshWalls(face, (x, z, nx, nz) => this.groundWall(x, z, nx, nz));
+      this.meshWalls(face, (x, z, nx, nz) => this.canopyWall(x, z, nx, nz, "upper"));
+      this.meshWalls(face, (x, z, nx, nz) => this.canopyWall(x, z, nx, nz, "lower"));
     }
     this.meshWater();
-    const { size, ground, water } = this.cells;
+
+    const { size, water } = this.cells;
     const heights = new Int16Array(size * size);
     for (let z = 0; z < size; z += 1) {
       for (let x = 0; x < size; x += 1) {
         const cell = at(this.cells, x, z);
-        heights[z * size + x] = Math.max(ground[cell]!, water[cell]!);
+        heights[z * size + x] = Math.max(ground[cell]!, canopyTop[cell]!, water[cell]!);
       }
     }
     return {
@@ -209,40 +237,63 @@ class ColumnMesher {
     };
   }
 
-  /** Greedy-merges column tops with equal height, color, material, and occlusion. */
-  private meshTops(): void {
-    const { size, ground, top, foliage } = this.cells;
+  /** Greedy-merges the tops of one height layer with equal height, color, and occlusion. */
+  private meshTops(
+    heights: Int16Array,
+    colorAt: (cell: number) => number,
+    material: QuadMaterial,
+  ): void {
+    const { size } = this.cells;
     const keys = new Float64Array(size * size).fill(-1);
     for (let z = 0; z < size; z += 1) {
       for (let x = 0; x < size; x += 1) {
         const cell = at(this.cells, x, z);
-        if (ground[cell] === EMPTY_HEIGHT) continue;
-        const word2 = packQuadWord2(top[cell]!, this.topOcclusion(x, z));
-        // Height, packed color, and material fit exactly in a double: 9 + 32 + 1 bits.
-        keys[z * size + x] = (ground[cell]! - WORLD_MIN_Y) * 2 ** 33 + word2 * 2 + foliage[cell]!;
+        if (heights[cell] === EMPTY_HEIGHT) continue;
+        const word2 = packQuadWord2(colorAt(cell), this.topOcclusion(heights, x, z));
+        // Height and packed color fit exactly in a double: 9 + 32 bits.
+        keys[z * size + x] = (heights[cell]! - WORLD_MIN_Y) * 2 ** 32 + word2;
       }
     }
     mergeGrid(keys, size, (x, z, width, depth, key) => {
-      const cell = at(this.cells, x, z);
-      const material = foliage[cell] === 1 ? QuadMaterial.Foliage : QuadMaterial.Solid;
-      const height = ground[cell]!;
+      const height = heights[at(this.cells, x, z)]!;
       this.push(
         this.opaque,
         packQuadWord0(x, height - 1, z, Face.PositiveY, material),
         packQuadWord1(width, depth, FULL_BOX, 0),
-        Math.floor(key / 2) % 2 ** 32,
+        key % 2 ** 32,
         height - 1,
         height,
       );
     });
   }
 
-  /**
-   * Walls face lower neighbors. Along the border they also reach `overlap` blocks below
-   * the neighbor, so a coarser or finer region beside this one never leaves a gap.
-   */
-  private meshWalls(face: Face): void {
-    const { size, ground, side, top, covered } = this.cells;
+  private meshCanopyUndersides(): void {
+    const { size, canopyTop, canopyBottom, canopyColor } = this.cells;
+    const keys = new Float64Array(size * size).fill(-1);
+    for (let z = 0; z < size; z += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const cell = at(this.cells, x, z);
+        if (canopyTop[cell] === EMPTY_HEIGHT) continue;
+        keys[z * size + x] = (canopyBottom[cell]! - WORLD_MIN_Y) * 2 ** 24 + canopyColor[cell]!;
+      }
+    }
+    mergeGrid(keys, size, (x, z, width, depth) => {
+      const cell = at(this.cells, x, z);
+      const bottom = canopyBottom[cell]!;
+      this.push(
+        this.opaque,
+        packQuadWord0(x, bottom, z, Face.NegativeY, QuadMaterial.Foliage),
+        packQuadWord1(width, depth, FULL_BOX, 0),
+        packQuadWord2(canopyColor[cell]!, FULLY_LIT),
+        bottom,
+        bottom + 1,
+      );
+    });
+  }
+
+  /** Merges equal walls along each row of cells that face `face`. */
+  private meshWalls(face: Face, wallAt: WallAt): void {
+    const { size } = this.cells;
     const [dx, dz] = FACE_STEPS[face]!;
     const alongX = dz !== 0;
     for (let row = 0; row < size; row += 1) {
@@ -254,36 +305,72 @@ class ColumnMesher {
       for (let step = 0; step < size; step += 1) {
         const x = alongX ? step : row;
         const z = alongX ? row : step;
-        const height = ground[at(this.cells, x, z)]!;
-        const bottom = this.wallBottom(x + dx, z + dz, height);
-        if (height === EMPTY_HEIGHT || bottom >= height) {
+        const wall = wallAt(x, z, x + dx, z + dz);
+        if (wall === undefined) {
           flush(step);
-          continue;
-        }
-        const cell = at(this.cells, x, z);
-        const cover = covered[cell] === 1;
-        // Covered walls carry the top color for their strip; the shader draws soil below it.
-        const color = cover ? top[cell]! : side[cell]!;
-        const same =
-          run !== undefined &&
-          run.bottom === bottom &&
-          run.top === height &&
-          run.color === color &&
-          run.covered === cover;
-        if (!same) {
+        } else if (run === undefined || !sameWall(run, wall)) {
           flush(step);
-          run = { start: step, bottom, top: height, color, covered: cover };
+          run = { start: step, ...wall };
         }
       }
       flush(size);
     }
   }
 
+  /**
+   * Ground walls face lower neighbors. Along the border they also reach `overlap` blocks
+   * below the neighbor, so a coarser or finer region beside this one never leaves a gap.
+   */
+  private groundWall(x: number, z: number, nx: number, nz: number): WallFace | undefined {
+    const cell = at(this.cells, x, z);
+    const height = this.cells.ground[cell]!;
+    if (height === EMPTY_HEIGHT) return undefined;
+    const bottom = this.wallBottom(nx, nz, height);
+    if (bottom >= height) return undefined;
+    const covered = this.cells.covered[cell] === 1;
+    return {
+      bottom,
+      top: height,
+      // Covered walls carry the top color for their strip; the shader draws soil below it.
+      color: covered ? this.cells.top[cell]! : this.cells.side[cell]!,
+      leaves: false,
+      covered,
+    };
+  }
+
   private wallBottom(x: number, z: number, height: number): number {
     const neighbor = this.cells.ground[at(this.cells, x, z)]!;
-    if (neighbor === EMPTY_HEIGHT) return this.edgeBottom;
+    if (neighbor === EMPTY_HEIGHT) return Math.max(WORLD_MIN_Y, height - EDGE_DEPTH);
     const border = x < 0 || z < 0 || x >= this.cells.size || z >= this.cells.size;
     return border ? Math.min(neighbor, height) - this.overlap : neighbor;
+  }
+
+  /**
+   * The side of a crown that a neighboring crown does not cover: the part above
+   * the neighbor's top, or the part below its bottom. Ground beside it hides the rest.
+   */
+  private canopyWall(
+    x: number,
+    z: number,
+    nx: number,
+    nz: number,
+    part: "upper" | "lower",
+  ): WallFace | undefined {
+    const { canopyTop, canopyBottom, canopyColor, ground } = this.cells;
+    const cell = at(this.cells, x, z);
+    const neighbor = at(this.cells, nx, nz);
+    if (canopyTop[cell] === EMPTY_HEIGHT) return undefined;
+    const open = canopyTop[neighbor] === EMPTY_HEIGHT;
+    // Without a neighboring crown the upper part is the whole side.
+    if (open && part === "lower") return undefined;
+
+    let bottom = canopyBottom[cell]!;
+    let top = canopyTop[cell]!;
+    if (!open && part === "upper") bottom = Math.max(bottom, canopyTop[neighbor]!);
+    if (!open && part === "lower") top = Math.min(top, canopyBottom[neighbor]!);
+    bottom = Math.max(bottom, ground[neighbor]!);
+    if (bottom >= top) return undefined;
+    return { bottom, top, color: canopyColor[cell]!, leaves: true, covered: false };
   }
 
   private pushWall(
@@ -296,26 +383,25 @@ class ColumnMesher {
   ): void {
     const x = alongX ? start : row;
     const z = alongX ? row : start;
-    const soil = (wall.covered || wall.color === SOIL) && wall.top - wall.bottom > SOIL_DEPTH + 1;
-    const split = soil ? wall.top - SOIL_DEPTH : wall.bottom;
-    if (split > wall.bottom) {
+    const material = wall.leaves ? QuadMaterial.Foliage : QuadMaterial.Solid;
+    const side = (bottom: number, top: number, color: number, covered = false): void =>
       this.push(
         this.opaque,
-        packQuadWord0(x, wall.bottom, z, face, QuadMaterial.Solid),
-        packQuadWord1(length, split - wall.bottom, FULL_BOX, 0),
-        packQuadWord2(DEEP_ROCK, FULLY_LIT),
-        wall.bottom,
-        split,
+        packQuadWord0(x, bottom, z, face, material, covered),
+        packQuadWord1(length, top - bottom, FULL_BOX, 0),
+        packQuadWord2(color, FULLY_LIT),
+        bottom,
+        top,
       );
+
+    if (wall.leaves) {
+      side(wall.bottom, wall.top, wall.color);
+      return;
     }
-    this.push(
-      this.opaque,
-      packQuadWord0(x, split, z, face, QuadMaterial.Solid, wall.covered),
-      packQuadWord1(length, wall.top - split, FULL_BOX, 0),
-      packQuadWord2(wall.color, FULLY_LIT),
-      split,
-      wall.top,
-    );
+    const soil = (wall.covered || wall.color === SOIL) && wall.top - wall.bottom > SOIL_DEPTH + 1;
+    const rock = soil ? wall.top - SOIL_DEPTH : wall.bottom;
+    if (rock > wall.bottom) side(wall.bottom, rock, DEEP_ROCK);
+    side(rock, wall.top, wall.color, wall.covered);
   }
 
   private meshWater(): void {
@@ -344,10 +430,9 @@ class ColumnMesher {
   }
 
   /** Darkens top corners next to taller neighbors, the column version of voxel occlusion. */
-  private topOcclusion(x: number, z: number): number {
-    const { ground } = this.cells;
-    const height = ground[at(this.cells, x, z)]!;
-    const taller = (cx: number, cz: number): boolean => ground[at(this.cells, cx, cz)]! > height;
+  private topOcclusion(heights: Int16Array, x: number, z: number): number {
+    const height = heights[at(this.cells, x, z)]!;
+    const taller = (cx: number, cz: number): boolean => heights[at(this.cells, cx, cz)]! > height;
     let packed = 0;
     const corners = [
       [-1, -1],
@@ -378,6 +463,16 @@ class ColumnMesher {
     this.minY = Math.min(this.minY, bottom);
     this.maxY = Math.max(this.maxY, top);
   }
+}
+
+function sameWall(left: Wall, right: WallFace): boolean {
+  return (
+    left.bottom === right.bottom &&
+    left.top === right.top &&
+    left.color === right.color &&
+    left.leaves === right.leaves &&
+    left.covered === right.covered
+  );
 }
 
 /** Greedy rectangle merge over a grid of keys, where -1 means no face. */
