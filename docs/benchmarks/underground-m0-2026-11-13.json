@@ -2,7 +2,7 @@
   "base": "e02cf7c51241170916eaf116c419a7d54c7c1916",
   "branch": "experiment/underground-m0",
   "date": "2026-11-13",
-  "scope": "Experimental M0 only; no public API, scene-server, integration tree or production modification",
+  "scope": "Experimental M0 only; no public API or production modification",
   "validation": {
     "assertions": 162,
     "legacyAlias": "maxY = ceilingY (exclusive), never +1",
@@ -4400,7 +4400,7 @@
     "caveDiskMiB": 128,
     "surfaceCache": "separate protected partition; existing snapshot cleanup retained",
     "poolCapPerMaterial": 16,
-    "publicAccess": "all users; deployment policy, public throttling and Cloudflare remain integration-owned"
+    "publicAccess": "all users; deployment policy and public throttling are out of scope"
   },
   "limitations": [
     "p95 uses eight post-warm-up measurements per matrix case; descriptive sample, not production SLA",

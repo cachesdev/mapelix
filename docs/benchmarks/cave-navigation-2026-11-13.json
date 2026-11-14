@@ -85,6 +85,6 @@
   "limitations": [
     "Renderer counters are logical allocations, not physical GPU residency.",
     "Collected heap includes additional shader/JS warm-up after unpooled disposal begins.",
-    "Production VM, public proxy and Cloudflare validation are integration-owned."
+    "Production server and public proxy validation are out of scope."
   ]
 }

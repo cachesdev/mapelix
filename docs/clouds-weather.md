@@ -1,7 +1,7 @@
-# Cosmetic clouds and weather (embed 3)
+# Cosmetic clouds and weather
 
-Viewer-only additions following `cf1082b`. Keep `EMBED_API_VERSION=3` and existing
-HTTP/region/discovery versions. Terrain, source indexes, server routes, URL bases,
+Viewer-only additions following `cf1082b`. Existing HTTP/region/discovery versions
+are kept. Terrain, source indexes, server routes, URL bases,
 `.bin` suffixes, cache identities and generation budgets are unchanged.
 
 ## Host interface
@@ -14,7 +14,7 @@ weather?: WeatherMode;         // default "clear"
 type WeatherMode = "clear" | "rain" | "thunderstorm";
 ```
 
-Optional methods on newer embed 3 viewers:
+Optional methods on newer viewers:
 
 ```ts
 viewer.setClouds?.(enabled);
@@ -26,7 +26,7 @@ viewer.setWeather?.("clear");
 `WeatherMode` is re-exported as a type by `world-viewer.ts`. Invalid runtime
 weather modes throw before changing the current choice. Existing methods,
 callbacks, selections, discovery filters and depth contracts are preserved.
-Hosts can detect the methods when supporting older embed 3 releases and provide
+Hosts can detect the methods when supporting older viewer builds and provide
 their own translated controls.
 
 Both effects are eligible **only in Overworld Surface**. Switching to Caves,
@@ -53,8 +53,14 @@ height, preserving the clear-water overview instead of adding a white veil.
 Water and glass render before cloud/rain overlays, so water's framebuffer
 refraction never captures those foreground effects. The water shader is unchanged.
 Plain clicks cancel a flight without retargeting the orbit pivot; real gestures
-only acquire terrain within twice the current orbit distance. These additions
-preserve embed 3, source packets and all cache identities.
+only acquire terrain within twice the current orbit distance. The wheel zooms
+toward the terrain under the cursor at any distance, and keyboard speed also
+follows the camera's height above the ground, so a pivot on nearby high terrain
+does not slow navigation. These additions preserve source packets and all cache
+identities.
+
+The weather tint is an inline TSL helper rather than a nested `Fn`: shared by the
+sky, the water reflection and the haze, a nested `Fn` rendered water opaque.
 
 Weather is manually selected cosmetic styling, independent of saved/server
 weather and biomes. Procedural rain streaks fall around the camera. Loaded
@@ -91,7 +97,7 @@ Minecraft textures, sounds or network weather service.
   instance resources. No pool or cache grows with explored coordinates.
 
 The frame-rate thresholds are viewer heuristics, not a hardware benchmark or a
-guaranteed frame rate. Production measurements remain the integrator's responsibility.
+guaranteed frame rate.
 
 ## Validation
 

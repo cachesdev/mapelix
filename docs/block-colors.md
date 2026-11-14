@@ -99,10 +99,9 @@ All 14 snapshot files, including `level.dat`, remain byte-identical. The two
 color patches apply in order to `f622e3a` using an isolated temporary index.
 
 Generic base: `d726cfc`. Commit `54c7a6c` establishes the catalog; its successor
-completes the remaining work. Integrate them in order on `f622e3a`. No changes touch
-`apps/scene-server`, panel/updater code, the embedded interface, base paths, `.bin`
-suffixes, dimensions or ceilings. API/viewer version 2 and region format 2 remain.
-The prototype mesh revision is 22; the existing server fingerprints compiled engine
+completes the remaining work. No changes touch the viewer options, base paths,
+suffixes, dimensions or ceilings. Region format 2 remains.
+The prototype mesh revision is 22; a server that fingerprints the compiled engine
 JavaScript, so rebuilding produces separate revision/cache entries.
 
 ## Separate follow-up topics

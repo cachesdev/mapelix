@@ -3,10 +3,9 @@
 This records the original Milestone 1 delivery. Subsequent selection and
 discovery work is documented in [Milestones 2–4](underground-exploration.md).
 
-Generic engine and local viewer implementation based on `e02cf7c`, isolated on
-`feature/underground-rendering`. This delivery includes the implementation,
-regression tests and archived Milestone 0 measurements. Production integration,
-resource discovery indexing and the 3D selection box remain separate work.
+Engine and local viewer implementation based on `e02cf7c`, with regression tests
+and archived Milestone 0 measurements. Resource discovery indexing and the 3D
+selection box came later.
 
 ## Canonical context
 
@@ -93,15 +92,11 @@ The view uses fixed neutral exploration lighting and a dark background.
 - A local server process reads one fixed snapshot revision. Changing snapshots
   requires restarting that local process. Production revision replacement, the
   recommended separate 128 MiB cave disk quota and obsolete-revision deletion
-  remain Claude's scene-server responsibilities.
+  belong to a production server.
 
-## Integration handoff
+## Server contract
 
-No `apps/scene-server`, Bedrock Control, integration worktree, production world or
-production server is changed. The local viewer is ready to exercise the generic
-engine; deploying it requires the separate adapter work.
-
-For the future API/embed 3 adapter:
+For a server other than the local adapter:
 
 1. Accept signed bounds and the canonical context above. Preserve old defaults
    for metadata without `mode`/`minY`/`maxY`; retain the `ceilingY` alias.
@@ -113,19 +108,12 @@ For the future API/embed 3 adapter:
    share results merely because their bounds match.
    Include the generator revision in the namespace whenever mesh output changes.
 4. Preserve configurable `regionBase`, `regionSuffix` (including `.bin`) and
-   viewer options across `setWorld`. Those generic options match the integration
-   branch's existing signatures. Binary region format remains **2**.
-5. Advertise supported cave thicknesses/LODs. The integration's API and
-   `EMBED_API_VERSION` must advance from 2 to 3 when it exposes this interface.
-   Those integration-owned files are intentionally unchanged here. Panel support
-   for versions 2/3 must precede release installation to preserve rollback.
+   viewer options across `setWorld`. Binary region format remains **2**.
+5. Advertise supported cave thicknesses/LODs, and version the host's own API when
+   it exposes this interface, so older hosts can keep rolling back.
 6. Implement independent Surface/caves cache quotas and preserve old-snapshot
    cleanup. Discovery indexes will later have their own snapshot/schema keys,
    independent of terrain windows, geometry strategy and LOD.
-
-Public access remains intended for every family member. Cloudflare, admission
-limits, cache-only public controls, deployment policy and licensing stay with
-Claude. This implementation adds no administrator-only restriction.
 
 ## Scope limits
 
@@ -136,8 +124,7 @@ currently operates on reusable whole X/Z regions, without multiplying cache keys
 by arbitrary selection rectangles.
 
 The supplied real snapshot has no End chunks. End regressions and four-view GPU
-lifecycle tests therefore use generated Bedrock data. Production VM memory,
-prewarming, bounded disk caching, update and rollback still need Claude's checks.
+lifecycle tests therefore use generated Bedrock data.
 
 ## Validation
 
@@ -208,7 +195,4 @@ pointing at an extracted, read-only snapshot, then open:
 /?dimension=overworld&mode=caves&minY=-32&maxY=0&x=7&y=-16&z=72&distance=60&heading=56&pitch=60
 ```
 
-The local controls and engine are implemented on the generic
-`feature/underground-rendering` branch, ready for integration review. The
-production API/embed version change, quotas and deployment validation remain the
-adapter's next step. No integration worktree or production service is changed.
+Production quotas and deployment validation belong to each server.

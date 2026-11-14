@@ -83,6 +83,6 @@
     "Fully enclosed source blocks remain markers/index entries when the mesh has no exposed face.",
     "At shallow pitch the bounded cave orbit may not clear every surrounding rock face; Recover view remains available.",
     "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or VM RSS.",
-    "Browser tests use generated disposable worlds. Production integration and real-world validation remain with Claude."
+    "Browser tests use generated disposable worlds."
   ]
 }

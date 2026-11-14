@@ -2,7 +2,7 @@
   "base": "e02cf7c51241170916eaf116c419a7d54c7c1916",
   "branch": "feature/underground-rendering",
   "date": "2026-11-13",
-  "scope": "Actual generic engine and local viewer; no integration worktree or production changes",
+  "scope": "Actual generic engine and local viewer; no production changes",
   "unit": {
     "engine": 167,
     "viewer": 12
@@ -1492,7 +1492,7 @@
   ],
   "limitations": [
     "No real End chunks in supplied snapshot; generated End used in browser lifecycle",
-    "Local cave cache is separate and memory-only; production disk quotas and old-revision cleanup remain integration-owned",
+    "Local cave cache is separate and memory-only; production disk quotas and old-revision cleanup are out of scope",
     "No resource discovery index, buried-ore overlay or interactive 3D box",
     "Browser memory counters are logical renderer resources and JS heap, not physical VRAM residency"
   ],

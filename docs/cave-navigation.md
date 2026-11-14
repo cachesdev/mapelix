@@ -1,8 +1,7 @@
 # Cave navigation and automatic depth
 
-Incremental viewer work on `feature/cave-navigation`, based on `92351d9`.
-Compatible with the integrated API/embed 3 (`cb1a3dc`). No scene-server, Bedrock
-Control, integration worktree or production changes are included.
+Incremental viewer work based on `92351d9`. Viewer only: no server, region
+format or cache-key change.
 
 ## Navigation
 
@@ -61,16 +60,15 @@ Source discovery packets/cache identities remain independent of depth. Existing
 encoded/GPU budgets, LOD 0/1 and maximum 128-block cave reach are unchanged.
 There is no server change, region/discovery format change or cache-key revision.
 Already cached regions remain valid.
-The integration's `engineFingerprint` hashes the two engine packages, which this
-change does not modify. With an unchanged snapshot, that region revision is
-therefore preserved; a viewer-only update requires no region cache invalidation.
+A server that fingerprints the two engine packages keeps its region revision,
+since this change does not modify them: a viewer-only update needs no region
+cache invalidation.
 
-## Optional embed 3 additions for Claude
+## Optional host additions
 
 No existing option, method signature, HTTP API or binary interface is removed or
-changed. Keep **EMBED_API_VERSION=3**. All additions are optional for the host;
-detect methods and the new snapshot field when supporting older embed 3 builds.
-The generic worktree does not own the integration's `embed.ts`.
+changed. All additions are optional for the host; detect methods and the new
+snapshot field when supporting older viewer builds.
 
 New `WorldViewerOptions`:
 
@@ -105,7 +103,7 @@ if (typeof viewer.setVerticalMovement === "function") {
 }
 ```
 
-The Svelte prototype owns its own buttons; Bedrock Control should supply its own.
+The Svelte prototype owns its own buttons; an embedding host supplies its own.
 The host loader can construct the next `WorldInfo` from its current world
 description plus the requested context; no extra HTTP request is necessary when
 that description and snapshot remain current.
@@ -146,5 +144,4 @@ On the user's copied snapshot, WebGPU follows an Overworld slice from -32..0 to
 camera distance/angles preserved. Both visits observe at most two simultaneous
 terrain/discovery downloads and no browser errors. All 1,895 source files retain
 their SHA-256 hashes. End navigation uses generated fixtures, since this copy
-contains no saved End chunks. Production VM/Cloudflare validation remains
-Claude's responsibility. See the [measurement summary](benchmarks/cave-navigation-2026-11-13.json).
+contains no saved End chunks. See the [measurement summary](benchmarks/cave-navigation-2026-11-13.json).

@@ -1,10 +1,9 @@
 # Underground exploration: Milestone 0 measurements
 
-Historical status at Milestone 0: measurements complete; API 3 is **not frozen**.
+Historical status at Milestone 0: measurements complete; the server API is **not frozen**.
 Base engine/viewer is
 `e02cf7c51241170916eaf116c419a7d54c7c1916`, on independent branch
-`experiment/underground-m0`. No scene-server, panel, integration worktree or
-production server was changed. This archived report and its baseline-specific
+`experiment/underground-m0`. No production server was changed. This archived report and its baseline-specific
 tools are retained alongside the subsequent
 [Milestone 1 implementation](underground-rendering.md); the findings below
 describe the experiment, rather than the current shipped engine.
@@ -71,8 +70,8 @@ Optional X/Z selection chooses reusable tiles; selection rectangles and a future
 interactive box must not create another copy of identical terrain tiles. Discovery
 index identity is independent of terrain strategy, window and LOD.
 
-The binary region format stays 2. The HTTP negative-number parser, API/embed 3,
-transport capability negotiation and panel rollback compatibility remain integration
+The binary region format stays 2. The HTTP negative-number parser, a versioned host API,
+transport capability negotiation and rollback compatibility remain server
 work. Configurable URL bases, `.bin`, revision and existing dimension semantics
 must be preserved. The experimental request parser is not the final contract.
 
@@ -163,8 +162,8 @@ HTTP, compression and network transport. This is not a public HTTP latency claim
 Two workers improve the burst but raise memory and CPU. The initial recommendation
 is one shared worker, not a new pool per mode. Starting a coarse prewarm task can
 add approximately 0.6..0.7 s to the observed foreground tail. Pause submission of
-new prewarm work while visitors are waiting. Cloudflare, request throttling and
-production admission policy belong to Claude; this harness modifies none of them.
+new prewarm work while visitors are waiting. Proxying, request throttling and
+production admission policy belong to the production server; this harness modifies none of them.
 
 ## Cache growth and eviction
 
@@ -183,7 +182,7 @@ eviction. This demonstrates a proposed partition, not scene-server implementatio
   only 2 MiB being allocated to retained encoded cave entries.
 
 An encoded-region quota does not cap the decoder, mesher, V8 or renderer RSS.
-Writes can transiently hold the new entry before eviction. Claude's existing
+Writes can transiently hold the new entry before eviction. A server's existing
 old-revision directory cleanup remains the baseline; it must also cover future
 discovery data. No obsolete revision cleanup is changed here.
 
@@ -199,7 +198,7 @@ builder per dimension is deliberately retained, bounded at three. It exercises
 the real snapshot, whose End is empty; the nonempty End rendering test below
 uses generated data. Garbage collection is requested at equivalent End checkpoints
 to distinguish reachable data from temporary allocations. This test does not model
-Claude's actual worker-pool shutdown policy or production garbage-collection timing.
+a production worker-pool shutdown policy or production garbage-collection timing.
 
 At switches 104 and 1,040 the worker heap is 12.01 and 12.11 MiB, and retained
 ArrayBuffer accounting is 25.89 MiB at both checkpoints. Over the final half of
@@ -265,15 +264,15 @@ footprint is retained between views; it is not 146 MiB of new data per switch.
 
 These corrections are **experimental harness changes only**. They must be ported
 and regression-tested in the generic viewer before underground delivery. They are
-not claimed to be deployed, committed or integrated into Claude's worktree.
+not claimed to be deployed or committed.
 
 ## Recommended limits and remaining gates
 
 - Preserve the architecture and public availability; no administrator-only mode.
 - One shared generation worker initially; foreground work before new prewarm jobs.
 - Default thickness 32; initial selectable thicknesses 16/32. Keep 64 as a measured
-  candidate, enabled only after Claude validates the target VM budget. Step-8 and
-  arbitrary thicknesses remain later options, not assumptions in API 3.
+  candidate, enabled only after the target server budget is validated. Step-8 and
+  arbitrary thicknesses remain later options, not assumptions in the server API.
 - L0 near the camera and L1 where appropriate. Do not permit L2 for local cave
   navigation until a topology-preserving policy is demonstrated.
 - Start with a 128-block cave streaming radius. A 256-block radius is a later
@@ -287,8 +286,8 @@ not claimed to be deployed, committed or integrated into Claude's worktree.
   source tile and detector/schema version, and apply equivalent revision cleanup.
   Discovery indexing itself is not implemented or benchmarked in M0.
 
-Before freezing API 3: port lifecycle fixes and bounded reuse, decide capability-
-advertised thickness/LOD limits, perform final biome/range tests, and have Claude
-measure the actual integrated service on the VM, including existing prewarm,
+Before freezing the server API: port lifecycle fixes and bounded reuse, decide capability-
+advertised thickness/LOD limits, perform final biome/range tests, and
+measure the actual service on its target server, including existing prewarm,
 protected cache quotas, snapshot replacement, update and rollback. The reported
 ~110 MiB production headroom must not be replaced by Windows desktop RSS figures.

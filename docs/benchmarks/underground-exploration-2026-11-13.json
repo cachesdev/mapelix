@@ -2053,6 +2053,6 @@
     "Desktop measurements do not establish production VM headroom",
     "Source grouping is limited to loaded saved chunks and selected filters; markers are capped at the nearest 128",
     "Container contents and live entities are not indexed",
-    "Production scene-server, panel controls, bounded disk caching and deployment remain Claude-owned"
+    "Production server, host controls, bounded disk caching and deployment are out of scope"
   ]
 }

@@ -1,9 +1,7 @@
 # Block models and animated lava
 
-This generic follow-up to `54c7a6c` and `855d98f` is developed in the
-`mapelix-engine` worktree on `feature/block-colors`. It changes the engine and
-generic viewer shaders, geometry batches and ray collider. The scene server,
-Bedrock Control worktrees, panel, updater and lockfile are not changed.
+This follow-up to `54c7a6c` and `855d98f` changes the engine and the viewer
+shaders, geometry batches and ray collider.
 
 ## Sources and supported geometry
 
@@ -78,18 +76,10 @@ New viewers also read old regions without flags. The actual reader from
 `855d98f` parses new real-world regions during validation. Old viewers approximate
 model parts as boxes and do not animate lava.
 
-The prototype mesh revision advances from 22 to **23**. Claude's server already
-fingerprints compiled engine JavaScript, producing a new revision and cache
-identity. Preserve `(world revision, dimension, ceilingY, level, x, z)`, the
-configured URL base path and `.bin` suffix. Metadata, embed options and URL
-construction do not change. Integration API/viewer version **2** needs no
-additional bump for this lot. Future embedded-interface changes still require
-incrementing `EMBED_API_VERSION`.
-
-Apply this commit after both color commits to `feature/bedrock-control-dimensions`.
-Claude owns the final merge, reproducible Linux builds, full prewarm/memory
-checks, panel revision pin, release and VM validation. This lot performs no
-merge, push, deployment or pull request.
+The prototype mesh revision advances from 22 to **23**. A server that fingerprints
+the compiled engine gets a new revision and cache identity. Keep the cache key
+`(world revision, dimension, ceilingY, level, x, z)` and any configured URL base
+path or suffix. Metadata, viewer options and URL construction do not change.
 
 ## Validation and limits
 
@@ -124,7 +114,7 @@ project forced WebGL 2. The regression checks 24 pool/backend combinations.
 The read-only user snapshot has Overworld/Nether without explored End chunks.
 End validation uses generated fixtures. All 14 source files are fingerprinted
 before and after validation. Targeted measurements compare against `855d98f`;
-they do not replace full integrated-server prewarm and memory checks.
+they do not replace full-server prewarm and memory checks.
 
 Overworld underground exploration, cave/gallery navigation and its visibility
 budgets remain separate. The existing Nether ceiling behavior is preserved.
@@ -143,8 +133,4 @@ bytes and median build time from 34.16 to 35.56 ms (+4.1%). The detailed Nether
 region grows from 86,664 to 107,340 bytes and from 36.22 to 43.83 ms (+21.0%).
 Detailed models, lower liquid surfaces and flow distinctions increase geometry.
 These local samples are not full-server prewarm or peak-memory guarantees;
-Claude must measure those budgets on the integrated release before deployment.
-
-Both color commits followed by this lot apply cleanly to `f622e3a` in an isolated
-temporary Git index. The scene server, lockfile, embedded viewer options, URL
-builder and Claude's working trees remain unchanged. No branch merge is performed.
+Deployments should measure those budgets on their own server.

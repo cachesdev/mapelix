@@ -75,7 +75,7 @@ An unvisited dimension displays empty space until the copied world contains chun
   Clouds start on; cosmetic weather starts off. These visual preferences survive reloads.
   Rain adapts its particle budget when rendering slows down. Caves, Nether and End hide
   both effects. See [clouds and weather](../../docs/clouds-weather.md) for host options,
-  rendering limits and the embed 3 contract.
+  rendering limits and the host contract.
 - F3 shows the frame rate, the backend, and streaming statistics. It also has switches for the
   edge fog and two experimental options: zooming out to 20,000 blocks and a custom render
   distance from 2,000 to 100,000 blocks.
@@ -101,13 +101,13 @@ The `ceilingY` alias remains accepted. See the
 [Milestone 1 notes](../../docs/underground-rendering.md) for the engine contract,
 memory lifecycle and responsibilities of production adapters.
 
-Selection and discovery interfaces, cache budgets and the API/embed 3 handoff are
+Selection and discovery interfaces, cache budgets and the server contract are
 documented in [Milestones 2–4](../../docs/underground-exploration.md). Local discovery
 indexes use a separate 4 MiB memory cache (`MAPELIX_DISCOVERY_MEMORY_MIB`), with no
 disk writes. The terrain URL base and suffix remain configurable independently
 of `discoveryBase`/`discoverySuffix` in embedded consumers.
-Optional automatic-depth loading, mobile methods and the backwards-compatible embed 3
-handoff are described in [cave navigation](../../docs/cave-navigation.md).
+Optional automatic-depth loading, mobile methods and the backwards-compatible host
+additions are described in [cave navigation](../../docs/cave-navigation.md).
 Discovery framing, the Surface proximity rule and optional translated/host-owned
 details are described in [discovery navigation](../../docs/discovery-navigation.md).
 Immediate labels and the optional host label formatter are described in

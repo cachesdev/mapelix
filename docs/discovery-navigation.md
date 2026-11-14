@@ -1,9 +1,7 @@
-# Discovery navigation and keyboard follow-up (embed 3)
+# Discovery navigation and keyboard follow-up
 
-Generic viewer changes following `974f715`, on `feature/cave-navigation`.
-Scene-server, Bedrock Control, Claude's integration worktree, engine packages and
-production are unchanged. No HTTP, region format, discovery schema or cache-key
-revision changes are required. Keep **EMBED_API_VERSION=3**.
+Viewer changes following `974f715`. Engine packages are unchanged. No HTTP,
+region format, discovery schema or cache-key revision changes are required.
 
 The Surface/keyboard corrections in `e5881b3` add no public options or methods.
 Hosts only need to update the descent hint from Shift to C and keep using
@@ -119,7 +117,7 @@ from coordinates alone. For discovery navigation and "Go there", use
 
 ## Optional host interface and callback order
 
-Existing `onDiscoverySelect(group)` remains an **override**, preserving embed 3
+Existing `onDiscoverySelect(group)` remains an **override**, preserving earlier
 behavior. When supplied, a marker calls it without first navigating. When absent,
 the viewer calls focusDiscovery itself. Do not use onDiscoverySelect as a
 post-navigation notification; that would trigger duplicate navigation.
@@ -138,7 +136,7 @@ New optional WorldViewerOptions:
 New methods are `focusDiscovery(group)` and `clearDiscoveryFocus()`. The latter
 aborts pending discovery metadata and dismisses the active selection/card.
 `snapshot().selectedDiscovery` exposes the active group or undefined. Detect
-these additions when supporting older embed 3 builds. DiscoveryDetailText is
+these additions when supporting older viewer builds. DiscoveryDetailText is
 also exported from world-viewer.ts for optional type re-exports.
 
 The existing `loadDepth(context, signal)` supplies metadata when another cave
@@ -201,4 +199,4 @@ is added for the card. See the [measurement summary](benchmarks/surface-discover
 
 Browser servers are temporary; no local preview is left running and production
 is not contacted. All worlds used in these checks are generated disposable
-fixtures. Production integration and real-VM validation remain Claude's work.
+fixtures.

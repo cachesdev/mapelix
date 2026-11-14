@@ -68,7 +68,7 @@ export function createSceneServer(options: SceneServerOptions) {
   let fingerprintPromise: Promise<{ terrain: string; snapshot: string }> | undefined;
   const memory = new Map<string, Promise<LoadedRegion>>();
   // Local caves are memory-only: exploring depths cannot create unbounded disk variants.
-  // Production disk quotas and revision cleanup belong to the scene-server adapter.
+  // Production disk quotas and revision cleanup belong to the production server.
   const caveMemory = new Map<string, LoadedRegion>();
   const cavePending = new Map<string, Promise<LoadedRegion>>();
   let caveBytes = 0;

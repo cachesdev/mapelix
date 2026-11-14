@@ -1,14 +1,9 @@
 # Native dimensions: Milestone 1
 
 The subsequent [block-model and lava lot](block-models-and-lava.md), after color
-commits `54c7a6c` and `855d98f`, retains the integration contract below: configured
-base path, `.bin`, dimension/ceiling cache separation and API/viewer version 2.
-Its optional quad extensions retain region format 2; prototype mesh revision is
-`23`. Claude's scene server, embed options, URL construction and integration
-worktrees are untouched. General cave exploration remains separate.
-
-Work starts from fork main `da1c879` on `feature/native-dimensions`, in the independent
-`mapelix-engine` worktree. The Bedrock Control integration worktree is outside this change.
+commits `54c7a6c` and `855d98f`, retains the server contract below: dimension/ceiling
+cache separation and region format 2. Its optional quad extensions keep region
+format 2; the prototype mesh revision is `23`. Work starts from `da1c879`.
 
 ## Implementation plan
 
@@ -68,10 +63,9 @@ archive. Its EULA-based license was inspected. No texture assets or third-party 
 copied. The [official texture catalog](https://github.com/Mojang/bedrock-samples/blob/main/resource_pack/textures/terrain_texture.json)
 is the reference for the native block families.
 
-## Bedrock Control integration handoff
+## Server contract
 
-No integration worktree, standalone scene server, deployment file or integration commit was
-changed. The following contract must be carried into that server by its integration owner:
+A server other than the prototype adapter should follow this contract:
 
 1. Open a `SceneWorld` with `dimension: "overworld" | "nether" | "the-end"`. One instance
    fixes the dimension for its worker pool. The existing default remains Overworld.
@@ -85,7 +79,7 @@ changed. The following contract must be carried into that server by its integrat
    its X/Z divided by eight for Nether, or X 100 / Y 64 / Z 0 for End. These are navigation
    defaults, not discovered portal or player positions. Library `world.info.spawn` is unchanged.
 5. Separate cache identities as `revision/dimension/ceilingY/level/x/z`. The existing adapter
-   uses mesh revision **20**. Bump the integration cache revision when adopting this output.
+   uses mesh revision **20**. Bump a server's cache revision when adopting this output.
 6. Add context and revision to every browser region URL. Dispose the previous streamer before
    replacing it and reject its late completions. The binary format remains **version 2**;
    the caller owns dimension/ceiling identity because the header does not contain them.
@@ -95,27 +89,23 @@ changed. The following contract must be carried into that server by its integrat
 
 ### Embedded viewer compatibility
 
-The integration branch owns its configurable URL base path, `.bin` region routes and
-`EMBED_API_VERSION`. This branch starts from fork main and demonstrates the engine through
-the existing prototype adapter. The integration owner must retain the following behavior
-when applying this commit and resolving any viewer conflicts:
+The prototype adapter demonstrates the engine with root-relative, extensionless routes.
+A host that embeds the viewer with its own routes should keep the following behavior:
 
-- Keep the integration's URL builder, configured base path and `.bin` suffix. Append
+- Keep the host's URL builder, configured base path and suffix (such as `.bin`). Append
   `dimension`, `ceilingY` and `revision` using `URLSearchParams`. Apply the configured base
   path to metadata requests as well as region requests, including dimension changes.
 - Preserve the existing viewer creation options and URL/fetch configuration when
   `setWorld` creates a replacement streamer. The prototype's root-relative, extensionless
-  URLs must not replace the integration's configurable URLs.
+  URLs must not replace the host's configurable URLs.
 - Carry both `dimension` and `ceilingY` through metadata, the embedded viewer, scene-server
   routing, region builds and every cache layer. Context must survive renderer/streamer
   replacement and URL restoration.
-- Increment the integration branch's existing `EMBED_API_VERSION` when adopting the changed
-  embedded metadata/interface and exposing dimension switching. The next value is chosen
-  from that branch's current version. This is separate from binary `REGION_FORMAT_VERSION`,
-  which remains 2, and mesh revision 20.
+- Version the host's own embedding interface when exposing dimension switching. This is
+  separate from binary `REGION_FORMAT_VERSION`, which remains 2, and mesh revision 20.
 - Preserve Overworld defaults and existing transport options. Requests without a dimension
   default to Overworld and ceiling Y 320. Normalize legacy metadata that omits scene context
-  to these defaults at the integration boundary.
+  to these defaults at the host boundary.
 
 Prototype adapter examples (the existing extensionless routes):
 
@@ -124,17 +114,16 @@ GET /world.json?dimension=nether&ceilingY=80
 GET /regions/0/-1/0?dimension=nether&ceilingY=80&revision=<metadata-revision>
 ```
 
-Integration request shape, retaining its configured base path and suffix:
+Host request shape, retaining its configured base path and suffix:
 
 ```text
 GET <configured-base>/world.json?dimension=nether&ceilingY=80
 GET <configured-base>/regions/0/-1/0.bin?dimension=nether&ceilingY=80&revision=<metadata-revision>
 ```
 
-The integration smoke test should use a non-root configured base path and verify metadata,
-`.bin` region loading, dimension switching, ceiling changes, cache separation and legacy
-Overworld requests. Scene-server adaptation and the embed API version bump belong to Claude's
-existing integration worktree; they are not changes in this engine commit.
+A host smoke test should use a non-root configured base path and verify metadata,
+region loading, dimension switching, ceiling changes, cache separation and legacy
+Overworld requests.
 
 `MAPELIX_SCENE_WORKERS` applies to each lazily opened dimension pool. Visiting all three
 dimensions can therefore create three pools; a shared global worker budget is future work.
@@ -217,13 +206,9 @@ Orthographic/top-down views can reuse this renderer later. They, further atmosph
 global cache/worker budgeting and texture-pack adaptation remain follow-ups. No camera,
 meshing or deployment rewrite was introduced.
 
-## Git state and changed files
+## Changed files
 
-Worktree: `mapelix-engine`. Branch: `feature/native-dimensions`, based on fork main `da1c879`.
-Delivery is a local commit on this branch, authorized by the user. No push, merge or pull
-request is part of this handoff. The original Mapelix checkout, BedrockMap, `apps/scene-server`
-and the Bedrock Control integration worktree were not modified. General underground
-exploration remains a future milestone.
+Based on `da1c879`.
 
 The change spans the dimension model, chunk/biome readers, the existing region builders and
 meshers, block appearances, viewer/server context handling, test fixtures, browser tests,

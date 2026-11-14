@@ -1,8 +1,6 @@
 # Underground exploration: Milestones 2–4
 
-Generic engine/local viewer work following Milestone 1 (`67a3540`) on
-`feature/underground-rendering`. Bedrock Control, `apps/scene-server`, Claude's
-integration worktree and production are outside this change.
+Engine and local viewer work following Milestone 1 (`67a3540`).
 
 ## Selection and navigation (Milestone 2)
 
@@ -85,10 +83,10 @@ optional; explicit URL state takes precedence. All users may use every category.
 - Local snapshots are fixed for the server process. Restart for a new copy.
   Production revision replacement and bounded disk quotas remain adapter-owned.
 
-## Integration contract for Claude
+## Server and host contract
 
 The region binary format remains **2**; discovery packets have their own
-**schema/detector version 1** (`MXD1`). API/embed **3** must expose these features
+**schema/detector version 1** (`MXD1`). A server exposes these features
 alongside the canonical context from [Milestone 1](underground-rendering.md).
 Legacy metadata without discovery capabilities causes no discovery requests.
 
@@ -115,14 +113,9 @@ Legacy metadata without discovery capabilities causes no discovery requests.
 6. Keep production Surface, caves and discoveries in protected cache partitions.
    Start discovery encoded RAM at 4 MiB and consider a separate 64 MiB disk cap,
    with automatic eviction and old-snapshot cleanup. No all-depth/all-world
-   discovery prewarming is needed. Validate combined RSS, existing prewarming,
-   cache-only controls, snapshot replacement, update and rollback on the VM.
-7. The panel may supply its own controls/preferences and callbacks; it need not
-   copy the prototype's Svelte panels. Accept API/embed 2 and 3 before installing
-   the release. Cloudflare, public request policy and deployment remain separate.
-
-The engine/viewer has no dependency on panel auto-update code or fork deployment
-logic. No push, merge or deployment is part of this implementation.
+   discovery prewarming is needed.
+7. A host may supply its own controls, preferences and callbacks; it need not
+   copy the prototype's Svelte panels.
 
 ## Validation
 
@@ -163,7 +156,7 @@ descriptive, not browser frame-time or production latency guarantees.
 
 One shared worker also completes four Surface prewarm jobs and requests from
 three simulated visitors (three cave regions plus three source indexes) in
-643.31 ms. This is the generic queue, not Claude's production scheduling/cache.
+643.31 ms. This is the generic queue, not a production scheduler or cache.
 The generation/mixed-workload harness peaks at 251.22 MiB process RSS and settles
 at 182.39 MiB RSS / 10.98 MiB heap after collection. A separate full key inventory
 raises the harness high-water mark; that inventory is not part of an ordinary

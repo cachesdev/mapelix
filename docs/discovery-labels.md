@@ -1,7 +1,6 @@
-# Immediate discovery labels (embed 3)
+# Immediate discovery labels
 
-Viewer-only additions following `e5881b3` on `feature/cave-navigation`.
-Keep `EMBED_API_VERSION=3`. No server, region format, discovery index, URL base,
+Viewer-only additions following `e5881b3`. No server, region format, discovery index, URL base,
 `.bin` suffix or cache identity changes are required.
 
 ## Optional host formatter
@@ -67,4 +66,4 @@ browser regressions pass on WebGPU and WebGL, covering dimensions, source-cache
 reuse, buried-ore exclusion, roofed chest pairs/barrels, closed-cave containers,
 immediate hover, keyboard focus, label flipping/tracking, map clicks/drags,
 touch selection, context cleanup and disposal. Browser worlds are generated,
-disposable fixtures; production integration remains host-owned.
+disposable fixtures.

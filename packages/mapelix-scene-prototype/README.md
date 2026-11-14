@@ -42,7 +42,7 @@ these values. `info.spawn` remains the Overworld spawn stored in `level.dat`; co
 choose their own entry points into other dimensions.
 
 See [milestone notes](../../docs/native-dimensions.md) for validation, limitations and the
-Bedrock Control API handoff.
+server contract.
 
 ## Underground windows
 
@@ -55,7 +55,7 @@ Surface/Nether/End geometry and default bounds.
 The browser-safe context helpers normalize aliases and isolate cave cache keys
 from Surface keys. Adapters must also namespace by snapshot revision. Binary
 format remains 2. See [underground rendering](../../docs/underground-rendering.md)
-for resource ownership, limits and the future API/embed 3 integration handoff.
+for resource ownership, limits and the server contract.
 
 ## Source discoveries
 
