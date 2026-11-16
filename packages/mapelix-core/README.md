@@ -118,6 +118,9 @@ neighbouring tiles and native zooms do not decode the same chunks again. `render
 the budget per renderer (default 256, `0` disables reuse); pixels are identical either way.
 Batch exports store per-chunk source fingerprints; `incremental: true` then re-renders only tiles
 whose dependencies changed and copies the others, with output identical to a full render.
+`surfaceCache: true` (or `{ maxMiB }`, default 512) also keeps extracted chunk surfaces in
+`<output>/.mapelix-surface-cache` between exports, so re-rendered tiles only extract changed chunks.
+Entries are verified when read; deleting or damaging the cache never changes the output.
 
 ## Cleanup
 

@@ -138,9 +138,81 @@ An unchanged dimension costs indexing, fingerprinting and copying (about 0.4 s o
 the rest is file copies and verification). An update costs much less than its share of tiles
 suggests, because each rendered tile still extracts its whole 256-block shadow halo, mostly from
 unchanged chunks that no longer get reused by neighbouring rendered tiles. Scattered changes reach
-most tiles through the halo. Keeping extracted chunk surfaces between runs, keyed by their
-fingerprints, would make small updates proportional to their size; it is not implemented.
+most tiles through the halo. The persistent surface cache below removes that extraction cost.
 
 For scale: the reference renderer, with height shading and no halo, redrew 4,805 changed Overworld
 chunks of a larger world and kept 672 unchanged tiles in 57 s on one core, and checked an unchanged
 Nether in 4 s.
+
+## Persistent chunk surface cache (batch 5b)
+
+With `surfaceCache` (`--surface-cache[=<mib>]`), extracted chunk surfaces outlive the export, so
+a re-rendered tile reads the surfaces of its unchanged halo chunks instead of decoding them again.
+
+- **Layout.** `<output>/.mapelix-surface-cache/<namespace>/<config>/<x>_<z>.pack`, one pack per
+  256 x 256 block storage tile. The namespace digests the renderer revision, appearance resources,
+  appearance and biome-blend radius; the config digests the dimension, surface range (cut) and
+  surface style. Each entry stores the chunk fingerprint it was extracted from (the fingerprint of
+  batch 5) and is only used while it is unchanged. A biome-free variant is derived from the
+  biome-scoped one, so most chunks are stored once.
+- **Verification.** Packs carry a format version, their dimension and config digest, and a SHA-256
+  trailer; entries are decoded with shape checks. A missing, truncated, corrupt or foreign pack or
+  entry is ignored and the surface is extracted again, so the cache cannot change pixels. Surfaces
+  holding values the encoding cannot reproduce exactly are not stored.
+- **Writes and cleanup.** Renderers only read packs; new surfaces are sent to the coordinating
+  process, which rewrites affected packs once, on a clean close (an aborted export writes nothing),
+  with a temporary file and a rename. The same pass drops entries whose chunk changed or
+  disappeared, removes damaged packs, unknown files and other namespaces, then evicts packs not
+  rewritten in this export first, then rewritten ones, until the store fits its bound (512 MiB
+  by default; about 2.5 KB per chunk here).
+- **Ownership.** The directory is created below the owned output root; every existing component is
+  rejected if it is a symbolic link or junction before the export, and again before each pack is
+  read, written or removed.
+
+Same updates as batch 5 (Overworld, from a cached full export of the same base snapshot), 2 / 1
+workers. Every update produced the same generation with and without the cache, and every tile
+matched the batch-5 full renders of the updated snapshots.
+
+| Update                                     | Rendered + composed / reused | Extracted chunks | No cache | Cache, 2 workers | Cache, 1 worker |
+| ------------------------------------------ | ---------------------------: | ---------------: | -------: | ---------------: | --------------: |
+| Unchanged                                  |                    0 / 376 |                0 |    3.4 s |            3.4 s |           3.5 s |
+| 20 neighbouring chunks, 2 deleted, 1 new   |                  117 / 280 |               41 |   11.8 s |            6.9 s |          10.2 s |
+| 400 neighbouring chunks, 10 deleted, 1 new |                  171 / 226 |              653 |   12.1 s |            9.4 s |          14.7 s |
+| 170 scattered chunks, 5 deleted, 1 new     |                   319 / 78 |              290 |   14.7 s |           11.7 s |          19.6 s |
+| Full render, empty cache                   |                    376 / 0 |            3,152 |   14.5 s |           15.4 s |               — |
+| Full render, warm cache                    |                    376 / 0 |                0 |        — |            9.5 s |               — |
+
+Extraction is now proportional to the changed chunks (both workers extract each changed chunk
+once, in both variants when needed). What remains is the fixed cost of an unchanged export and the
+shading of every dirty tile: one changed chunk still dirties every tile whose 256-block shadow halo
+covers it (up to about 4 zoom-0, 12 zoom-1 and 30 zoom-2 tiles). Writing the cache adds about 1 s to
+a full render with an empty cache. A damaged cache (flipped bytes, a truncated and a deleted pack,
+junk files) gave the same tiles; the three damaged packs were rejected and replaced.
+
+### Fixed cost of an update
+
+Every export, even an unchanged one, hashes every database file (source identity), indexes every
+map record and digests every record value (chunk fingerprints). On Linux (ext4, Node 24.14.1,
+14.7 MiB database, 2,444 chunks), measured three times after dropping the page cache and again
+warm:
+
+| Startup step                               | Cold   | Warm   |
+| ------------------------------------------ | -----: | -----: |
+| Source identity (SHA-256 of all files)     | 0.18 s | 0.16 s |
+| Open and index                             | 0.49 s | 0.48 s |
+| Open, index and chunk fingerprints         | 0.61 s | 0.59 s |
+
+At this size disk reads are negligible; the cost is parsing, inflating and hashing, linear in the
+database size. A world ten times larger (about 150 MiB) should take about 1.8 s for the source
+identity and 6 s to index and fingerprint, plus about 0.3 s of cold reads on an SSD (1.5 s at
+100 MB/s). An unchanged Overworld export takes 2.5 s on Linux and 3.4 s on Windows; beyond startup,
+most of it copies and verifies the 376 reused tiles, which grows with the tile count rather than the
+database size.
+
+Possible follow-ups, not planned yet:
+
+- **Per-file record digests.** LevelDB table files are immutable, so their indexed keys and value
+  digests could be cached by file name and size; startup would then only read new files.
+- **No copies of reused tiles.** A generation could reference unchanged tiles of the previous one
+  (or hard-link them) instead of copying and re-verifying them; this changes the generation layout
+  and its retention rules.

@@ -5,6 +5,7 @@ import { readLevelDbRecords, type NamedLevelDbFile } from "./bedrock/record-sour
 import type { RenderedTile, TileCoordinates } from "./tile.js";
 import type { SurfaceRange } from "./surface-range.js";
 import type { SurfaceStyle } from "./surface-style.js";
+import type { SurfaceStoreJob, SurfaceStoreReader } from "./chunk-surface-store.js";
 import type { TileRenderCache } from "./tile-render-cache.js";
 import {
   chunkHasBiomeScope,
@@ -37,6 +38,8 @@ export interface IndexedTileRenderJob {
    * may share cached chunk surfaces; omit it to disable surface reuse.
    */
   readonly cacheKey?: string;
+  /** Optional on-disk surface store view; requires `cacheKey` and an enabled memory cache. */
+  readonly surfaceStore?: SurfaceStoreJob;
   readonly options?: Pick<
     RenderTileOptions,
     "shadows" | "biomeBlendRadius" | "correctReferenceBugs" | "includeSurface"
@@ -48,6 +51,7 @@ export async function renderIndexedTile(
   options: RenderTileOptions = {},
   signal?: AbortSignal,
   cache?: TileRenderCache,
+  store?: SurfaceStoreReader,
 ): Promise<RenderedTile> {
   signal?.throwIfAborted();
   const records: EffectiveBedrockRecord[] = job.biomeRecords.map((record) => {
@@ -67,6 +71,9 @@ export async function renderIndexedTile(
   const pinned = new Map<string, ChunkSurface>();
   const surfaceKey = (chunkX: number, chunkZ: number, scoped: boolean): string =>
     `${job.cacheKey}|${chunkX},${chunkZ}|${scoped ? 1 : 0}`;
+  const stored = useCache && store !== undefined ? job.surfaceStore : undefined;
+  // Chunks already looked up in the disk store during this render and not found there.
+  const extract = new Set<string>();
 
   for (const source of job.sources) {
     const keys = new Set<string>();
@@ -86,6 +93,16 @@ export async function renderIndexedTile(
           if (surface !== undefined) {
             pinned.set(key, surface);
             continue;
+          }
+          if (stored !== undefined && !extract.has(key)) {
+            const scoped = chunkHasBiomeScope(job.coordinates, chunkX, chunkZ);
+            const loaded = await store!.lookup(stored, chunkX, chunkZ, scoped, signal);
+            if (loaded !== undefined) {
+              cache!.setSurface(key, loaded);
+              pinned.set(key, loaded);
+              continue;
+            }
+            extract.add(key);
           }
         }
         keys.add(hex(group.bytes.subarray(offset, offset + group.keyLength)));
@@ -131,8 +148,10 @@ export async function renderIndexedTile(
   }
   const tile = renderRecordTile(records, job.coordinates, renderOptions, {
     get: (chunkX, chunkZ, scoped) => pinned.get(surfaceKey(chunkX, chunkZ, scoped)),
-    set: (chunkX, chunkZ, scoped, surface) =>
-      cache!.setSurface(surfaceKey(chunkX, chunkZ, scoped), surface),
+    set: (chunkX, chunkZ, scoped, surface) => {
+      cache!.setSurface(surfaceKey(chunkX, chunkZ, scoped), surface);
+      if (stored !== undefined) store!.record(stored, chunkX, chunkZ, scoped, surface);
+    },
   });
   signal?.throwIfAborted();
   return tile;

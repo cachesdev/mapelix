@@ -1,5 +1,6 @@
 import { Worker } from "node:worker_threads";
 
+import type { StoredSurfaceEntry } from "./chunk-surface-store.js";
 import type { IndexedTileRenderJob } from "./node-tile-render.js";
 import { tileBounds, type RenderedTile } from "./tile.js";
 import { renderAbortError } from "./render-abort.js";
@@ -9,6 +10,14 @@ interface WorkerResponse {
   readonly id: number;
   readonly tile?: RenderedTile;
   readonly error?: string;
+  readonly surfaces?: readonly StoredSurfaceEntry[];
+  readonly surfaceStats?: SurfaceReport["stats"];
+}
+
+/** Surfaces a worker extracted for the disk store, and its store counters, for one tile. */
+export interface SurfaceReport {
+  readonly surfaces: readonly StoredSurfaceEntry[];
+  readonly stats: { readonly hits: number; readonly stored: number; readonly rejected: number };
 }
 
 interface PendingRender {
@@ -40,10 +49,16 @@ export class TileRenderWorkerPool {
   private nextId = 1;
   private closed = false;
   private closePromise: Promise<void> | undefined;
+  private readonly onSurfaces: ((report: SurfaceReport) => void) | undefined;
 
-  constructor(concurrency: number, renderCacheMiB?: number) {
+  constructor(
+    concurrency: number,
+    renderCacheMiB?: number,
+    onSurfaces?: (report: SurfaceReport) => void,
+  ) {
     this.concurrency = concurrency;
     this.renderCacheMiB = renderCacheMiB;
+    this.onSurfaces = onSurfaces;
     for (let index = 0; index < concurrency; index += 1) {
       this.slots.push(this.createSlot());
     }
@@ -125,6 +140,8 @@ export class TileRenderWorkerPool {
     slot.active = undefined;
     slot.worker.unref();
     if (response.tile !== undefined) {
+      if (response.surfaces !== undefined && response.surfaceStats !== undefined)
+        this.onSurfaces?.({ surfaces: response.surfaces, stats: response.surfaceStats });
       pending.resolve(response.tile);
     } else {
       pending.reject(new Error(response.error ?? "Mapelix render worker returned no tile"));

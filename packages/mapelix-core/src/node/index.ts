@@ -38,6 +38,9 @@ function withSurfaceProfiles(world: BedrockWorld): MapWorld {
           getChunkFingerprints: (dimension: Parameters<MapWorld["getTileCoverage"]>[0]) =>
             world.getChunkFingerprints!(surfaceProfile(dimension).dimension),
         }),
+    ...(world.getSurfaceCacheStats === undefined
+      ? {}
+      : { getSurfaceCacheStats: () => world.getSurfaceCacheStats!() }),
     close: (options) => world.close(options),
   };
 }

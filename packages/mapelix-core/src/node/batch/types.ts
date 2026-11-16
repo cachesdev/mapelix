@@ -1,5 +1,5 @@
 import type { SurfaceProfile } from "../../surface-profiles.js";
-import type { Dimension, MapAppearance, TileCoordinates } from "../../types.js";
+import type { Dimension, MapAppearance, SurfaceStoreStats, TileCoordinates } from "../../types.js";
 
 export interface BatchBounds {
   readonly minX: number;
@@ -39,6 +39,12 @@ export interface BatchOptions {
    * settings; only tiles whose dependencies changed are rendered. Falls back to a full render.
    */
   readonly incremental?: boolean;
+  /**
+   * Keep extracted chunk surfaces in `<output>/.mapelix-surface-cache` between exports, keyed by
+   * chunk fingerprint, renderer revision and settings, so updates only extract changed chunks.
+   * `true` uses a 512 MiB bound. Removing or damaging the cache never changes the output.
+   */
+  readonly surfaceCache?: boolean | { readonly maxMiB?: number };
   readonly limits?: Partial<BatchLimits>;
   readonly signal?: AbortSignal;
 }
@@ -54,6 +60,8 @@ export interface NormalizedBatch {
   readonly correctReferenceBugs: boolean;
   readonly bounds: BatchBounds | null;
   readonly incremental: boolean;
+  /** Surface cache size bound in MiB; 0 disables the cache. */
+  readonly surfaceCacheMiB: number;
   readonly limits: BatchLimits;
 }
 
@@ -123,6 +131,8 @@ export interface BatchUpdate {
   readonly renderedTiles: number;
   readonly composedOverviews: number;
   readonly reusedTiles: number;
+  /** Disk surface cache counters when the cache is enabled. */
+  readonly surfaceCache?: SurfaceStoreStats;
 }
 
 export interface BatchResult {

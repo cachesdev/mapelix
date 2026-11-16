@@ -38,6 +38,7 @@ describe("generic batch CLI", () => {
         "off",
         "--zooms=-4,-1",
         "--incremental",
+        "--surface-cache",
       ]),
     ).toMatchObject({
       dimensions: ["nether", "end", "overworld"],
@@ -47,7 +48,11 @@ describe("generic batch CLI", () => {
       shadows: "off",
       zooms: [-4, -1],
       incremental: true,
+      surfaceCache: true,
     });
+    expect(
+      parseBatchArguments(["--world", "w", "--output", "o", "--surface-cache=64"]),
+    ).toMatchObject({ surfaceCache: { maxMiB: 64 } });
     expect(parseBatchArguments(["--help"])).toBe("help");
   });
 
@@ -61,6 +66,7 @@ describe("generic batch CLI", () => {
       ["--world", "x", "--output", "y", "--workers", "1.5"],
       ["--world", "x", "--output", "y", "--bounds=0,0,1"],
       ["--world", "x", "--output", "y", "--appearance", "textured"],
+      ["--world", "x", "--output", "y", "--surface-cache=lots"],
     ].map((args) => ({ args })),
   )("rejects invalid arguments $args", ({ args }) => {
     expect(() => parseBatchArguments(args)).toThrow();

@@ -14,6 +14,7 @@ Read-only classic 2D export. The output parent must already exist.
   --correct-reference-bugs   Opt into corrected reference shadow rounding
   --bounds <x0,z0,x1,z1>      Exclusive block bounds; intersecting tiles remain full
   --incremental              Reuse unchanged tiles of the published generation
+  --surface-cache[=<mib>]    Keep chunk surfaces between exports (default bound: 512)
   --workers <n>              1..16 worker threads (default: 2)
   --max-pending <n>          Accepted jobs, 1..1024 (default: worker count)
   --max-tiles <n>            Published tiles plus temporary zoom-0 sources (default: 10000)
@@ -24,7 +25,7 @@ Read-only classic 2D export. The output parent must already exist.
   --help                    Show this help
 
 On success, stdout contains one JSON summary. Errors go to stderr with nonzero exit.
-Use --zooms=-4,-1 for an overview-only export. Incremental reuse is a separate follow-up.
+Use --zooms=-4,-1 for an overview-only export.
 `;
 
 function integer(name: string, text: string): number {
@@ -35,7 +36,7 @@ function integer(name: string, text: string): number {
 
 export function parseBatchArguments(args: readonly string[]): BatchOptions | "help" {
   const { values } = parseArgs({
-    args: [...args],
+    args: args.map((arg) => (arg === "--surface-cache" ? "--surface-cache=" : arg)),
     strict: true,
     allowPositionals: false,
     options: {
@@ -49,6 +50,7 @@ export function parseBatchArguments(args: readonly string[]): BatchOptions | "he
       "biome-blend-radius": { type: "string" },
       "correct-reference-bugs": { type: "boolean" },
       incremental: { type: "boolean" },
+      "surface-cache": { type: "string" },
       bounds: { type: "string" },
       workers: { type: "string" },
       "max-pending": { type: "string" },
@@ -91,6 +93,8 @@ export function parseBatchArguments(args: readonly string[]): BatchOptions | "he
         [property]: integer(`--${flag}`, value) * (property === "timeoutMs" ? 1000 : 1),
       });
   }
+  // A bare --surface-cache is accepted by rewriting it to an explicit empty value below.
+  const surfaceCache = values["surface-cache"];
   let bounds: BatchBounds | undefined;
   if (values.bounds !== undefined) {
     const parts = values.bounds.split(",").map((part) => integer("--bounds", part));
@@ -118,5 +122,11 @@ export function parseBatchArguments(args: readonly string[]): BatchOptions | "he
       : { correctReferenceBugs: values["correct-reference-bugs"] }),
     ...(bounds === undefined ? {} : { bounds }),
     ...(values.incremental === undefined ? {} : { incremental: values.incremental }),
+    ...(surfaceCache === undefined
+      ? {}
+      : {
+          surfaceCache:
+            surfaceCache === "" ? true : { maxMiB: integer("--surface-cache", surfaceCache) },
+        }),
   };
 }

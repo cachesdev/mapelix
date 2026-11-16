@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { DEFAULT_SURFACE_STORE_MIB } from "@mapelix/prototype";
 
 import { surfaceProfile } from "../../surface-profiles.js";
 import { DEFAULT_MAP_ZOOMS, mapPixelsPerBlock } from "../../tile-grid.js";
@@ -58,6 +59,17 @@ export function normalizeBatch(options: BatchOptions): NormalizedBatch {
   if (!Number.isSafeInteger(biomeBlendRadius) || biomeBlendRadius < 0 || biomeBlendRadius > 16) {
     throw new RangeError("biomeBlendRadius must be an integer within 0..16");
   }
+  const surfaceCache = options.surfaceCache ?? false;
+  const surfaceCacheMiB =
+    surfaceCache === false
+      ? 0
+      : surfaceCache === true
+        ? DEFAULT_SURFACE_STORE_MIB
+        : (surfaceCache.maxMiB ?? DEFAULT_SURFACE_STORE_MIB);
+  if (!Number.isSafeInteger(surfaceCacheMiB) || surfaceCacheMiB < 0 || surfaceCacheMiB > 65_536)
+    throw new RangeError("surfaceCache.maxMiB must be an integer within 1..65536");
+  if (surfaceCache !== false && surfaceCacheMiB === 0)
+    throw new RangeError("surfaceCache.maxMiB must be an integer within 1..65536");
   const bounds = options.bounds ?? null;
   if (
     bounds !== null &&
@@ -79,6 +91,7 @@ export function normalizeBatch(options: BatchOptions): NormalizedBatch {
     correctReferenceBugs: options.correctReferenceBugs ?? false,
     bounds,
     incremental: options.incremental ?? false,
+    surfaceCacheMiB,
     limits,
   };
 }

@@ -94,6 +94,10 @@ a successful rename is the commit point and the call succeeds. A second identica
 renders all requested tiles, verifies the existing immutable payload and publishes the same bytes.
 With `--incremental`, tiles whose source chunks, shadow halo and biome-blend window are unchanged are
 copied from the published generation instead; the result is byte-identical to a full render.
+With `--surface-cache`, extracted chunk surfaces are also kept in `<output>/.mapelix-surface-cache`
+(bounded, 512 MiB by default, `--surface-cache=<mib>` to change it), so the tiles that must be
+rendered again only extract changed chunks. Deleting or damaging that directory never changes the
+output; see `docs/2d-performance.md`.
 
 All inputs and existing output components reject symbolic links and Windows junctions, including
 linked database files. An unrelated or unsupported root manifest and a corrupt colliding immutable

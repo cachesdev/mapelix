@@ -10,12 +10,22 @@ import {
 } from "./bedrock/chunk-key.js";
 import { createLevelDbRecordIndex, type LevelDbRecordIndexEntry } from "./bedrock/record-source.js";
 import {
+  DEFAULT_SURFACE_STORE_MIB,
+  SURFACE_PACK_VERSION,
+  SurfaceStoreReader,
+  SurfaceStoreWriter,
+  createSurfaceStoreStats,
+  surfaceStoreDigest,
+  type SurfaceStoreJob,
+  type SurfaceStoreStats,
+} from "./chunk-surface-store.js";
+import {
   renderIndexedTile,
   type IndexedTileRenderJob,
   type IndexedTileSource,
   type PackedKeyGroup,
 } from "./node-tile-render.js";
-import { TileRenderWorkerPool } from "./node-worker-pool.js";
+import { TileRenderWorkerPool, type SurfaceReport } from "./node-worker-pool.js";
 import { DEFAULT_RENDER_CACHE_MIB, TileRenderCache } from "./tile-render-cache.js";
 import type { SurfaceStyle } from "./surface-style.js";
 import { renderAbortError } from "./render-abort.js";
@@ -51,8 +61,23 @@ export interface BedrockWorldDirectory {
   readonly renderCacheMiB?: number;
   /** Digest every map record at startup so `getChunkFingerprints` can detect changed chunks. */
   readonly chunkFingerprints?: boolean;
+  /**
+   * Persist extracted chunk surfaces between sessions (requires `chunkFingerprints` and a
+   * non-zero `renderCacheMiB`). Entries are keyed by chunk fingerprint, `namespace`, dimension,
+   * surface range and surface style, verified when read and written once, on a clean close.
+   */
+  readonly surfaceCache?: SurfaceCacheOptions;
   /** Cancels startup reads; close({ abort: true }) cancels an opened world. */
   readonly signal?: AbortSignal;
+}
+
+export interface SurfaceCacheOptions {
+  /** Existing directory owned by the caller and reserved for this store. */
+  readonly directory: string;
+  /** Renderer identity and settings; a different namespace replaces the stored surfaces. */
+  readonly namespace: string;
+  /** Size bound of the store. Defaults to 512 MiB. */
+  readonly maxMiB?: number;
 }
 
 interface ChunkDigest {
@@ -91,6 +116,11 @@ class IndexedBedrockWorld implements BedrockWorld {
   private readonly renderCache: TileRenderCache;
   private readonly styleIds = new WeakMap<SurfaceStyle, number>();
   private readonly fingerprints: Map<number, Map<string, ChunkDigest>> | undefined;
+  private readonly surfaceWriter: SurfaceStoreWriter | undefined;
+  private readonly surfaceReader: SurfaceStoreReader | undefined;
+  private readonly surfaceStats: SurfaceStoreStats = createSurfaceStoreStats();
+  private readonly styleDigests = new WeakMap<SurfaceStyle, string>();
+  private tileFingerprints: Map<string, Map<string, string>> | undefined;
 
   constructor(
     databaseDirectory: string,
@@ -99,12 +129,29 @@ class IndexedBedrockWorld implements BedrockWorld {
     forceWorkers: boolean,
     renderCacheMiB: number,
     fingerprints: boolean,
+    surfaceCache: SurfaceCacheOptions | undefined,
   ) {
     this.databaseDirectory = databaseDirectory;
     this.forceWorkers = forceWorkers;
+    if (surfaceCache !== undefined && renderCacheMiB > 0) {
+      const maxMiB = surfaceCache.maxMiB ?? DEFAULT_SURFACE_STORE_MIB;
+      this.surfaceWriter = new SurfaceStoreWriter({
+        root: surfaceCache.directory,
+        namespace: surfaceCache.namespace,
+        maxBytes: Math.floor(maxMiB * 1024 * 1024),
+      });
+    }
     this.workerPool =
       renderConcurrency > 1 || forceWorkers
-        ? new TileRenderWorkerPool(renderConcurrency, renderCacheMiB)
+        ? new TileRenderWorkerPool(
+            renderConcurrency,
+            renderCacheMiB,
+            this.surfaceWriter === undefined ? undefined : (report) => this.addSurfaces(report),
+          )
+        : undefined;
+    this.surfaceReader =
+      this.surfaceWriter !== undefined && this.workerPool === undefined
+        ? new SurfaceStoreReader()
         : undefined;
     this.renderCache = new TileRenderCache(this.workerPool === undefined ? renderCacheMiB : 0);
     const buildingTiles = new Map<string, BuildingTile>();
@@ -179,9 +226,21 @@ class IndexedBedrockWorld implements BedrockWorld {
       return this.workerPool.render(job);
     }
 
-    const pending = this.renderQueue.then(() =>
-      renderIndexedTile(job, options, this.renderAbort.signal, this.renderCache),
-    );
+    const pending = this.renderQueue.then(async () => {
+      const tile = await renderIndexedTile(
+        job,
+        options,
+        this.renderAbort.signal,
+        this.renderCache,
+        this.surfaceReader,
+      );
+      if (this.surfaceReader !== undefined)
+        this.addSurfaces({
+          surfaces: this.surfaceReader.drain(),
+          stats: this.surfaceReader.drainStats(),
+        });
+      return tile;
+    });
     this.renderQueue = pending.then(
       () => undefined,
       () => undefined,
@@ -195,9 +254,75 @@ class IndexedBedrockWorld implements BedrockWorld {
       throw new Error("Open the world with chunkFingerprints: true to read chunk fingerprints");
     const result = new Map<string, string>();
     for (const [chunkKey, chunk] of this.fingerprints.get(DIMENSION_IDS[dimension]) ?? []) {
-      result.set(chunkKey, `${Buffer.from(chunk.xor).toString("hex")}${chunk.count.toString(16)}`);
+      result.set(chunkKey, fingerprintText(chunk));
     }
     return result;
+  }
+
+  /** Disk surface store counters; final after `close()` resolves. */
+  getSurfaceCacheStats(): SurfaceStoreStats | undefined {
+    return this.surfaceWriter === undefined ? undefined : { ...this.surfaceStats };
+  }
+
+  private addSurfaces(report: SurfaceReport): void {
+    this.surfaceStats.hits += report.stats.hits;
+    this.surfaceStats.stored += report.stats.stored;
+    this.surfaceStats.rejected += report.stats.rejected;
+    this.surfaceWriter?.add(report.surfaces);
+  }
+
+  private fingerprintsOf(dimension: number): Map<string, string> | undefined {
+    const chunks = this.fingerprints?.get(dimension);
+    if (chunks === undefined) return undefined;
+    return new Map([...chunks].map(([key, chunk]) => [key, fingerprintText(chunk)]));
+  }
+
+  private surfaceStoreJob(
+    dimension: number,
+    options: RenderTileOptions,
+    minTileX: number,
+    minTileY: number,
+    maxTileX: number,
+    maxTileY: number,
+  ): SurfaceStoreJob | undefined {
+    const writer = this.surfaceWriter;
+    if (writer === undefined || this.fingerprints === undefined) return undefined;
+    if (this.tileFingerprints === undefined) {
+      this.tileFingerprints = new Map();
+      for (const [dimensionId, chunks] of this.fingerprints) {
+        for (const [chunkKey, chunk] of chunks) {
+          const [x, z] = chunkKey.split(",").map(Number);
+          const tileKey = indexTileKey(dimensionId, floorDiv(x!, 16), floorDiv(z!, 16));
+          const tile = this.tileFingerprints.get(tileKey) ?? new Map<string, string>();
+          tile.set(chunkKey, fingerprintText(chunk));
+          this.tileFingerprints.set(tileKey, tile);
+        }
+      }
+    }
+    const fingerprints = new Map<string, string>();
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+        for (const entry of this.tileFingerprints.get(indexTileKey(dimension, tileX, tileY)) ?? [])
+          fingerprints.set(entry[0], entry[1]);
+      }
+    }
+    const style = options.surfaceStyle;
+    let styleDigest: string | null = null;
+    if (style !== undefined) {
+      styleDigest = this.styleDigests.get(style) ?? surfaceStoreDigest(JSON.stringify(style));
+      this.styleDigests.set(style, styleDigest);
+    }
+    const range = options.surfaceRange;
+    const config = surfaceStoreDigest(
+      JSON.stringify([
+        SURFACE_PACK_VERSION,
+        writer.namespaceName,
+        dimension,
+        range === undefined ? null : [range.minY, range.maxY, range.topY],
+        styleDigest,
+      ]),
+    );
+    return { directory: writer.configDirectory(config), config, dimension, fingerprints };
   }
 
   getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
@@ -221,13 +346,22 @@ class IndexedBedrockWorld implements BedrockWorld {
   close(options: CloseWorldOptions = {}): Promise<void> {
     if (options.abort === true) this.renderAbort.abort(renderAbortError());
     const workersClosed = this.workerPool?.close(options);
-    this.closePromise ??= this.drainAndClose(workersClosed);
+    this.closePromise ??= this.drainAndClose(workersClosed, options.abort === true);
     return this.closePromise;
   }
 
-  private async drainAndClose(workersClosed: Promise<void> | undefined): Promise<void> {
+  private async drainAndClose(
+    workersClosed: Promise<void> | undefined,
+    abort: boolean,
+  ): Promise<void> {
     try {
       await Promise.all([this.renderQueue, workersClosed]);
+      if (this.surfaceWriter !== undefined && !abort && !this.renderAbort.signal.aborted) {
+        const stats = await this.surfaceWriter.flush((dimension) => this.fingerprintsOf(dimension));
+        this.surfaceStats.writtenBytes = stats.writtenBytes;
+        this.surfaceStats.removedPacks = stats.removedPacks;
+        this.surfaceStats.totalBytes = stats.totalBytes;
+      }
     } finally {
       this.tiles.clear();
       this.renderCache.clear();
@@ -283,12 +417,24 @@ class IndexedBedrockWorld implements BedrockWorld {
       }
     }
 
+    const surfaceStore =
+      options.includeSurface === true
+        ? undefined
+        : this.surfaceStoreJob(
+            dimension,
+            options,
+            minInputTileX,
+            minInputTileY,
+            maxInputTileX,
+            maxInputTileY,
+          );
     return {
       coordinates,
       databaseDirectory: this.databaseDirectory,
       sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
       biomeRecords,
       cacheKey: this.cacheKey(dimension, options),
+      ...(surfaceStore === undefined ? {} : { surfaceStore }),
       ...(options.surfaceRange === undefined ? {} : { surfaceRange: options.surfaceRange }),
       ...(options.surfaceStyle === undefined ? {} : { surfaceStyle: options.surfaceStyle }),
       options: {
@@ -366,6 +512,8 @@ function filterKeyGroup(
  */
 export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<BedrockWorld> {
   input.signal?.throwIfAborted();
+  if (input.surfaceCache !== undefined && input.chunkFingerprints !== true)
+    throw new TypeError("surfaceCache requires chunkFingerprints: true");
   const renderConcurrency = input.renderConcurrency ?? 1;
   if (!Number.isSafeInteger(renderConcurrency) || renderConcurrency < 1) {
     throw new RangeError(
@@ -413,7 +561,12 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     input.forceWorkers === true,
     input.renderCacheMiB ?? DEFAULT_RENDER_CACHE_MIB,
     input.chunkFingerprints === true,
+    input.surfaceCache,
   );
+}
+
+function fingerprintText(chunk: ChunkDigest): string {
+  return `${Buffer.from(chunk.xor).toString("hex")}${chunk.count.toString(16)}`;
 }
 
 function indexTileKey(dimension: number, x: number, y: number): string {

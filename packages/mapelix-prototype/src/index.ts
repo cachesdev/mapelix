@@ -1,6 +1,11 @@
 export { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
 export { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
-export { openBedrockWorld, type BedrockWorldDirectory } from "./node-world.js";
+export {
+  openBedrockWorld,
+  type BedrockWorldDirectory,
+  type SurfaceCacheOptions,
+} from "./node-world.js";
+export { DEFAULT_SURFACE_STORE_MIB, type SurfaceStoreStats } from "./chunk-surface-store.js";
 export { writeLeafletTile, type LeafletTileOutput } from "./node-output.js";
 export type { SurfaceRange } from "./surface-range.js";
 export type { SurfaceBlockStyle, SurfaceStyle, SurfaceStyleVariant } from "./surface-style.js";

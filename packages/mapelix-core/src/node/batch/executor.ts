@@ -8,7 +8,7 @@ import { MAP_TILE_SIZE } from "../../tile-grid.js";
 import type { RenderedTile, TileCoordinates } from "../../types.js";
 import { jsonBytes, rendererIdentity, sha256, sourceIdentity } from "./identity.js";
 import { generationId, publishedManifest, verifyGeneration } from "./manifest.js";
-import { assertNoLinks, ownedPath, removeOwnedTree } from "./paths.js";
+import { assertNoLinks, assertTreeNoLinks, ownedPath, removeOwnedTree } from "./paths.js";
 import {
   changedChunks,
   dirtyTiles,
@@ -28,6 +28,20 @@ import type {
   PreparedBatch,
 } from "./types.js";
 
+export const SURFACE_CACHE_DIRECTORY = ".mapelix-surface-cache";
+
+/** Creates the owned surface cache directory and rejects links anywhere below it. */
+async function prepareSurfaceCache(output: string): Promise<string> {
+  const directory = ownedPath(output, SURFACE_CACHE_DIRECTORY);
+  try {
+    await mkdir(directory);
+  } catch (cause) {
+    if (!(cause instanceof Error && "code" in cause && cause.code === "EEXIST")) throw cause;
+  }
+  await assertTreeNoLinks(directory);
+  return directory;
+}
+
 /** Runs only in the supervised coordinator; no publication can occur from this worker. */
 export async function prepareBatch(
   input: BatchWorkerInput,
@@ -38,11 +52,27 @@ export async function prepareBatch(
   const source = await sourceIdentity(batch.world, batch.limits.maxInputFileBytes, signal);
   const renderer = await rendererIdentity();
   signal.throwIfAborted();
+  const surfaceCache =
+    batch.surfaceCacheMiB > 0
+      ? {
+          directory: await prepareSurfaceCache(batch.output),
+          // Chunk position, dimension, surface range and style are added by the renderer.
+          namespace: jsonBytes({
+            revision: renderer.revision,
+            appearanceSha256: renderer.appearanceSha256,
+            appearance: batch.appearance,
+            biomeBlendRadius: batch.biomeBlendRadius,
+          }),
+          maxMiB: batch.surfaceCacheMiB,
+        }
+      : undefined;
+  signal.throwIfAborted();
   const world = await openMapWorld({
     directory: batch.world,
     renderConcurrency: batch.limits.workers,
     forceWorkers: true,
     chunkFingerprints: true,
+    ...(surfaceCache === undefined ? {} : { surfaceCache }),
     signal,
   });
   const abort = () => {
@@ -195,7 +225,9 @@ export async function prepareBatch(
       true,
     );
     // Overview composition only reads the completed PNGs; release native workers first.
+    // Closing also writes newly extracted surfaces to the surface cache.
     await world.close();
+    const surfaceCacheStats = world.getSurfaceCacheStats?.();
     const overviewTiles = plan.tiles.filter((tile) => tile.z < 0);
     await reuseTiles(overviewTiles.filter((tile) => reusable(tile) !== undefined));
     const overviewJobs = overviewTiles.filter((tile) => reusable(tile) === undefined);
@@ -265,6 +297,7 @@ export async function prepareBatch(
       renderedTiles,
       composedOverviews,
       reusedTiles,
+      ...(surfaceCacheStats === undefined ? {} : { surfaceCache: surfaceCacheStats }),
     };
     return { manifest, generation, publicationBytes, update };
   } finally {

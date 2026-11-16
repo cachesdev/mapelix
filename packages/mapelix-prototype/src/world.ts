@@ -13,6 +13,7 @@ import { encodePng } from "./png.js";
 import { renderSurface, type RenderSurfaceOptions } from "./render.js";
 import { assertSurfaceRange, type SurfaceRange } from "./surface-range.js";
 import { surfaceBlockStyle, type SurfaceBlockStyle } from "./surface-style.js";
+import type { SurfaceStoreStats } from "./chunk-surface-store.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -38,6 +39,8 @@ export interface BedrockWorld {
    * worlds without it cannot be updated incrementally.
    */
   getChunkFingerprints?(dimension: Dimension): ReadonlyMap<string, string>;
+  /** Counters of the optional on-disk chunk surface store; final once `close()` resolves. */
+  getSurfaceCacheStats?(): SurfaceStoreStats | undefined;
   /** Stops accepting work and releases resources after draining or aborting accepted renders. */
   close(options?: CloseWorldOptions): Promise<void>;
 }

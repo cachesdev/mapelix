@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tileBounds, tileDependencyBounds } from "@mapelix/prototype";
@@ -161,4 +161,80 @@ describe("incremental batch export", () => {
       reason: "render settings changed",
     });
   }, 60_000);
+
+  it("reads cached chunk surfaces without changing any tile", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mapelix-surface-cache-"));
+    roots.push(root);
+    const before = join(root, "before");
+    const after = join(root, "after");
+    await writeFixtureWorld(before, [
+      sectionRecord(0, 0, 0, 4, "minecraft:grass_block"),
+      sectionRecord(0, 3, 2, 5, "minecraft:stone"),
+      sectionRecord(0, 40, 40, 4, "minecraft:stone"),
+    ]);
+    await writeFixtureWorld(after, [
+      sectionRecord(0, 0, 0, 4, "minecraft:grass_block"),
+      sectionRecord(0, 3, 2, 6, "minecraft:red_wool"),
+      sectionRecord(0, 40, 40, 4, "minecraft:stone"),
+    ]);
+    const options = {
+      zooms: [-1, 0, 1],
+      dimensions: ["overworld" as const],
+      limits: { workers: 1 },
+      incremental: true,
+      surfaceCache: { maxMiB: 16 },
+    };
+    const output = join(root, "export");
+    const cache = join(output, ".mapelix-surface-cache");
+    const first = await renderBatch({ ...options, world: before, output });
+    expect(first.update.surfaceCache).toMatchObject({ hits: 0 });
+    expect(first.update.surfaceCache!.stored).toBeGreaterThan(0);
+    expect(first.update.surfaceCache!.totalBytes).toBeGreaterThan(0);
+
+    const full = await renderBatch({
+      zooms: options.zooms,
+      dimensions: options.dimensions,
+      limits: options.limits,
+      world: after,
+      output: join(root, "full"),
+    });
+    const updated = await renderBatch({ ...options, world: after, output });
+    expect(updated.update.mode).toBe("incremental");
+    expect(updated.update.surfaceCache!.hits).toBeGreaterThan(0);
+    expect(updated.manifest.generation).toBe(full.manifest.generation);
+
+    // Damaged packs are ignored; the result is unchanged.
+    const packs = await packFiles(cache);
+    expect(packs.length).toBeGreaterThan(0);
+    for (const pack of packs) {
+      const bytes = await readFile(pack);
+      bytes[Math.floor(bytes.byteLength / 2)]! ^= 0xff;
+      await writeFile(pack, bytes);
+    }
+    await rm(join(output, "manifest.json"));
+    const damaged = await renderBatch({ ...options, world: after, output });
+    expect(damaged.update.surfaceCache).toMatchObject({ hits: 0 });
+    expect(damaged.update.surfaceCache!.rejected).toBeGreaterThan(0);
+    expect(damaged.manifest.generation).toBe(full.manifest.generation);
+
+    // A deleted cache is rebuilt; a linked one is refused.
+    await rm(cache, { recursive: true });
+    await rm(join(output, "manifest.json"));
+    const rebuilt = await renderBatch({ ...options, world: after, output });
+    expect(rebuilt.manifest.generation).toBe(full.manifest.generation);
+    await rm(cache, { recursive: true });
+    await mkdir(join(root, "elsewhere"));
+    await symlink(join(root, "elsewhere"), cache, "junction");
+    await expect(renderBatch({ ...options, world: after, output })).rejects.toThrow(/links/i);
+    expect(await readdir(join(root, "elsewhere"))).toEqual([]);
+  }, 90_000);
 });
+
+async function packFiles(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(directory, { withFileTypes: true, recursive: true })) {
+    if (entry.isFile() && entry.name.endsWith(".pack"))
+      files.push(join(entry.parentPath, entry.name));
+  }
+  return files;
+}
