@@ -30,6 +30,16 @@ Modern flat colors are the default. `--appearance reference` retains the previou
 keeping dimension profiles. `--shadows opacity` uses the renderer's existing opacity shadows;
 `--shadows off` disables them. Textures and isometric image output are outside this command.
 
+`--biome-blend-radius <n>` averages biome-dependent colors (grass, foliage, water) over the
+surrounding `n` blocks, from 0 to 16. The default 0 keeps the reference renderer's per-block biome
+colors; a radius widens each tile's input window by `n` blocks, so incremental updates re-render
+tiles within that distance of a changed chunk. `--correct-reference-bugs` opts into corrections of
+known reference-renderer defects; today it starts opacity-shadow rays at the physical top face of a
+block instead of almost one block above it. It is off by default so output matches the reference.
+Both settings are recorded with the render settings: changing either one makes `--incremental` fall
+back to a full render. A new blend radius also starts a new `--surface-cache` namespace; the shadow
+correction does not change extracted surfaces, so cached surfaces stay valid.
+
 The default zooms are -4..+2; explicit native +3 remains supported. For an overview-only selection,
 use `--zooms=-4,-1`. Zoom-zero sources are rendered once and streamed from PNGs with alpha-weighted
 area filtering. They are reused from the published inventory or kept temporarily within staging.
