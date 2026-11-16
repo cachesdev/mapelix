@@ -76,6 +76,8 @@ reference corrections and surface diagnostics. Existing custom color resolver ca
 precedence over declarative colors and use the main-process fallback. `forceWorkers: true` on
 `openBedrockWorld` enables workers even at concurrency one and refuses nonserializable callbacks.
 Its optional `signal` cancels startup file reads; close an opened world to cancel its renders.
+`renderCacheMiB` (default 256, per renderer) bounds the record and chunk-surface caches reused by
+consecutive tiles; `0` disables them. Rendered pixels do not depend on it.
 
 - Reads Bedrock LevelDB `.ldb`, `.sst`, and `.log` files, including tombstones and sequence ordering.
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.

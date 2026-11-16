@@ -70,36 +70,40 @@ export async function prepareBatch(
     const run = async (
       jobs: readonly TileCoordinates[],
       render: (coordinates: TileCoordinates) => Promise<RenderedTile>,
+      spatial = false,
     ): Promise<void> => {
-      let next = 0;
+      const lanes = Math.min(jobs.length, batch.limits.maxPending);
+      const bands = spatial ? spatialBands(jobs, lanes) : [[...jobs]];
       let failure: unknown;
-      const renderNext = async (): Promise<void> => {
+      const renderNext = async (lane: number): Promise<void> => {
         try {
-          while (next < jobs.length) {
+          for (let job = nextJob(bands, lane); job !== undefined; job = nextJob(bands, lane)) {
             signal.throwIfAborted();
-            await writeTile(await render(jobs[next++]!));
+            await writeTile(await render(job));
           }
         } catch (cause) {
           failure ??= cause;
           controller.abort(cause);
         }
       };
-      await Promise.all(
-        Array.from({ length: Math.min(jobs.length, batch.limits.maxPending) }, renderNext),
-      );
+      await Promise.all(Array.from({ length: lanes }, (_, lane) => renderNext(lane)));
       if (failure !== undefined) throw failure;
       signal.throwIfAborted();
     };
-    await run([...plan.tiles.filter((tile) => tile.z >= 0), ...plan.temporary], (coordinates) => {
-      const profile = batch.profiles.find((value) => value.dimension === coordinates.dimension)!;
-      return world.renderTile(coordinates, {
-        topY: profile.topY,
-        appearance: batch.appearance,
-        shadows: batch.shadows !== "off",
-        biomeBlendRadius: batch.biomeBlendRadius,
-        correctReferenceBugs: batch.correctReferenceBugs,
-      });
-    });
+    await run(
+      [...plan.tiles.filter((tile) => tile.z >= 0), ...plan.temporary],
+      (coordinates) => {
+        const profile = batch.profiles.find((value) => value.dimension === coordinates.dimension)!;
+        return world.renderTile(coordinates, {
+          topY: profile.topY,
+          appearance: batch.appearance,
+          shadows: batch.shadows !== "off",
+          biomeBlendRadius: batch.biomeBlendRadius,
+          correctReferenceBugs: batch.correctReferenceBugs,
+        });
+      },
+      true,
+    );
     // Overview composition only reads the completed PNGs; release native workers first.
     await world.close();
     await run(
@@ -176,4 +180,38 @@ export async function prepareBatch(
     signal.removeEventListener("abort", abort);
     await world.close({ abort: signal.aborted });
   }
+}
+
+/**
+ * Orders native tiles by dimension and zoom-0 area (north to south, west to east), then by zoom,
+ * and splits them into contiguous bands, one per concurrent lane. Neighbouring tiles and the
+ * native zooms of one area then reach the same renderer while its caches still hold them.
+ */
+export function spatialBands(jobs: readonly TileCoordinates[], lanes: number): TileCoordinates[][] {
+  const area = (tile: TileCoordinates, axis: "x" | "y"): number =>
+    tile.z > 0 ? Math.floor(tile[axis] / 2 ** tile.z) : tile[axis];
+  const ordered = [...jobs].sort(
+    (left, right) =>
+      left.dimension.localeCompare(right.dimension) ||
+      area(left, "y") - area(right, "y") ||
+      area(left, "x") - area(right, "x") ||
+      left.z - right.z ||
+      left.y - right.y ||
+      left.x - right.x,
+  );
+  return Array.from({ length: lanes }, (_, lane) =>
+    ordered.slice(
+      Math.floor((ordered.length * lane) / lanes),
+      Math.floor((ordered.length * (lane + 1)) / lanes),
+    ),
+  );
+}
+
+/** Takes the next job of the band of a lane, or else the last job of the largest band. */
+export function nextJob(bands: TileCoordinates[][], lane: number): TileCoordinates | undefined {
+  const job = bands[lane % bands.length]!.shift();
+  if (job !== undefined) return job;
+  let largest: TileCoordinates[] | undefined;
+  for (const band of bands) if (band.length > (largest?.length ?? 0)) largest = band;
+  return largest?.pop();
 }

@@ -1,7 +1,7 @@
 import { Worker } from "node:worker_threads";
 
 import type { IndexedTileRenderJob } from "./node-tile-render.js";
-import type { RenderedTile } from "./tile.js";
+import { tileBounds, type RenderedTile } from "./tile.js";
 import { renderAbortError } from "./render-abort.js";
 import type { CloseWorldOptions } from "./world.js";
 
@@ -21,10 +21,19 @@ interface PendingRender {
 interface WorkerSlot {
   readonly worker: Worker;
   active: PendingRender | undefined;
+  /** Block-space centre of the last job, used to keep neighbouring tiles on one warm cache. */
+  last: JobLocation | undefined;
+}
+
+interface JobLocation {
+  readonly dimension: string;
+  readonly x: number;
+  readonly z: number;
 }
 
 export class TileRenderWorkerPool {
   readonly concurrency: number;
+  private readonly renderCacheMiB: number | undefined;
   private readonly slots: WorkerSlot[] = [];
   private readonly queue: PendingRender[] = [];
   private readonly pending = new Set<Promise<RenderedTile>>();
@@ -32,8 +41,9 @@ export class TileRenderWorkerPool {
   private closed = false;
   private closePromise: Promise<void> | undefined;
 
-  constructor(concurrency: number) {
+  constructor(concurrency: number, renderCacheMiB?: number) {
     this.concurrency = concurrency;
+    this.renderCacheMiB = renderCacheMiB;
     for (let index = 0; index < concurrency; index += 1) {
       this.slots.push(this.createSlot());
     }
@@ -74,8 +84,10 @@ export class TileRenderWorkerPool {
   }
 
   private createSlot(): WorkerSlot {
-    const worker = new Worker(new URL("./node-render-worker.js", import.meta.url));
-    const slot: WorkerSlot = { worker, active: undefined };
+    const worker = new Worker(new URL("./node-render-worker.js", import.meta.url), {
+      workerData: { renderCacheMiB: this.renderCacheMiB },
+    });
+    const slot: WorkerSlot = { worker, active: undefined, last: undefined };
     worker.on("message", (response: WorkerResponse) => this.complete(slot, response));
     worker.on("error", (cause) => this.fail(slot, cause));
     worker.on("exit", (code) => {
@@ -87,19 +99,20 @@ export class TileRenderWorkerPool {
   }
 
   private dispatch(): void {
-    for (const slot of this.slots) {
-      while (slot.active === undefined) {
-        const pending = this.queue.shift();
-        if (pending === undefined) return;
-        slot.active = pending;
-        slot.worker.ref();
-        try {
-          slot.worker.postMessage({ id: pending.id, job: pending.job });
-        } catch (cause) {
-          slot.active = undefined;
-          slot.worker.unref();
-          pending.reject(cause instanceof Error ? cause : new Error(String(cause)));
-        }
+    while (this.queue.length > 0) {
+      const location = jobLocation(this.queue[0]!.job);
+      const slot = nearestIdleSlot(this.slots, location);
+      if (slot === undefined) return;
+      const pending = this.queue.shift()!;
+      slot.active = pending;
+      slot.last = location;
+      slot.worker.ref();
+      try {
+        slot.worker.postMessage({ id: pending.id, job: pending.job });
+      } catch (cause) {
+        slot.active = undefined;
+        slot.worker.unref();
+        pending.reject(cause instanceof Error ? cause : new Error(String(cause)));
       }
     }
   }
@@ -130,4 +143,35 @@ export class TileRenderWorkerPool {
     if (!this.closed || this.queue.length > 0) this.slots.push(this.createSlot());
     this.dispatch();
   }
+}
+
+function jobLocation(job: IndexedTileRenderJob): JobLocation {
+  const bounds = tileBounds(job.coordinates);
+  return {
+    dimension: job.coordinates.dimension,
+    x: (bounds.minX + bounds.maxX) / 2,
+    z: (bounds.minZ + bounds.maxZ) / 2,
+  };
+}
+
+/** Prefers the idle worker whose previous tile was nearest, so its caches stay useful. */
+function nearestIdleSlot(
+  slots: readonly WorkerSlot[],
+  location: JobLocation,
+): WorkerSlot | undefined {
+  let best: WorkerSlot | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const slot of slots) {
+    if (slot.active !== undefined) continue;
+    const last = slot.last;
+    const distance =
+      last === undefined || last.dimension !== location.dimension
+        ? Number.MAX_VALUE
+        : (last.x - location.x) ** 2 + (last.z - location.z) ** 2;
+    if (best === undefined || distance < bestDistance) {
+      best = slot;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }

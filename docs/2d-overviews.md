@@ -129,7 +129,8 @@ power-loss limitations.
 
 Overview composition is cheap: about 0.3 s for all four overview levels of the local Overworld
 snapshot. Export time is dominated by native zooms 0..+2 and their shadow halo. Measurements, the
-profile and the proposed follow-up are in [2D export performance](2d-performance.md).
+profile and the shared caches that cut the full Overworld export from 151 s to about 14.5 s are in
+[2D export performance](2d-performance.md).
 
 ## Validation
 

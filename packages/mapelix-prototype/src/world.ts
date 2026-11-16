@@ -67,23 +67,54 @@ interface SurfaceSubchunk extends DecodedSubchunk {
 /** uNmINeD-compatible horizontal input halo for the default 3D shadow pass. */
 export const SHADOW_RENDER_HALO = 256;
 
+/**
+ * Surface columns of one 16 x 16 chunk, indexed `localZ * 16 + localX`.
+ *
+ * A chunk surface depends only on the chunk's own records, the surface range and the surface
+ * style, so it can be shared by every tile whose input covers the chunk.
+ */
+export type ChunkSurface = readonly (SurfaceBlock | undefined)[];
+
+/**
+ * Optional store of extracted chunk surfaces. One store must only be used with a single record
+ * snapshot, dimension, surface range and surface style; callers key it accordingly.
+ */
+export interface ChunkSurfaceCache {
+  /**
+   * `biomeScoped` is true when the chunk lies inside the 3 x 3 storage-tile neighbourhood whose
+   * biome records a tile render reads. Surfaces computed with and without biome data differ.
+   */
+  get(chunkX: number, chunkZ: number, biomeScoped: boolean): ChunkSurface | undefined;
+  set(chunkX: number, chunkZ: number, biomeScoped: boolean, surface: ChunkSurface): void;
+}
+
+type TileRecordGroups = ReadonlyMap<string, readonly EffectiveBedrockRecord[]>;
+
+function groupTileRecords(
+  records: Iterable<EffectiveBedrockRecord>,
+): Map<string, EffectiveBedrockRecord[]> {
+  const tileRecords = new Map<string, EffectiveBedrockRecord[]>();
+  for (const record of records) {
+    const location = classifyMapRecordKey(record.key);
+    if (location === undefined) {
+      continue;
+    }
+    const tileX = floorDiv(location.x, 16);
+    const tileY = floorDiv(location.z, 16);
+    const tileKey = tileRecordKey(location.dimension, tileX, tileY);
+    const group = tileRecords.get(tileKey) ?? [];
+    group.push(record);
+    tileRecords.set(tileKey, group);
+  }
+  return tileRecords;
+}
+
 class RecordBedrockWorld implements BedrockWorld {
-  readonly tileRecords = new Map<string, EffectiveBedrockRecord[]>();
+  readonly tileRecords: Map<string, EffectiveBedrockRecord[]>;
   private closed = false;
 
   constructor(records: Iterable<EffectiveBedrockRecord>) {
-    for (const record of records) {
-      const location = classifyMapRecordKey(record.key);
-      if (location === undefined) {
-        continue;
-      }
-      const tileX = floorDiv(location.x, 16);
-      const tileY = floorDiv(location.z, 16);
-      const tileKey = tileRecordKey(location.dimension, tileX, tileY);
-      const group = this.tileRecords.get(tileKey) ?? [];
-      group.push(record);
-      this.tileRecords.set(tileKey, group);
-    }
+    this.tileRecords = groupTileRecords(records);
   }
 
   async renderTile(
@@ -91,151 +122,7 @@ class RecordBedrockWorld implements BedrockWorld {
     options: RenderTileOptions = {},
   ): Promise<RenderedTile> {
     if (this.closed) throw new Error("The Bedrock world is closed");
-    const range = options.surfaceRange;
-    assertSurfaceRange(range);
-    const bounds = tileBounds(coordinates);
-    const dimension = DIMENSION_IDS[coordinates.dimension];
-    const chunks = new Map<string, SurfaceSubchunk[]>();
-    const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
-    const biome3DChunks = new Map<number, Map<number, DecodedData3D>>();
-    const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
-    const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
-    const inputBounds = tileInputBounds(coordinates, options.shadows !== false);
-
-    for (let tileOffsetY = -1; tileOffsetY <= 1; tileOffsetY += 1) {
-      for (let tileOffsetX = -1; tileOffsetX <= 1; tileOffsetX += 1) {
-        const neighborRecords = this.tileRecords.get(
-          tileRecordKey(dimension, storageTileX + tileOffsetX, storageTileY + tileOffsetY),
-        );
-        for (const record of neighborRecords ?? []) {
-          const mapKey = classifyMapRecordKey(record.key);
-          if (mapKey === undefined || mapKey.dimension !== dimension) continue;
-          if (mapKey.tag === DATA_2D_TAG) {
-            const data = decodeData2D(record.key, record.value);
-            if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
-          } else if (mapKey.tag === DATA_3D_TAG) {
-            const data = decodeData3D(record.key, record.value, {
-              repeatBelow: range !== undefined,
-            });
-            if (data !== undefined) setBiomeChunk(biome3DChunks, mapKey.x, mapKey.z, data);
-          }
-        }
-      }
-    }
-
-    const minStorageTileX = floorDiv(inputBounds.minX, TILE_SIZE);
-    const minStorageTileY = floorDiv(inputBounds.minZ, TILE_SIZE);
-    const maxStorageTileX = floorDiv(inputBounds.maxX - 1, TILE_SIZE);
-    const maxStorageTileY = floorDiv(inputBounds.maxZ - 1, TILE_SIZE);
-    for (let inputTileY = minStorageTileY; inputTileY <= maxStorageTileY; inputTileY += 1) {
-      for (let inputTileX = minStorageTileX; inputTileX <= maxStorageTileX; inputTileX += 1) {
-        const records = this.tileRecords.get(tileRecordKey(dimension, inputTileX, inputTileY));
-        for (const record of records ?? []) {
-          const mapKey = classifyMapRecordKey(record.key);
-          if (mapKey?.tag === DATA_2D_TAG || mapKey?.tag === DATA_3D_TAG) continue;
-          const key = mapKey?.tag === SUBCHUNK_TAG ? mapKey : undefined;
-          if (
-            key === undefined ||
-            key.dimension !== dimension ||
-            key.x * 16 < inputBounds.minX ||
-            key.x * 16 >= inputBounds.maxX ||
-            key.z * 16 < inputBounds.minZ ||
-            key.z * 16 >= inputBounds.maxZ ||
-            (range !== undefined && (key.y * 16 > range.topY || key.y * 16 + 15 < range.minY))
-          ) {
-            continue;
-          }
-
-          const decoded = decodeSubchunk(record.key, record.value, {
-            includeStates: options.surfaceStyle !== undefined,
-          });
-          const subchunk: SurfaceSubchunk | undefined =
-            decoded === undefined || options.surfaceStyle === undefined
-              ? decoded
-              : {
-                  ...decoded,
-                  styles: decoded.primary.palette.map((name, index) =>
-                    surfaceBlockStyle(
-                      options.surfaceStyle,
-                      name,
-                      decoded.primary.states?.[index] ?? {},
-                    ),
-                  ),
-                };
-          if (subchunk === undefined) continue;
-          const chunkKey = `${key.x},${key.z}`;
-          const group = chunks.get(chunkKey) ?? [];
-          group.push(subchunk);
-          chunks.set(chunkKey, group);
-        }
-      }
-    }
-
-    const blockSpan = tileBlockSpan(coordinates.z);
-    const inputWidth = inputBounds.maxX - inputBounds.minX;
-    const inputHeight = inputBounds.maxZ - inputBounds.minZ;
-    const inputSamples = Array.from(
-      { length: inputWidth * inputHeight },
-      (): SurfaceBlock | undefined => undefined,
-    );
-    for (const subchunks of chunks.values()) {
-      subchunks.sort((left, right) => right.y - left.y);
-      const key = subchunks[0]?.key;
-      if (key === undefined) {
-        continue;
-      }
-      writeChunkSurface(
-        inputSamples,
-        inputWidth,
-        inputHeight,
-        inputBounds.minX,
-        inputBounds.minZ,
-        key.x,
-        key.z,
-        subchunks,
-        biomeChunks.get(key.x)?.get(key.z),
-        biome3DChunks.get(key.x)?.get(key.z),
-        range,
-      );
-    }
-
-    const samples = Array.from(
-      { length: blockSpan * blockSpan },
-      (_, index): SurfaceBlock | undefined => {
-        const x = index % blockSpan;
-        const z = Math.floor(index / blockSpan);
-        return inputSamples[
-          (bounds.minZ + z - inputBounds.minZ) * inputWidth + (bounds.minX + x - inputBounds.minX)
-        ];
-      },
-    );
-    let maximumHeight = Number.NEGATIVE_INFINITY;
-    for (const sample of inputSamples) {
-      if (sample !== undefined)
-        maximumHeight = Math.max(maximumHeight, sample.supportY ?? sample.y);
-    }
-
-    const rgba = renderSurface(samples, options, {
-      biomeAt: (x, z) => biomeAt(biomeChunks, bounds.minX + x, bounds.minZ + z),
-      sampleAt: (x, z) => {
-        const inputX = bounds.minX + x - inputBounds.minX;
-        const inputZ = bounds.minZ + z - inputBounds.minZ;
-        if (inputX < 0 || inputX >= inputWidth || inputZ < 0 || inputZ >= inputHeight) {
-          return undefined;
-        }
-        return inputSamples[inputZ * inputWidth + inputX];
-      },
-      maximumHeight,
-    });
-    return {
-      coordinates,
-      bounds,
-      width: TILE_SIZE,
-      height: TILE_SIZE,
-      rgba,
-      png: encodePng(rgba, TILE_SIZE, TILE_SIZE),
-      ...(options.includeSurface === true ? { surface: { sampleSize: blockSpan, samples } } : {}),
-    };
+    return renderGroupedTile(this.tileRecords, coordinates, options);
   }
 
   getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
@@ -265,6 +152,240 @@ class RecordBedrockWorld implements BedrockWorld {
     this.tileRecords.clear();
     return Promise.resolve();
   }
+}
+
+/**
+ * Renders one tile from effective records. Chunks found in `chunkSurfaces` are reused instead of
+ * being extracted again, and every chunk extracted from `records` is stored in it. The rendered
+ * pixels are identical with or without the store.
+ */
+export function renderRecordTile(
+  records: Iterable<EffectiveBedrockRecord>,
+  coordinates: TileCoordinates,
+  options: RenderTileOptions = {},
+  chunkSurfaces?: ChunkSurfaceCache,
+): RenderedTile {
+  return renderGroupedTile(groupTileRecords(records), coordinates, options, chunkSurfaces);
+}
+
+/** True when a tile render reads the biome records of this chunk. */
+export function chunkHasBiomeScope(
+  coordinates: TileCoordinates,
+  chunkX: number,
+  chunkZ: number,
+): boolean {
+  const bounds = tileBounds(coordinates);
+  return (
+    Math.abs(floorDiv(chunkX, 16) - floorDiv(bounds.minX, TILE_SIZE)) <= 1 &&
+    Math.abs(floorDiv(chunkZ, 16) - floorDiv(bounds.minZ, TILE_SIZE)) <= 1
+  );
+}
+
+const EMPTY_CHUNK_SURFACE: ChunkSurface = Object.freeze(
+  Array.from({ length: 256 }, (): SurfaceBlock | undefined => undefined),
+);
+
+function renderGroupedTile(
+  tileRecords: TileRecordGroups,
+  coordinates: TileCoordinates,
+  options: RenderTileOptions,
+  chunkSurfaces?: ChunkSurfaceCache,
+): RenderedTile {
+  const range = options.surfaceRange;
+  assertSurfaceRange(range);
+  const bounds = tileBounds(coordinates);
+  const dimension = DIMENSION_IDS[coordinates.dimension];
+  const chunks = new Map<string, SurfaceSubchunk[]>();
+  const loadedChunks = new Map<string, { readonly x: number; readonly z: number }>();
+  const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
+  const biome3DChunks = new Map<number, Map<number, DecodedData3D>>();
+  const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
+  const storageTileY = floorDiv(bounds.minZ, TILE_SIZE);
+  const inputBounds = tileInputBounds(coordinates, options.shadows !== false);
+
+  for (let tileOffsetY = -1; tileOffsetY <= 1; tileOffsetY += 1) {
+    for (let tileOffsetX = -1; tileOffsetX <= 1; tileOffsetX += 1) {
+      const neighborRecords = tileRecords.get(
+        tileRecordKey(dimension, storageTileX + tileOffsetX, storageTileY + tileOffsetY),
+      );
+      for (const record of neighborRecords ?? []) {
+        const mapKey = classifyMapRecordKey(record.key);
+        if (mapKey === undefined || mapKey.dimension !== dimension) continue;
+        if (mapKey.tag === DATA_2D_TAG) {
+          const data = decodeData2D(record.key, record.value);
+          if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
+        } else if (mapKey.tag === DATA_3D_TAG) {
+          const data = decodeData3D(record.key, record.value, {
+            repeatBelow: range !== undefined,
+          });
+          if (data !== undefined) setBiomeChunk(biome3DChunks, mapKey.x, mapKey.z, data);
+        }
+      }
+    }
+  }
+
+  const minStorageTileX = floorDiv(inputBounds.minX, TILE_SIZE);
+  const minStorageTileY = floorDiv(inputBounds.minZ, TILE_SIZE);
+  const maxStorageTileX = floorDiv(inputBounds.maxX - 1, TILE_SIZE);
+  const maxStorageTileY = floorDiv(inputBounds.maxZ - 1, TILE_SIZE);
+  for (let inputTileY = minStorageTileY; inputTileY <= maxStorageTileY; inputTileY += 1) {
+    for (let inputTileX = minStorageTileX; inputTileX <= maxStorageTileX; inputTileX += 1) {
+      const records = tileRecords.get(tileRecordKey(dimension, inputTileX, inputTileY));
+      for (const record of records ?? []) {
+        const mapKey = classifyMapRecordKey(record.key);
+        if (mapKey === undefined || mapKey.tag === DATA_2D_TAG) continue;
+        if (
+          chunkSurfaces !== undefined &&
+          mapKey.dimension === dimension &&
+          chunkOriginInside(mapKey.x, mapKey.z, inputBounds)
+        ) {
+          loadedChunks.set(`${mapKey.x},${mapKey.z}`, { x: mapKey.x, z: mapKey.z });
+        }
+        if (mapKey.tag === DATA_3D_TAG) continue;
+        const key = mapKey.tag === SUBCHUNK_TAG ? mapKey : undefined;
+        if (
+          key === undefined ||
+          key.dimension !== dimension ||
+          !chunkOriginInside(key.x, key.z, inputBounds) ||
+          (range !== undefined && (key.y * 16 > range.topY || key.y * 16 + 15 < range.minY))
+        ) {
+          continue;
+        }
+
+        const decoded = decodeSubchunk(record.key, record.value, {
+          includeStates: options.surfaceStyle !== undefined,
+        });
+        const subchunk: SurfaceSubchunk | undefined =
+          decoded === undefined || options.surfaceStyle === undefined
+            ? decoded
+            : {
+                ...decoded,
+                styles: decoded.primary.palette.map((name, index) =>
+                  surfaceBlockStyle(
+                    options.surfaceStyle,
+                    name,
+                    decoded.primary.states?.[index] ?? {},
+                  ),
+                ),
+              };
+        if (subchunk === undefined) continue;
+        const chunkKey = `${key.x},${key.z}`;
+        const group = chunks.get(chunkKey) ?? [];
+        group.push(subchunk);
+        chunks.set(chunkKey, group);
+      }
+    }
+  }
+
+  const blockSpan = tileBlockSpan(coordinates.z);
+  const inputWidth = inputBounds.maxX - inputBounds.minX;
+  const inputHeight = inputBounds.maxZ - inputBounds.minZ;
+  const inputSamples = Array.from(
+    { length: inputWidth * inputHeight },
+    (): SurfaceBlock | undefined => undefined,
+  );
+  const writeSurface = (chunkX: number, chunkZ: number, surface: ChunkSurface): void =>
+    writeChunkSurface(
+      inputSamples,
+      inputWidth,
+      inputHeight,
+      inputBounds.minX,
+      inputBounds.minZ,
+      chunkX,
+      chunkZ,
+      surface,
+    );
+
+  if (chunkSurfaces !== undefined) {
+    const minChunkX = -floorDiv(-inputBounds.minX, 16);
+    const minChunkZ = -floorDiv(-inputBounds.minZ, 16);
+    const maxChunkX = floorDiv(inputBounds.maxX - 1, 16);
+    const maxChunkZ = floorDiv(inputBounds.maxZ - 1, 16);
+    for (let chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ += 1) {
+      for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX += 1) {
+        if (loadedChunks.has(`${chunkX},${chunkZ}`)) continue;
+        const cached = chunkSurfaces.get(
+          chunkX,
+          chunkZ,
+          chunkHasBiomeScope(coordinates, chunkX, chunkZ),
+        );
+        if (cached !== undefined) writeSurface(chunkX, chunkZ, cached);
+      }
+    }
+  }
+
+  for (const subchunks of chunks.values()) {
+    subchunks.sort((left, right) => right.y - left.y);
+    const key = subchunks[0]?.key;
+    if (key === undefined) {
+      continue;
+    }
+    const surface = extractChunkSurface(
+      subchunks,
+      biomeChunks.get(key.x)?.get(key.z),
+      biome3DChunks.get(key.x)?.get(key.z),
+      range,
+    );
+    writeSurface(key.x, key.z, surface);
+    chunkSurfaces?.set(key.x, key.z, chunkHasBiomeScope(coordinates, key.x, key.z), surface);
+  }
+  if (chunkSurfaces !== undefined) {
+    for (const [chunkKey, chunk] of loadedChunks) {
+      if (chunks.has(chunkKey)) continue;
+      chunkSurfaces.set(
+        chunk.x,
+        chunk.z,
+        chunkHasBiomeScope(coordinates, chunk.x, chunk.z),
+        EMPTY_CHUNK_SURFACE,
+      );
+    }
+  }
+
+  const samples = Array.from(
+    { length: blockSpan * blockSpan },
+    (_, index): SurfaceBlock | undefined => {
+      const x = index % blockSpan;
+      const z = Math.floor(index / blockSpan);
+      return inputSamples[
+        (bounds.minZ + z - inputBounds.minZ) * inputWidth + (bounds.minX + x - inputBounds.minX)
+      ];
+    },
+  );
+  let maximumHeight = Number.NEGATIVE_INFINITY;
+  for (const sample of inputSamples) {
+    if (sample !== undefined) maximumHeight = Math.max(maximumHeight, sample.supportY ?? sample.y);
+  }
+
+  const rgba = renderSurface(samples, options, {
+    biomeAt: (x, z) => biomeAt(biomeChunks, bounds.minX + x, bounds.minZ + z),
+    sampleAt: (x, z) => {
+      const inputX = bounds.minX + x - inputBounds.minX;
+      const inputZ = bounds.minZ + z - inputBounds.minZ;
+      if (inputX < 0 || inputX >= inputWidth || inputZ < 0 || inputZ >= inputHeight) {
+        return undefined;
+      }
+      return inputSamples[inputZ * inputWidth + inputX];
+    },
+    maximumHeight,
+  });
+  return {
+    coordinates,
+    bounds,
+    width: TILE_SIZE,
+    height: TILE_SIZE,
+    rgba,
+    png: encodePng(rgba, TILE_SIZE, TILE_SIZE),
+    ...(options.includeSurface === true ? { surface: { sampleSize: blockSpan, samples } } : {}),
+  };
+}
+
+function chunkOriginInside(chunkX: number, chunkZ: number, bounds: BlockBounds): boolean {
+  return (
+    chunkX * 16 >= bounds.minX &&
+    chunkX * 16 < bounds.maxX &&
+    chunkZ * 16 >= bounds.minZ &&
+    chunkZ * 16 < bounds.maxZ
+  );
 }
 
 function biomeAt(
@@ -319,11 +440,27 @@ function writeChunkSurface(
   tileMinZ: number,
   chunkX: number,
   chunkZ: number,
+  surface: ChunkSurface,
+): void {
+  for (let localZ = 0; localZ < 16; localZ += 1) {
+    const pixelZ = chunkZ * 16 + localZ - tileMinZ;
+    if (pixelZ < 0 || pixelZ >= sampleHeight) continue;
+    for (let localX = 0; localX < 16; localX += 1) {
+      const sample = surface[localZ * 16 + localX];
+      if (sample === undefined) continue;
+      const pixelX = chunkX * 16 + localX - tileMinX;
+      if (pixelX < 0 || pixelX >= sampleWidth) continue;
+      samples[pixelZ * sampleWidth + pixelX] = sample;
+    }
+  }
+}
+
+function extractChunkSurface(
   subchunks: readonly SurfaceSubchunk[],
   biomes: DecodedData2D | undefined,
   biomes3D: DecodedData3D | undefined,
   range: SurfaceRange | undefined,
-): void {
+): ChunkSurface {
   const biomeSectionYs =
     range === undefined
       ? subchunks
@@ -334,24 +471,22 @@ function writeChunkSurface(
           { length: (range.maxY - range.minY) / 16 },
           (_, index) => range.minY / 16 + index,
         );
+  const columns = Array.from({ length: 256 }, (): SurfaceBlock | undefined => undefined);
   for (let localZ = 0; localZ < 16; localZ += 1) {
     for (let localX = 0; localX < 16; localX += 1) {
       const surface = findSurfaceBlock(subchunks, localX, localZ, range);
       if (surface === undefined) {
         continue;
       }
-      const pixelX = chunkX * 16 + localX - tileMinX;
-      const pixelZ = chunkZ * 16 + localZ - tileMinZ;
-      if (pixelX < 0 || pixelX >= sampleWidth || pixelZ < 0 || pixelZ >= sampleHeight) continue;
       const biomeId =
         (biomes3D === undefined
           ? undefined
           : data3DBiomeAt(biomes3D, biomeSectionYs, localX, surface.y, localZ)) ??
         (biomes === undefined ? undefined : data2DBiomeAt(biomes, localX, localZ));
-      samples[pixelZ * sampleWidth + pixelX] =
-        biomeId === undefined ? surface : { ...surface, biomeId };
+      columns[localZ * 16 + localX] = biomeId === undefined ? surface : { ...surface, biomeId };
     }
   }
+  return columns;
 }
 
 function findSurfaceBlock(

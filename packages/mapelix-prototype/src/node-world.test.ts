@@ -210,6 +210,67 @@ describe("openBedrockWorld", () => {
       await rm(worldDirectory, { recursive: true, force: true });
     }
   });
+
+  it.each([
+    { label: "an unbounded", renderCacheMiB: 256, renderConcurrency: 1 },
+    { label: "an evicting", renderCacheMiB: 0.01, renderConcurrency: 1 },
+  ])(
+    "renders identical pixels with $label render cache",
+    async ({ renderCacheMiB, renderConcurrency }) => {
+      const worldDirectory = await mkdtemp(join(tmpdir(), "mapelix-render-cache-"));
+      try {
+        const databaseDirectory = join(worldDirectory, "db");
+        await mkdir(databaseDirectory);
+        const entries = [];
+        for (const [chunkX, chunkZ] of [
+          [-17, -3],
+          [-2, 0],
+          [-1, 0],
+          [0, 0],
+          [0, 1],
+          [3, 4],
+          [15, 15],
+          [16, 2],
+        ] as const) {
+          const height = 4 + ((chunkX * 7 + chunkZ * 3) & 3);
+          entries.push(singleBlockSubchunk(chunkX, chunkZ, height, chunkX & 15, chunkZ & 15));
+          entries.push(data2DChunk(chunkX, chunkZ, 1 + (chunkX & 3)));
+        }
+        await writeFile(join(databaseDirectory, "000001.log"), levelDbLog(entries));
+        const tiles = [
+          { z: 0, x: 0, y: 0 },
+          { z: 0, x: -1, y: 0 },
+          { z: 1, x: 0, y: 0 },
+          { z: 1, x: 1, y: 1 },
+          { z: 2, x: 0, y: 0 },
+          { z: 2, x: 3, y: 2 },
+          { z: 2, x: -1, y: -1 },
+          { z: 0, x: 0, y: 0 },
+        ].map((tile) => ({ dimension: "overworld" as const, ...tile }));
+        const renderAll = async (cacheMiB: number, concurrency: number) => {
+          const world = await openBedrockWorld({
+            directory: worldDirectory,
+            renderCacheMiB: cacheMiB,
+            renderConcurrency: concurrency,
+          });
+          try {
+            const rendered = [];
+            for (const coordinates of tiles) {
+              rendered.push(await world.renderTile(coordinates, { biomeBlendRadius: 2 }));
+            }
+            return rendered.map((tile) => Buffer.from(tile.rgba).toString("base64"));
+          } finally {
+            await world.close();
+          }
+        };
+
+        expect(await renderAll(renderCacheMiB, renderConcurrency)).toEqual(await renderAll(0, 1));
+      } finally {
+        await rm(worldDirectory, { recursive: true, force: true });
+      }
+    },
+    15_000,
+  );
 });
 
 interface LifecycleResult {

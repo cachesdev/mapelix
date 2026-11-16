@@ -5,7 +5,7 @@ follow-up. All numbers come from one small local Bedrock snapshot (Overworld and
 chunks) on a desktop Ryzen 7 7800X3D with Node 24.14.1. The OS file cache was not controlled. Treat
 them as relative observations, not release budgets.
 
-## Baseline
+## Baseline before batch 4b
 
 Fresh process and output, compiled CLI, two rendering workers, default output (opacity shadows):
 
@@ -37,7 +37,7 @@ With matched opacity shadows, Mapelix is about 12 times slower on the Overworld.
 renderer also writes some fully empty native tiles (28 at zoom 0 against 17), so tile counts differ
 while the 19 overview tiles match.
 
-## Where the time goes
+## Where the time went before batch 4b
 
 A dense diagnostic profile (timers in every worker, about 50 % overhead, so not a baseline) shows:
 
@@ -57,21 +57,44 @@ A dense diagnostic profile (timers in every worker, about 50 % overhead, so not 
 Profiling hooks were observational: every profiled export produced PNGs byte-identical to the
 unprofiled exports.
 
-## Proposed follow-up (batch 4b)
+## Shared caches and spatial scheduling (batch 4b)
 
-Goal: the default Overworld export of this snapshot in at most twice the reference renderer's
-height-shading time (≤ 21.6 s), with byte-identical reference PNGs, a stated worker budget and
-repeated warm and cold measurements.
+The native zooms now reuse work across tiles, with unchanged output:
 
-1. Reuse decoded records, chunks, biome and style data, surfaces and full-height opacity runs across
-   neighbouring native tiles and across zooms 0..+2, inside an explicit cache byte budget keyed by
-   snapshot, dimension, height cut, appearance and biome settings.
-2. Schedule native tiles spatially so that neighbouring tiles share one worker and its cache.
-3. Stop rereading and inflating the selected LevelDB files for every native tile.
-4. Keep resolution-dependent shadow sampling and shading exactly: no resizing of +2 into lower
-   native zooms, no smaller default halo, no change to opacity math.
-5. Optionally, and only if approved, add a lighter shadow mode with explicitly different quality.
-   It must never change the default PNG reference set.
+1. **Chunk surfaces.** Each renderer keeps the extracted surface of every chunk it decodes: top
+   block, cover, water depth, colour layers, biome ID and the full-height opacity runs used by
+   shadows. A surface depends only on the chunk's records, the dimension's surface range and the
+   surface style, so neighbouring tiles and zooms 0, +1 and +2 reuse it. The 256-block shadow halo
+   is still read and shaded at full resolution; it is just no longer re-extracted for every tile.
+   Entries are keyed by dimension, surface range, surface style and whether the chunk's biome
+   records are in the tile's biome neighbourhood.
+2. **Database records.** Map records of a database file are parsed and inflated once per renderer
+   and kept by file name, instead of rereading the file for every tile. A file larger than the
+   record budget is still read per tile for the requested keys only.
+3. **Spatial scheduling.** Batch exports sort native tiles by zoom-0 area (north to south, west to
+   east), then by zoom, and give each concurrent lane a contiguous band. The worker pool sends a job
+   to the idle worker whose previous tile was nearest. A lane that finishes early takes work from
+   the end of the largest remaining band.
+
+Both caches are least-recently-used and bounded by `renderCacheMiB` per renderer (default 256:
+a quarter for records, the rest for surfaces). Sizes are estimates of retained memory. `0` disables
+reuse. Surfaces used by a tile are pinned for that render, so eviction never changes a tile.
+
+Same snapshot and machine, fresh process and output, two workers, default output:
+
+| Dimension | Zooms  | Tiles | Before   | After (3 runs)    | Peak RSS before / after |
+| --------- | ------ | ----: | -------: | ----------------: | ----------------------: |
+| Overworld | -4..+2 |   376 | 151.44 s | 14.43–14.62 s     | 1026 / 1110–1171 MiB    |
+| Nether    | -4..+2 |   184 |  34.30 s | 5.15–5.43 s       |  823 / 848–915 MiB      |
+| Overworld, shadows off | -4..+2 | 376 | 25.29 s | 7.80 s |  718 / 942 MiB          |
+
+The Overworld export with default opacity shadows is now within twice the reference renderer's
+height-shading time (10.82 s), and close to its opacity-shadow time (12.89 s). Every PNG of these
+exports, including the overview zooms, is byte-identical to the previous exports. The OS file
+cache was warm (the snapshot is 15 MiB); cold-cache runs were not controlled separately.
+
+No shadow quality was changed: there is no reduced halo, no resizing between native zooms and no
+lighter shadow mode.
 
 Incremental rendering (batch 5) is a separate goal. It must invalidate on real per-dimension
 dependencies, including shadow-halo and biome-blend neighbours. A useful order of magnitude: a

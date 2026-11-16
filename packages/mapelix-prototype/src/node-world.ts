@@ -15,6 +15,8 @@ import {
   type PackedKeyGroup,
 } from "./node-tile-render.js";
 import { TileRenderWorkerPool } from "./node-worker-pool.js";
+import { DEFAULT_RENDER_CACHE_MIB, TileRenderCache } from "./tile-render-cache.js";
+import type { SurfaceStyle } from "./surface-style.js";
 import { renderAbortError } from "./render-abort.js";
 import { assertSurfaceRange } from "./surface-range.js";
 import {
@@ -41,6 +43,11 @@ export interface BedrockWorldDirectory {
   readonly renderConcurrency?: number;
   /** Use an abortable worker even at concurrency one; callbacks are then unsupported. */
   readonly forceWorkers?: boolean;
+  /**
+   * Memory budget, in MiB, for the record and chunk-surface caches of each renderer (every worker
+   * has its own). Zero disables reuse between tiles. Defaults to 256.
+   */
+  readonly renderCacheMiB?: number;
   /** Cancels startup reads; close({ abort: true }) cancels an opened world. */
   readonly signal?: AbortSignal;
 }
@@ -57,6 +64,8 @@ interface BuildingTile {
   subchunkCount: number;
 }
 
+let nextStyleId = 1;
+
 const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
   overworld: 0,
   nether: 1,
@@ -71,19 +80,23 @@ class IndexedBedrockWorld implements BedrockWorld {
   private renderQueue: Promise<void> = Promise.resolve();
   private closePromise: Promise<void> | undefined;
   private readonly renderAbort = new AbortController();
+  private readonly renderCache: TileRenderCache;
+  private readonly styleIds = new WeakMap<SurfaceStyle, number>();
 
   constructor(
     databaseDirectory: string,
     records: Iterable<LevelDbRecordIndexEntry>,
     renderConcurrency: number,
     forceWorkers: boolean,
+    renderCacheMiB: number,
   ) {
     this.databaseDirectory = databaseDirectory;
     this.forceWorkers = forceWorkers;
     this.workerPool =
       renderConcurrency > 1 || forceWorkers
-        ? new TileRenderWorkerPool(renderConcurrency)
+        ? new TileRenderWorkerPool(renderConcurrency, renderCacheMiB)
         : undefined;
+    this.renderCache = new TileRenderCache(this.workerPool === undefined ? renderCacheMiB : 0);
     const buildingTiles = new Map<string, BuildingTile>();
     for (const record of records) {
       const location = classifyMapRecordKey(record.key);
@@ -142,7 +155,7 @@ class IndexedBedrockWorld implements BedrockWorld {
     }
 
     const pending = this.renderQueue.then(() =>
-      renderIndexedTile(job, options, this.renderAbort.signal),
+      renderIndexedTile(job, options, this.renderAbort.signal, this.renderCache),
     );
     this.renderQueue = pending.then(
       () => undefined,
@@ -181,7 +194,21 @@ class IndexedBedrockWorld implements BedrockWorld {
       await Promise.all([this.renderQueue, workersClosed]);
     } finally {
       this.tiles.clear();
+      this.renderCache.clear();
     }
+  }
+
+  private cacheKey(dimension: number, options: RenderTileOptions): string {
+    const style = options.surfaceStyle;
+    let styleId = 0;
+    if (style !== undefined) {
+      styleId = this.styleIds.get(style) ?? 0;
+      if (styleId === 0) {
+        styleId = nextStyleId++;
+        this.styleIds.set(style, styleId);
+      }
+    }
+    return surfaceCacheKey(dimension, options, styleId);
   }
 
   private createRenderJob(
@@ -225,6 +252,7 @@ class IndexedBedrockWorld implements BedrockWorld {
       databaseDirectory: this.databaseDirectory,
       sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
       biomeRecords,
+      cacheKey: this.cacheKey(dimension, options),
       ...(options.surfaceRange === undefined ? {} : { surfaceRange: options.surfaceRange }),
       ...(options.surfaceStyle === undefined ? {} : { surfaceStyle: options.surfaceStyle }),
       options: {
@@ -239,6 +267,16 @@ class IndexedBedrockWorld implements BedrockWorld {
       },
     };
   }
+}
+
+/** Jobs with equal keys extract identical chunk surfaces from identical records. */
+function surfaceCacheKey(dimension: number, options: RenderTileOptions, styleId: number): string {
+  const range = options.surfaceRange;
+  return [
+    dimension,
+    range === undefined ? "full" : `${range.minY}:${range.maxY}:${range.topY}`,
+    styleId,
+  ].join("/");
 }
 
 function filterSources(
@@ -331,6 +369,7 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     index.drainRecords(),
     renderConcurrency,
     input.forceWorkers === true,
+    input.renderCacheMiB ?? DEFAULT_RENDER_CACHE_MIB,
   );
 }
 

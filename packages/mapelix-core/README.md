@@ -113,6 +113,9 @@ reference adapter's main-process execution unless `forceWorkers: true` is suppli
 use workers. A `resolveBlockStyle` callback uses the main-process fallback, or is refused clearly
 when forced workers are requested. An optional startup `signal` cancels index reads.
 `includeSurface: true` adds diagnostic block, height, biome and opacity-run metadata.
+Each renderer keeps bounded caches of database records and extracted chunk surfaces, so
+neighbouring tiles and native zooms do not decode the same chunks again. `renderCacheMiB` sets
+the budget per renderer (default 256, `0` disables reuse); pixels are identical either way.
 
 ## Cleanup
 

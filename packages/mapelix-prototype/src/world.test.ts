@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createBedrockWorld } from "./world.js";
+import { createBedrockWorld, renderRecordTile, type ChunkSurface } from "./world.js";
 
 function int32(value: number): number[] {
   return [value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff];
@@ -414,5 +414,41 @@ describe("createBedrockWorld", () => {
       Array.from(singleTile.rgba.slice(0, 4)),
     );
     expect(Array.from(singleTile.rgba.slice(0, 4))).toEqual([97, 65, 115, 255]);
+  });
+});
+
+describe("renderRecordTile", () => {
+  it("reuses cached chunk surfaces across tiles and zooms without changing pixels", async () => {
+    const records = [
+      singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block", 3, 5, 9),
+      singleBlockSubchunk(-1, 0, 6, "minecraft:oak_leaves", 3, 2, 1),
+      singleBlockSubchunk(0, 0, 5, "minecraft:stone", 0, 0, 15),
+      singleBlockSubchunk(2, 1, 4, "minecraft:water", 4, 4, 15),
+      data2DChunk(-1, 0, 1),
+      data3DChunk(-1, 0, 29),
+      data2DChunk(2, 1, 6),
+    ];
+    const biomeOnly = records.filter((record) => record.key[8] === 0x2d);
+    const options = { surfaceRange: { minY: -64, maxY: 320, topY: 319 }, biomeBlendRadius: 1 };
+    const cached = new Map<string, ChunkSurface>();
+    const cache = {
+      get: (x: number, z: number, scoped: boolean) => cached.get(`${x},${z},${scoped}`),
+      set: (x: number, z: number, scoped: boolean, surface: ChunkSurface) =>
+        void cached.set(`${x},${z},${scoped}`, surface),
+    };
+    const world = createBedrockWorld(records);
+    for (const tile of [
+      { z: 0, x: 0, y: 0 },
+      { z: 1, x: 0, y: 0 },
+      { z: 2, x: -1, y: 0 },
+      { z: 2, x: 0, y: 0 },
+    ]) {
+      const coordinates = { dimension: "overworld" as const, ...tile };
+      const expected = (await world.renderTile(coordinates, options)).rgba;
+      expect(renderRecordTile(records, coordinates, options, cache).rgba).toEqual(expected);
+      // Only biome records remain: every surface must now come from the cache.
+      expect(renderRecordTile(biomeOnly, coordinates, options, cache).rgba).toEqual(expected);
+    }
+    expect(cached.size).toBeGreaterThan(0);
   });
 });
