@@ -66,7 +66,10 @@ An unvisited dimension displays empty space until the copied world contains chun
 - Drag to move. Right-drag to turn and tilt. Scroll to zoom toward the point under the cursor.
 - W, A, S, and D move. Q and E turn. R and F zoom.
 - Enter X and Z coordinates to fly there. The house button returns to spawn.
-- The compass turns the view to face north.
+- The compass turns the view to face north. The cube button next to it switches between the
+  perspective and an isometric (orthographic) view with a short animation. The isometric view
+  keeps the scale of the plane through the focus and hides clouds. Rain covers the whole
+  visible ground there, with the same density on screen at every zoom.
 - The Overworld slider sets the time of day. Nether and End use fixed lighting and atmosphere.
 - Overworld Surface also offers **Clouds**, **Rain** and **Thunderstorm** checkboxes.
   Clouds start on; cosmetic weather starts off. These visual preferences survive reloads.
@@ -84,7 +87,10 @@ the orbit pivot, so narrow passages cannot trap the camera.
 
 The address bar keeps the current view, so a link opens the same place. It accepts `x`, `y`,
 `z`, `distance`, `heading`, and `pitch` in blocks and degrees, and `hour` from 0 to 24. A link
-without `y` looks at the highest block at `x` and `z`.
+without `y` looks at the highest block at `x` and `z`. `projection=iso` opens the isometric view.
+`demo=projection` adds a panel that shows the scale in pixels per block (2D map zoom `z` is
+`2^z` pixels per block), presets for scale and tilt, and two optional rules that show
+perspective inside the isometric view past a zoom or below a tilt.
 
 Links also retain `dimension` (`overworld`, `nether`, `the-end`) and `ceilingY`. For example,
 `?dimension=nether&ceilingY=80&x=0&z=0` opens a Nether cut at Y 80.
@@ -106,6 +112,22 @@ Discovery framing, the Surface proximity rule and optional translated/host-owned
 details are described in [discovery navigation](../../docs/discovery-navigation.md).
 Immediate labels and the optional host label formatter are described in
 [discovery labels](../../docs/discovery-labels.md).
+
+### Projection options
+
+Hosts choose the projection with the `projection` option (`"perspective"`, the default, or
+`"isometric"`) or `setProjection(mode, animate = true)`. Automatic perspective is off by
+default. A host can turn it on with the `autoPerspective` option or
+`setAutoPerspective(rules)`, and `undefined` turns it off again. Each rule is optional:
+
+| Rule | Unit | Effect |
+| --- | --- | --- |
+| `abovePixelsPerBlock` | CSS pixels per block | Show perspective while zoomed in past this scale |
+| `belowPitch` | radians | Show perspective while the camera looks down by less than this |
+
+The rules only change what an isometric choice shows; a perspective choice stays
+perspective. A switch back needs an 8 % margin, so the view does not flicker at a threshold.
+`snapshot().projection` reports the chosen and shown projection, the blend and the scale.
 
 ## Validation
 

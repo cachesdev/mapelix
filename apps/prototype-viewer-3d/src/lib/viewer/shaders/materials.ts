@@ -16,12 +16,14 @@ import {
   cameraFar,
   cameraNear,
   cameraPosition,
+  cameraProjectionMatrixInverse,
   color,
   dot,
   exp,
   float,
   fract,
   fwidth,
+  getViewPosition,
   hash,
   interleavedGradientNoise,
   max,
@@ -296,8 +298,17 @@ function createWaterMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
     const surfaceDepth = positionView.z.negate();
     const offset = normal.xz.mul(0.035).div(surfaceDepth.mul(0.02).add(1));
     const bentUV = screenUV.add(offset);
-    const depthAt = (uv: Node<"vec2">) =>
-      perspectiveDepthToViewZ(retainedViewportDepth.sample(uv).x, cameraNear, cameraFar).negate();
+    // Blended and isometric projections are not perspective; their depth goes through the
+    // inverse projection. The perspective path stays exactly as it was. The depth sample is a
+    // variable: shared by both branches inline, it was emitted inside one branch only.
+    const depthAt = (uv: Node<"vec2">) => {
+      const depth = retainedViewportDepth.sample(uv).x.toVar();
+      return select(
+        atmosphere.projectionBlend.greaterThan(0),
+        getViewPosition(uv, depth, cameraProjectionMatrixInverse).z,
+        perspectiveDepthToViewZ(depth, cameraNear, cameraFar),
+      ).negate();
+    };
     const bentThickness = depthAt(bentUV).sub(surfaceDepth);
     const sampleUV = select(bentThickness.lessThan(0), screenUV, bentUV);
     const thickness = max(depthAt(sampleUV).sub(surfaceDepth), 0);

@@ -4,18 +4,9 @@ import {
   DynamicDrawUsage,
   LineBasicNodeMaterial,
   LineSegments,
-  type Vector3,
+  Vector3,
 } from "three/webgpu";
-import {
-  attribute,
-  cameraPosition,
-  float,
-  fract,
-  positionWorld,
-  smoothstep,
-  uniform,
-  vec3,
-} from "three/tsl";
+import { attribute, float, fract, positionWorld, smoothstep, uniform, vec3 } from "three/tsl";
 import type { SceneContext } from "@mapelix/scene-prototype/dimensions";
 import type { Atmosphere } from "./atmosphere";
 import { WeatherBudget } from "./weather-budget";
@@ -40,6 +31,11 @@ export class WeatherLayer {
   private mode: WeatherMode;
   private eligible = true;
   private readonly clock = uniform(0);
+  /** Center of the rain volume: the camera in perspective, nearer the focus when isometric. */
+  private readonly origin = uniform(new Vector3());
+  /** Size of the rain volume relative to the perspective one. */
+  private readonly scale = uniform(1);
+  private originScale = 1;
   private readonly seeds = new Float32Array(MAX_RAIN_DROPS * 6);
   private readonly roofs = new BufferAttribute(new Float32Array(MAX_RAIN_DROPS * 2), 1).setUsage(
     DynamicDrawUsage,
@@ -85,17 +81,26 @@ export class WeatherLayer {
     });
     const point = attribute("rainSeed", "vec3"),
       end = attribute("rainEnd", "float");
-    const x = fract(point.x.sub(cameraPosition.x.div(WIDTH)).add(0.5))
-      .mul(WIDTH)
-      .sub(WIDTH / 2);
-    const z = fract(point.z.sub(cameraPosition.z.div(WIDTH)).add(0.5))
-      .mul(WIDTH)
-      .sub(WIDTH / 2);
-    const y = fract(point.y.sub(this.clock).sub(cameraPosition.y.div(HEIGHT)).add(0.5))
-      .mul(HEIGHT)
-      .sub(HEIGHT / 2);
-    material.positionNode = vec3(x.sub(end.mul(0.08)), y.sub(end.mul(1.2)), z);
-    const edge = float(1).sub(smoothstep(22, 32, vec3(x, 0, z).length()));
+    // A scale of 1 is the perspective volume; multiplying by 1 leaves every value unchanged.
+    const width = this.scale.mul(WIDTH),
+      height = this.scale.mul(HEIGHT);
+    const x = fract(point.x.sub(this.origin.x.div(width)).add(0.5))
+      .mul(width)
+      .sub(width.mul(0.5));
+    const z = fract(point.z.sub(this.origin.z.div(width)).add(0.5))
+      .mul(width)
+      .sub(width.mul(0.5));
+    const y = fract(point.y.sub(this.clock).sub(this.origin.y.div(height)).add(0.5))
+      .mul(height)
+      .sub(height.mul(0.5));
+    material.positionNode = vec3(
+      x.sub(end.mul(this.scale.mul(0.08))),
+      y.sub(end.mul(this.scale.mul(1.2))),
+      z,
+    );
+    const edge = float(1).sub(
+      smoothstep(this.scale.mul(22), this.scale.mul(32), vec3(x, 0, z).length()),
+    );
     material.opacityNode = edge
       .mul(this.atmosphere.rain)
       .mul(this.atmosphere.storm.mul(0.18).add(0.25));
@@ -126,12 +131,17 @@ export class WeatherLayer {
     }
   }
 
+  /**
+   * `camera` centers the rain volume. An isometric view passes a larger `scale`, so the
+   * volume covers the visible ground and drops keep the same density and size on screen.
+   */
   update(
     delta: number,
     frameDelta: number,
     camera: Vector3,
     revision: number,
     heightAt: (x: number, z: number) => number | undefined,
+    scale = 1,
   ): void {
     this.budget.sample(frameDelta);
     if (!this.eligible) return;
@@ -163,20 +173,25 @@ export class WeatherLayer {
     const count = this.budget.quality === 2 ? MAX_RAIN_DROPS : 256;
     this.root.geometry.setDrawRange(0, count * 2);
     this.root.position.copy(camera);
+    this.origin.value.copy(camera);
+    this.scale.value = scale;
     this.clock.value = wrap(this.clock.value + delta * 0.45);
     if (
       revision === this.roofRevision &&
-      Math.hypot(camera.x - this.roofX, camera.z - this.roofZ) < 2
+      scale === this.originScale &&
+      Math.hypot(camera.x - this.roofX, camera.z - this.roofZ) < 2 * scale
     )
       return;
     this.roofRevision = revision;
     this.roofX = camera.x;
     this.roofZ = camera.z;
+    this.originScale = scale;
+    const width = WIDTH * scale;
     for (let i = 0; i < MAX_RAIN_DROPS; i++) {
-      const x = wrap(this.seeds[i * 6]! - camera.x / WIDTH + 0.5) * WIDTH - WIDTH / 2 + camera.x;
+      const x = wrap(this.seeds[i * 6]! - camera.x / width + 0.5) * width - width / 2 + camera.x;
       const z =
-        wrap(this.seeds[i * 6 + 2]! - camera.z / WIDTH + 0.5) * WIDTH - WIDTH / 2 + camera.z;
-      const height = heightAt(x, z) ?? camera.y - HEIGHT / 2;
+        wrap(this.seeds[i * 6 + 2]! - camera.z / width + 0.5) * width - width / 2 + camera.z;
+      const height = heightAt(x, z) ?? camera.y - (HEIGHT * scale) / 2;
       this.roofs.setX(i * 2, height);
       this.roofs.setX(i * 2 + 1, height);
     }

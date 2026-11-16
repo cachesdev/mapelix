@@ -18,6 +18,7 @@
   import StatusCard from "$lib/components/StatusCard.svelte";
   import TimeOfDay from "$lib/components/TimeOfDay.svelte";
   import ViewControls from "$lib/components/ViewControls.svelte";
+  import ProjectionDemo from "$lib/components/ProjectionDemo.svelte";
   import CaveNavigation from "$lib/components/CaveNavigation.svelte";
   import SelectionControls from "$lib/components/SelectionControls.svelte";
   import DiscoveryControls from "$lib/components/DiscoveryControls.svelte";
@@ -36,6 +37,7 @@
     WorldInfo,
     WorldViewer,
     WeatherMode,
+    ViewProjection,
   } from "$lib/viewer/world-viewer";
 
   const DEFAULT_HOUR = 15.5;
@@ -63,6 +65,9 @@
   let selectionTool = $state<SelectionTool>("off");
   let discoveryPrefs = $state.raw<DiscoveryFilters>(DEFAULT_DISCOVERY_FILTERS);
   let autoDepth = $state(true);
+  let projection = $state<ViewProjection>("perspective");
+  /** `?demo=projection` shows controls for automatic perspective rules. */
+  let projectionDemo = $state(false);
   const surfaceCeilings = new Map<Dimension, number>();
   let switching = $state(false);
   let loadContext: ((context: SceneContext) => Promise<void>) | undefined;
@@ -137,6 +142,8 @@
       return;
     }
     dimension = start.context.dimension;
+    projection = start.projection ?? "perspective";
+    projectionDemo = new URL(window.location.href).searchParams.get("demo") === "projection";
     try {
       clouds = localStorage.getItem("mapelix-clouds-v1") !== "0";
     } catch {
@@ -223,6 +230,7 @@
       updateContext(info);
       created = await WorldViewer.create(element, info, start.view, {
         clouds,
+        projection,
         weather,
         ...(start.selection ? { selection: start.selection } : {}),
         discoveryFilters: initialDiscoveries,
@@ -263,9 +271,18 @@
           snapshot.selection,
           discoveryPrefs,
           autoDepth,
+          projection,
         ]);
         if (key !== lastUrl && world)
-          writeViewToUrl(snapshot.view, hour, world, snapshot.selection, discoveryPrefs, autoDepth);
+          writeViewToUrl(
+            snapshot.view,
+            hour,
+            world,
+            snapshot.selection,
+            discoveryPrefs,
+            autoDepth,
+            projection,
+          );
         lastUrl = key;
       }, 250);
     })().catch((cause: unknown) => {
@@ -391,6 +408,14 @@
           bind:customRenderDistance
           bind:renderDistance
           bind:zoomUnlocked
+        />
+      {/if}
+      {#if projectionDemo && viewer && snapshot}
+        <ProjectionDemo
+          {snapshot}
+          onrules={(rules) => viewer?.setAutoPerspective(rules)}
+          onscale={(pixels) => viewer?.setPixelsPerBlock(pixels)}
+          onpitch={(degrees) => viewer?.setPitch((degrees * Math.PI) / 180)}
         />
       {/if}
     </div>
@@ -539,6 +564,11 @@
         heading={snapshot?.view.heading ?? 0}
         onnorth={() => viewer?.faceNorth()}
         onzoom={(factor) => viewer?.zoom(factor)}
+        {projection}
+        onprojection={(next) => {
+          projection = next;
+          viewer?.setProjection(next);
+        }}
       />
     </div>
   </div>

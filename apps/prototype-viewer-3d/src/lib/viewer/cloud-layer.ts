@@ -77,7 +77,9 @@ export class CloudLayer {
     const overview = float(1).sub(smoothstep(256, 512, cameraPosition.y));
     // Fade before crossing the layer: overhead clouds must not wash out the map or water.
     const above = float(1).sub(smoothstep(HEIGHT - 16, HEIGHT, cameraPosition.y));
-    material.opacityNode = edge.mul(overview).mul(above).mul(0.62);
+    // An isometric view looks from a whole plane, partly above the layer; keep it map-like.
+    const perspective = float(1).sub(atmosphere.projectionBlend);
+    material.opacityNode = edge.mul(overview).mul(above).mul(perspective).mul(0.62);
     const faces = attribute("cloudFaces", "uint");
     material.maskNode = normalWorld.y
       .abs()

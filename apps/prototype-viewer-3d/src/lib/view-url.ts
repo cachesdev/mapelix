@@ -1,7 +1,7 @@
 import { replaceState } from "$app/navigation";
 import { page } from "$app/state";
 
-import type { CameraView } from "$lib/viewer/world-viewer";
+import type { CameraView, ViewProjection } from "$lib/viewer/world-viewer";
 import { selectionFromSearch, type HorizontalSelection } from "@mapelix/scene-prototype/selection";
 import {
   discoveryFiltersFromSearch,
@@ -22,11 +22,15 @@ export interface UrlView {
   readonly selection: HorizontalSelection | undefined;
   readonly discoveries: DiscoveryFilters | undefined;
   readonly autoDepth: boolean | undefined;
+  readonly projection: ViewProjection | undefined;
 }
 
 const DEGREES = Math.PI / 180;
 
-/** Reads a shared view such as `?x=120&y=70&z=-40&distance=90&heading=45&pitch=35&hour=17`. */
+/**
+ * Reads a shared view such as `?x=120&y=70&z=-40&distance=90&heading=45&pitch=35&hour=17`;
+ * `projection=iso` opens it in the isometric projection.
+ */
 export function readViewFromUrl(url: URL): UrlView {
   const number = (name: string): number | undefined => {
     const raw = url.searchParams.get(name);
@@ -59,6 +63,12 @@ export function readViewFromUrl(url: URL): UrlView {
         : url.searchParams.get("autoDepth") === "1"
           ? true
           : undefined,
+    projection:
+      url.searchParams.get("projection") === "iso"
+        ? "isometric"
+        : url.searchParams.get("projection") === "perspective"
+          ? "perspective"
+          : undefined,
   };
 }
 
@@ -70,8 +80,11 @@ export function writeViewToUrl(
   selection?: HorizontalSelection,
   discoveries?: DiscoveryFilters,
   autoDepth?: boolean,
+  projection?: ViewProjection,
 ): void {
   const url = new URL(window.location.href);
+  if (projection === "isometric") url.searchParams.set("projection", "iso");
+  else url.searchParams.delete("projection");
   if (autoDepth !== undefined) url.searchParams.set("autoDepth", autoDepth ? "1" : "0");
   for (const key of ["dimension", "ceilingY", "mode", "minY", "maxY"]) url.searchParams.delete(key);
   for (const [key, value] of contextSearch(context)) url.searchParams.set(key, value);

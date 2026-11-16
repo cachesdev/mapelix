@@ -1,8 +1,17 @@
 import { MapControls } from "three/addons/controls/MapControls.js";
-import { MathUtils, MOUSE, Quaternion, Ray, Vector3, type PerspectiveCamera } from "three/webgpu";
+import {
+  MathUtils,
+  MOUSE,
+  Plane,
+  Quaternion,
+  Vector3,
+  type PerspectiveCamera,
+  type Ray,
+} from "three/webgpu";
 
 import type { SurfaceHit } from "./quad-collider";
 import { CAVE_LIMITS, type VerticalBounds } from "@mapelix/scene-prototype/dimensions";
+import { projectionRay, rayReach, ViewCamera } from "./view-projection";
 import { HeldKeys, keyboardSpeed } from "./camera-input";
 
 /** What the camera reads from the loaded terrain. */
@@ -99,7 +108,7 @@ export class CameraRig {
     this.camera = camera;
     this.element = element;
     this.terrain = terrain;
-    this.controls = new MapControls(camera, element);
+    this.controls = new ViewMapControls(camera, element);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
     this.controls.screenSpacePanning = false;
@@ -469,7 +478,7 @@ export class CameraRig {
     this.takeOver();
     const ray = pointerRay(this.camera, this.element, event.clientX, event.clientY);
     // Zoom toward what is under the cursor, however far; only the pivot stays local.
-    const hit = this.terrain.raycast(ray.origin, ray.direction, this.camera.far);
+    const hit = this.terrain.raycast(ray.origin, ray.direction, rayReach(this.camera));
     const anchor =
       hit === undefined ? this.controls.target.clone() : ray.at(hit.distance, new Vector3());
     this.zoomAbout(anchor, WHEEL_ZOOM ** (wheelPixels(event) / 100));
@@ -592,20 +601,17 @@ export class CameraRig {
   };
 }
 
-/** The ray from the camera through a point on the canvas, in client pixels. */
+/**
+ * The ray from the camera through a point on the canvas, in client pixels. Isometric and
+ * blended views start it on the near plane; see `projectionRay`.
+ */
 export function pointerRay(
   camera: PerspectiveCamera,
   element: HTMLElement,
   clientX: number,
   clientY: number,
 ): Ray {
-  const bounds = element.getBoundingClientRect();
-  const x = ((clientX - bounds.left) / bounds.width) * 2 - 1;
-  const y = -((clientY - bounds.top) / bounds.height) * 2 + 1;
-  const ray = new Ray();
-  ray.origin.setFromMatrixPosition(camera.matrixWorld);
-  ray.direction.set(x, y, 0.5).unproject(camera).sub(ray.origin).normalize();
-  return ray;
+  return projectionRay(camera, element, clientX, clientY);
 }
 
 /** Wheel travel in pixels. Touchpad pinches arrive as small wheel steps with Ctrl held. */
@@ -617,4 +623,49 @@ function wheelPixels(event: WheelEvent): number {
         ? 100
         : 1;
   return event.deltaY * unit * (event.ctrlKey ? 10 : 1);
+}
+
+/**
+ * MapControls drags the ground under the pointer with a ray from the camera position, which
+ * only fits a perspective projection. Blended and isometric views cast the pointer ray through
+ * the projection actually drawn; perspective keeps the original code.
+ */
+class ViewMapControls extends MapControls {
+  declare protected _panOffset: Vector3;
+  declare protected _panWorldStart: Vector3;
+  private readonly panPlane = new Plane();
+  private readonly panPoint = new Vector3();
+
+  protected _handleMouseDownPan(event: PointerEvent): void {
+    // @ts-expect-error The pan handlers are internal to OrbitControls and MapControls.
+    super._handleMouseDownPan(event);
+    if (this.screenSpacePanning) return;
+    this.panPlane.setFromNormalAndCoplanarPoint(this.object.up, this.target);
+    if (this.blended()) this.groundAt(event, this._panWorldStart);
+  }
+
+  protected _handleMouseMovePan(event: PointerEvent): void {
+    if (this.screenSpacePanning || !this.blended()) {
+      // @ts-expect-error The pan handlers are internal to OrbitControls and MapControls.
+      super._handleMouseMovePan(event);
+      return;
+    }
+    if (!this.groundAt(event, this.panPoint)) return;
+    this._panOffset.copy(this.panPoint.sub(this._panWorldStart)).negate();
+    this.update();
+  }
+
+  private blended(): boolean {
+    return this.object instanceof ViewCamera && this.object.blended;
+  }
+
+  private groundAt(event: PointerEvent, target: Vector3): boolean {
+    const ray = projectionRay(
+      this.object as ViewCamera,
+      this.domElement!,
+      event.clientX,
+      event.clientY,
+    );
+    return ray.intersectPlane(this.panPlane, target) !== null;
+  }
 }

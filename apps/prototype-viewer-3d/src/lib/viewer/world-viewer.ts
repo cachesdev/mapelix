@@ -4,7 +4,6 @@ import {
   MathUtils,
   NeutralToneMapping,
   PCFShadowMap,
-  PerspectiveCamera,
   RenderPipeline,
   Scene,
   Timer,
@@ -41,6 +40,17 @@ import type { DiscoveryLabelFormatter } from "./discovery-label";
 import { discoveryContext, discoveryDistance, type DiscoveryDetailText } from "./discovery-focus";
 import { RegionStreamer, type StreamingStats } from "./region-streamer";
 import { RegionMeshPool } from "./region-mesh";
+import {
+  PROJECTION_TRANSITION_SECONDS,
+  ViewCamera,
+  distanceForPixelsPerBlock,
+  easeProjection,
+  effectiveProjection,
+  pixelsPerBlock,
+  rayReach,
+  type AutoPerspective,
+  type ViewProjection,
+} from "./view-projection";
 import { createSceneMaterials, type SceneMaterials } from "./shaders/materials";
 import {
   CAVE_LIMITS,
@@ -62,6 +72,7 @@ export interface WorldInfo extends SceneContextInput {
 export type { CameraView, VerticalMovement } from "./camera-rig";
 export type { DiscoveryDetailText } from "./discovery-focus";
 export type { WeatherMode } from "./weather-layer";
+export type { AutoPerspective, ViewProjection } from "./view-projection";
 
 /** Kept across view switches so embedding does not fall back to a different server. */
 export interface WorldViewerOptions {
@@ -92,6 +103,21 @@ export interface WorldViewerOptions {
   /** Shared accessible name and immediate hover/focus label; defaults to English. */
   readonly formatDiscoveryLabel?: DiscoveryLabelFormatter;
   readonly onDiscoveryFocusChange?: (discovery: DiscoveryGroup | undefined) => void;
+  /** Initial projection (default perspective). */
+  readonly projection?: ViewProjection;
+  /** Rules that show perspective inside an isometric view (default none). */
+  readonly autoPerspective?: AutoPerspective;
+}
+
+export interface ProjectionState {
+  /** The projection picked by the viewer's host. */
+  readonly chosen: ViewProjection;
+  /** The projection shown, after any automatic perspective rule. */
+  readonly shown: ViewProjection;
+  /** Orthographic share of the projection now, from 0 to 1; in between during a transition. */
+  readonly blend: number;
+  /** CSS pixels covered by one block on the plane through the camera focus. */
+  readonly pixelsPerBlock: number;
 }
 
 export interface ViewerSnapshot {
@@ -104,6 +130,7 @@ export interface ViewerSnapshot {
   readonly discoveries: DiscoveryStats;
   readonly navigation: DepthNavigation;
   readonly selectedDiscovery: DiscoveryGroup | undefined;
+  readonly projection: ProjectionState;
 }
 
 export interface Pointed {
@@ -130,7 +157,7 @@ export class WorldViewer {
   private readonly pipeline: RenderPipeline;
   private readonly glow: ReturnType<typeof bloom>;
   private readonly scene = new Scene();
-  private readonly camera = new PerspectiveCamera(50, 1, 1, 12000);
+  private readonly camera = new ViewCamera(50, 1, 1, 12000);
   private readonly atmosphere = new Atmosphere();
   private readonly clouds: CloudLayer;
   private readonly weather: WeatherLayer;
@@ -159,6 +186,7 @@ export class WorldViewer {
   private readonly timer = new Timer();
   private readonly resizeObserver: ResizeObserver;
   private readonly sunDirection = new Vector3(0.4, 0.7, 0.3);
+  private readonly rainOrigin = new Vector3();
   private shadowKey = "";
   private regionsChanged = true;
   /** A fixed render distance in blocks, or undefined to follow the zoom. */
@@ -166,6 +194,12 @@ export class WorldViewer {
   private frames = 0;
   private frameWindowStart = performance.now();
   private framesPerSecond = 0;
+  private projectionChoice: ViewProjection = "perspective";
+  private projectionShown: ViewProjection = "perspective";
+  private autoPerspective: AutoPerspective | undefined;
+  /** Blend at the start of the running transition, and how far it has run, from 0 to 1. */
+  private projectionFrom = 0;
+  private projectionProgress = 1;
 
   private constructor(
     container: HTMLElement,
@@ -290,6 +324,8 @@ export class WorldViewer {
       { settle: this.context.mode !== "caves" && start.y === undefined },
     );
     this.setSelection(options.selection);
+    this.autoPerspective = options.autoPerspective;
+    this.setProjection(options.projection ?? "perspective", false);
 
     // Only very bright light blooms: the sun, glints on water, and lamps after dark.
     const color = pass(this.scene, this.camera, { samples: 4 }).getTextureNode("output");
@@ -363,7 +399,38 @@ export class WorldViewer {
       discoveries: this.discoveries.stats,
       navigation: this.depthFollow.state,
       selectedDiscovery: this.selectedDiscovery,
+      projection: {
+        chosen: this.projectionChoice,
+        shown: this.projectionShown,
+        blend: this.camera.projectionBlend,
+        pixelsPerBlock: this.focusPixelsPerBlock(),
+      },
     };
+  }
+
+  /** Picks perspective or isometric; the change animates unless `animate` is false. */
+  setProjection(projection: ViewProjection, animate = true): void {
+    this.projectionChoice = projection;
+    this.updateProjectionTarget(animate);
+  }
+
+  /** Rules that show perspective inside an isometric view; undefined turns them off. */
+  setAutoPerspective(rules: AutoPerspective | undefined): void {
+    this.autoPerspective = rules;
+    this.updateProjectionTarget(true);
+  }
+
+  /** Tilts the camera to `pitch` radians above the horizon, keeping the focus and zoom. */
+  setPitch(pitch: number): void {
+    this.rig.setView({ ...this.snapshot().view, pitch }, { settle: false });
+    this.fitViewDistance();
+  }
+
+  /** Zooms so that one block covers `pixels` CSS pixels on the plane through the focus. */
+  setPixelsPerBlock(pixels: number): void {
+    const distance = distanceForPixelsPerBlock(pixels, this.camera.fov, this.cssHeight);
+    this.rig.setView({ ...this.snapshot().view, distance }, { settle: false });
+    this.fitViewDistance();
   }
 
   /** Hour of the day from 0 to 24. Noon is 12. */
@@ -649,6 +716,53 @@ export class WorldViewer {
     this.rig.zoom(factor);
   }
 
+  private get cssHeight(): number {
+    return Math.max(1, this.container.clientHeight);
+  }
+
+  private focusPixelsPerBlock(): number {
+    return pixelsPerBlock(this.rig.distance, this.camera.fov, this.cssHeight);
+  }
+
+  /** Starts a transition when the projection to show changes; jumps to its end without `animate`. */
+  private updateProjectionTarget(animate: boolean): void {
+    const shown = effectiveProjection(
+      this.projectionChoice,
+      this.projectionShown,
+      { pixelsPerBlock: this.focusPixelsPerBlock(), pitch: this.rig.pitch },
+      this.autoPerspective,
+    );
+    if (shown !== this.projectionShown) {
+      this.projectionShown = shown;
+      this.projectionFrom = this.camera.projectionBlend;
+      this.projectionProgress = 0;
+    }
+    if (!animate) {
+      this.projectionProgress = 1;
+      this.advanceProjection(0);
+    }
+  }
+
+  /** Moves the projection blend toward the shown projection; true when it changed. */
+  private advanceProjection(delta: number): boolean {
+    const target = this.projectionShown === "isometric" ? 1 : 0;
+    if (this.projectionProgress < 1)
+      this.projectionProgress = Math.min(
+        1,
+        this.projectionProgress + delta / PROJECTION_TRANSITION_SECONDS,
+      );
+    const blend = MathUtils.lerp(
+      this.projectionFrom,
+      target,
+      easeProjection(this.projectionProgress),
+    );
+    if (blend === this.camera.projectionBlend) return false;
+    this.camera.projectionBlend = blend;
+    this.atmosphere.projectionBlend.value = blend;
+    this.camera.updateProjectionMatrix();
+    return true;
+  }
+
   faceNorth(): void {
     this.rig.faceNorth();
   }
@@ -656,7 +770,7 @@ export class WorldViewer {
   /** The block under a canvas position: the first loaded surface along the pointer ray. */
   pick(clientX: number, clientY: number): Pointed | undefined {
     const ray = pointerRay(this.camera, this.renderer.domElement, clientX, clientY);
-    const hit = this.streamer.raycast(ray.origin, ray.direction, this.camera.far);
+    const hit = this.streamer.raycast(ray.origin, ray.direction, rayReach(this.camera));
     if (hit === undefined) return undefined;
     // Half a block behind the face lies the block it belongs to.
     const point = ray.at(hit.distance, new Vector3());
@@ -694,8 +808,10 @@ export class WorldViewer {
     const frameDelta = this.timer.getDelta();
     const delta = Math.min(frameDelta, 0.1);
     const moved = this.rig.update(delta);
-    if (moved) this.fitViewDistance();
-    if (moved || this.regionsChanged || this.frames % 15 === 0) {
+    this.updateProjectionTarget(true);
+    const projected = this.advanceProjection(delta);
+    if (moved || projected) this.fitViewDistance();
+    if (moved || projected || this.regionsChanged || this.frames % 15 === 0) {
       this.streamer.update(this.camera, this.renderer.domElement.height);
     }
     if (this.streamer.animate(performance.now())) this.regionsChanged = true;
@@ -729,12 +845,14 @@ export class WorldViewer {
       this.renderer.domElement,
     );
     this.updateShadow();
+    const rain = this.rainVolume();
     this.weather.update(
       delta,
       frameDelta,
-      this.camera.position,
+      rain.origin,
       this.streamer.surfaceRevision,
       (x, z) => this.streamer.exactHeightAt(x, z) ?? this.streamer.heightAt(x, z),
+      rain.scale,
     );
     this.applyWeatherLighting();
     this.clouds.update(delta, this.camera.position);
@@ -769,6 +887,7 @@ export class WorldViewer {
     this.camera.near = MathUtils.clamp(zoom / 400, zoom < 6 ? 0.1 : 1, 50);
     // Regions start within reach, and their far corners can lie a few thousand blocks beyond.
     this.camera.far = reach * 1.2 + (caves ? 256 : 4000);
+    this.camera.focusDistance = zoom;
     this.camera.updateProjectionMatrix();
   }
 
@@ -779,7 +898,7 @@ export class WorldViewer {
   private updateShadow(): void {
     const focus = this.rig.focus;
     // Extents snap to steps of the square root of two, so zooming re-renders only a few times.
-    const wanted = MathUtils.clamp(this.rig.distance * 1.25, 48, MAX_SHADOW_EXTENT);
+    const wanted = MathUtils.clamp(this.shadowReach(), 48, MAX_SHADOW_EXTENT);
     const extent = 2 ** (Math.round(Math.log2(wanted) * 2) / 2);
     const texel = (extent * 2) / SHADOW_MAP_SIZE;
     // The depth range grows with the map, and the biases keep the same size in blocks.
@@ -811,12 +930,47 @@ export class WorldViewer {
     this.sun.shadow.needsUpdate = true;
   }
 
+  /**
+   * Where the rain volume sits and how large it is. Perspective keeps it around the camera.
+   * An isometric view moves it to the focus and grows it with the zoom, so it covers the
+   * visible ground and drops keep their density and length on screen.
+   */
+  private rainVolume(): { readonly origin: Vector3; readonly scale: number } {
+    const blend = this.camera.projectionBlend;
+    if (!(blend > 0)) return { origin: this.camera.position, scale: 1 };
+    const half = this.rig.distance * Math.tan(MathUtils.DEG2RAD * this.camera.fov * 0.5);
+    const footprint = Math.hypot(
+      half * this.camera.aspect,
+      half / Math.max(Math.sin(this.rig.pitch), 0.2),
+    );
+    // Drops are fully visible within 22 volume units of the center; see WeatherLayer.
+    const scale = Math.max(footprint / 22, 0.25);
+    return {
+      origin: this.rainOrigin.copy(this.camera.position).lerp(this.rig.focus, blend),
+      scale: MathUtils.lerp(1, scale, blend),
+    };
+  }
+
+  /** Half the width of ground around the focus that needs shadows, in blocks. */
+  private shadowReach(): number {
+    const reach = this.rig.distance * 1.25;
+    const blend = this.camera.projectionBlend;
+    if (!(blend > 0)) return reach;
+    // An isometric view keeps one scale out to the screen edges, so the map must span the whole
+    // footprint: the visible height on the focus plane, stretched along the ground by the pitch.
+    const half = this.rig.distance * Math.tan(MathUtils.DEG2RAD * this.camera.fov * 0.5);
+    const footprint =
+      Math.max(half * this.camera.aspect, half / Math.max(Math.sin(this.rig.pitch), 0.2)) * 1.1;
+    return MathUtils.lerp(reach, Math.max(reach, footprint), blend);
+  }
+
   private resize(): void {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
+    this.camera.focusDistance = this.rig.distance;
     this.camera.updateProjectionMatrix();
   }
 

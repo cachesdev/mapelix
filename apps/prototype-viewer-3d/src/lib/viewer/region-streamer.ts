@@ -16,6 +16,7 @@ import {
 } from "three/webgpu";
 
 import { regionEntry, type SurfaceHit } from "./quad-collider";
+import { projectedPixels, ViewCamera } from "./view-projection";
 import { RegionMesh, type RegionMeshPool } from "./region-mesh";
 import { ExplorationRequests } from "./exploration-requests";
 import { exteriorBlock } from "./surface-visibility";
@@ -79,6 +80,12 @@ interface CachedRegion {
   /** Undefined for regions the world never stored. */
   readonly mesh: RegionMesh | undefined;
   lastDrawn: number;
+  /**
+   * Stored while the view was blended or isometric, where perspective would not have asked
+   * for it. Perspective then ignores its heights until it uses the region itself, so its
+   * levels of detail match a view opened directly in perspective.
+   */
+  blended: boolean;
 }
 
 interface Wanted {
@@ -122,6 +129,9 @@ export class RegionStreamer {
   private readonly cameraPosition = new Vector3();
   /** Screen pixels covered by one block at a distance of one block. */
   private pixelsPerBlock = 1;
+  /** Orthographic share of the camera projection, see `ViewCamera`. */
+  private projectionBlend = 0;
+  private focusDistance = 1;
   private viewDistance: number;
   private disposed = false;
   private readonly context;
@@ -216,6 +226,8 @@ export class RegionStreamer {
   update(camera: PerspectiveCamera, screenHeight: number): void {
     this.frame += 1;
     this.pixelsPerBlock = screenHeight / (2 * Math.tan(MathUtils.degToRad(camera.fov / 2)));
+    this.projectionBlend = camera instanceof ViewCamera ? camera.projectionBlend : 0;
+    this.focusDistance = camera instanceof ViewCamera ? camera.focusDistance : 1;
     camera.updateMatrixWorld();
     this.cameraPosition.setFromMatrixPosition(camera.matrixWorld);
     this.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -337,10 +349,13 @@ export class RegionStreamer {
     const distance = this.distanceTo(target);
     if (distance > this.viewDistance) return true;
     const cached = this.cache.get(target.key);
-    const refine = target.level > 0 && distance < this.refineDistance(target.level);
+    const refine = target.level > 0 && this.refines(target, distance);
 
     if (!refine) {
-      if (cached !== undefined) return this.use(cached, draw);
+      if (cached !== undefined) {
+        if (this.projectionBlend <= 0) cached.blended = false;
+        return this.use(cached, draw);
+      }
       wanted.push({ node: target, priority: this.priority(target, distance) });
       // While zooming out, finer regions that are still cached fill in until this one arrives.
       return this.coverWithCached(target, draw, 2);
@@ -462,7 +477,7 @@ export class RegionStreamer {
   }
 
   private store(target: RegionNode, mesh: RegionMesh | undefined): void {
-    this.cache.set(target.key, { mesh, lastDrawn: this.frame });
+    this.cache.set(target.key, { mesh, lastDrawn: this.frame, blended: this.projectionBlend > 0 });
     this.bytes += mesh?.byteLength ?? 0;
     if (target.level === 0) this.detailRevision++;
     this.options.onRegion();
@@ -487,6 +502,26 @@ export class RegionStreamer {
     }
   }
 
+  /**
+   * Whether a node's cells would draw larger than the pixel target. An orthographic view draws
+   * every distance at nearly one scale, so only nodes in view refine there; nodes outside keep
+   * coarse cells for shadows and quick pans.
+   */
+  private refines(target: RegionNode, distance: number): boolean {
+    if (this.projectionBlend <= 0) return distance < this.refineDistance(target.level);
+    if (!this.frustum.intersectsBox(this.nodeBox(target))) return false;
+    const pixels = target.level === 1 ? this.options.blockPixels : this.options.voxelPixels;
+    return (
+      projectedPixels(
+        regionCellSize(target.level),
+        distance,
+        this.pixelsPerBlock,
+        this.projectionBlend,
+        this.focusDistance,
+      ) > pixels
+    );
+  }
+
   /** Distance at which a node's cells would draw larger than the pixel target. */
   private refineDistance(level: number): number {
     const pixels = level === 1 ? this.options.blockPixels : this.options.voxelPixels;
@@ -495,7 +530,8 @@ export class RegionStreamer {
 
   private distanceTo(target: RegionNode): number {
     const span = regionSpan(target.level);
-    const cached = this.cache.get(target.key)?.mesh?.region;
+    const entry = this.cache.get(target.key);
+    const cached = entry?.blended && this.projectionBlend <= 0 ? undefined : entry?.mesh?.region;
     const { dimension, minY, maxY, mode } = this.context;
     const low =
       mode === "caves"
@@ -512,6 +548,12 @@ export class RegionStreamer {
   /** Nearer nodes load first; nodes outside the view wait behind visible ones. */
   private priority(target: RegionNode, distance: number): number {
     const span = regionSpan(target.level);
+    return this.frustum.intersectsBox(this.nodeBox(target)) ? distance : distance * 3 + span;
+  }
+
+  /** A node's column with a margin above and below the typical terrain. */
+  private nodeBox(target: RegionNode): Box3 {
+    const span = regionSpan(target.level);
     const { dimension, minY, maxY, mode } = this.context;
     this.box.min.set(
       target.x * span,
@@ -527,7 +569,7 @@ export class RegionStreamer {
       mode === "caves" ? maxY : dimension === "overworld" ? TYPICAL_HIGH + 64 : maxY,
       (target.z + 1) * span,
     );
-    return this.frustum.intersectsBox(this.box) ? distance : distance * 3 + span;
+    return this.box;
   }
 }
 

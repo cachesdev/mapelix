@@ -135,6 +135,8 @@ export class Atmosphere {
   readonly viewDistance = uniform(2400);
   /** Sets how thick the haze is. It grows as the camera zooms out, so high views reach farther. */
   readonly hazeDistance = uniform(2400);
+  /** Orthographic share of the camera projection (0 perspective, 1 isometric), see ViewCamera. */
+  readonly projectionBlend = uniform(0);
   /** 1 while terrain fades into the sky before the edge of the loaded area, 0 to show the edge. */
   readonly edgeFade = uniform(1);
   /** 1 in daylight and 0 at night, for effects that change with the light, like glowing blocks. */

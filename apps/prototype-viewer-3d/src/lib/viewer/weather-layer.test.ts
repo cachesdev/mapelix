@@ -81,3 +81,27 @@ it("automatically suppresses cosmetic effects on sustained low frame rates", () 
   layer.dispose();
   expect(disposed).toHaveBeenCalledTimes(2);
 });
+
+it("keeps the perspective rain volume and grows it to cover an isometric view", () => {
+  const spread = (scale?: number) => {
+    const sky = new Atmosphere(),
+      layer = new WeatherLayer(sky, "rain"),
+      xs: number[] = [];
+    for (let i = 0; i < 120; i++)
+      layer.update(1 / 60, 1 / 60, camera, 1, (x) => (xs.push(x - camera.x), 80), scale);
+    const offsets = xs.slice(-MAX_RAIN_DROPS);
+    layer.dispose();
+    return { min: Math.min(...offsets), max: Math.max(...offsets), offsets };
+  };
+  const perspective = spread(),
+    explicit = spread(1),
+    isometric = spread(6);
+  // Scale 1 is exactly the perspective volume.
+  expect(explicit.offsets).toEqual(perspective.offsets);
+  expect(perspective.min).toBeGreaterThanOrEqual(-32);
+  expect(perspective.max).toBeLessThanOrEqual(32);
+  // A larger volume spreads the same drops over the visible ground.
+  expect(isometric.min).toBeLessThan(-150);
+  expect(isometric.max).toBeGreaterThan(150);
+  expect(isometric.max).toBeLessThanOrEqual(192);
+});

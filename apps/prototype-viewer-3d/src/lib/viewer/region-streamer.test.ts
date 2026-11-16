@@ -4,6 +4,7 @@ import { EMPTY_HEIGHT, encodeSceneRegion, regionGridSize } from "@mapelix/scene-
 import { sceneContext } from "@mapelix/scene-prototype/dimensions";
 import type { SceneMaterials } from "./shaders/materials";
 import { RegionStreamer, type StreamingOptions } from "./region-streamer";
+import { ViewCamera } from "./view-projection";
 
 const constructed = vi.hoisted(() => vi.fn());
 vi.mock("./region-mesh", () => ({
@@ -181,5 +182,118 @@ describe("dimension streaming lifecycle", () => {
     expect(overworld.stats.cached).toBe(0);
     expect(constructed).toHaveBeenCalledTimes(1);
     nether.dispose();
+  });
+});
+
+describe("level of detail under an isometric projection", () => {
+  function requests(camera: PerspectiveCamera): string[] {
+    const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetcher);
+    const streamer = stream("overworld", { viewDistance: 2048, maxRequests: 10_000 });
+    streamer.update(camera, 600);
+    streamer.dispose();
+    vi.unstubAllGlobals();
+    return fetcher.mock.calls
+      .map(([input]) => new URL(String(input), "http://localhost").pathname)
+      .sort();
+  }
+
+  function view(blend: number, focusDistance: number, kind = ViewCamera): PerspectiveCamera {
+    const camera = new kind(50, 1.5, 1, 6000);
+    camera.position.set(0, 64 + focusDistance * 0.7, focusDistance * 0.7);
+    camera.lookAt(0, 64, 0);
+    camera.updateMatrixWorld();
+    if (camera instanceof ViewCamera) {
+      camera.projectionBlend = blend;
+      camera.focusDistance = focusDistance;
+    }
+    camera.updateProjectionMatrix();
+    return camera;
+  }
+
+  const levels = (paths: string[]) => paths.map((path) => Number(path.split("/")[2]));
+
+  it("requests exactly the same regions as before in perspective", () => {
+    expect(requests(view(0, 300))).toEqual(requests(view(0, 300, PerspectiveCamera as never)));
+  });
+
+  it("refines by on-screen scale, only inside the view", () => {
+    const perspective = levels(requests(view(0, 1200)));
+    const isometric = levels(requests(view(1, 1200)));
+    // Far out, perspective still refines next to the camera; an isometric view does not.
+    expect(Math.min(...perspective)).toBeLessThan(Math.min(...isometric));
+    expect(isometric.length).toBeLessThan(perspective.length);
+    // Close in, the isometric view refines everything it shows.
+    expect(Math.min(...levels(requests(view(1, 40))))).toBe(0);
+  });
+});
+
+describe("returning from an isometric view", () => {
+  function serve(): void {
+    const empty = new Uint32Array(0);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>((input) => {
+        const [level, x, z] = new URL(String(input), "http://localhost").pathname
+          .split("/")
+          .slice(2)
+          .map(Number) as [number, number, number];
+        const size = regionGridSize(level) ** 2;
+        const bytes = encodeSceneRegion({
+          level,
+          x,
+          z,
+          // Flat low ground: lower than the typical terrain assumed before a region arrives.
+          minY: 60,
+          maxY: 62,
+          heights: new Int16Array(size).fill(EMPTY_HEIGHT),
+          opaque: empty,
+          plants: empty,
+          translucent: empty,
+        });
+        return Promise.resolve(new Response(new Uint8Array(bytes).buffer));
+      }),
+    );
+  }
+
+  async function settle(streamer: RegionStreamer, camera: PerspectiveCamera): Promise<void> {
+    for (let step = 0; step < 200; step += 1) {
+      streamer.update(camera, 600);
+      const { loading, remaining } = streamer.stats;
+      if (loading === 0 && remaining === 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    streamer.update(camera, 600);
+  }
+
+  function camera(blend: number): ViewCamera {
+    const view = new ViewCamera(50, 1.5, 1, 6000);
+    view.position.set(0, 64 + 200 * Math.sin(0.42), 200 * Math.cos(0.42));
+    view.lookAt(0, 64, 0);
+    view.updateMatrixWorld();
+    view.projectionBlend = blend;
+    view.focusDistance = 200;
+    view.updateProjectionMatrix();
+    return view;
+  }
+
+  const drawn = (streamer: RegionStreamer) =>
+    [...(Reflect.get(streamer, "drawn") as Map<string, unknown>).keys()].sort();
+
+  it("draws the same regions as a view opened directly in perspective", async () => {
+    serve();
+    const options = { viewDistance: 1800, maxRequests: 64, memoryBudget: 1 << 30 };
+    const direct = stream("overworld", options);
+    await settle(direct, camera(0));
+    const expected = drawn(direct);
+    direct.dispose();
+
+    const roundTrip = stream("overworld", options);
+    await settle(roundTrip, camera(1));
+    const isometric = drawn(roundTrip);
+    await settle(roundTrip, camera(0));
+    expect(isometric).not.toEqual(expected);
+    expect(drawn(roundTrip)).toEqual(expected);
+    roundTrip.dispose();
   });
 });
