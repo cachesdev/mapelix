@@ -96,7 +96,51 @@ cache was warm (the snapshot is 15 MiB); cold-cache runs were not controlled sep
 No shadow quality was changed: there is no reduced halo, no resizing between native zooms and no
 lighter shadow mode.
 
-Incremental rendering (batch 5) is a separate goal. It must invalidate on real per-dimension
-dependencies, including shadow-halo and biome-blend neighbours. A useful order of magnitude: a
-single-core incremental update of a larger world with the reference renderer redrew 4,805 changed
-Overworld chunks and kept 672 unchanged tiles in 57 s, and checked an unchanged Nether in 4 s.
+## Incremental updates (batch 5)
+
+`incremental: true` (CLI `--incremental`) updates the published export from a new snapshot and
+reuses every tile whose inputs did not change. The output is byte-identical to a full render of the
+new snapshot: the generation ID, and so the manifest and every PNG, are the same.
+
+- **Change detection.** Every generation stores `source-chunks.json`, listed in the manifest as
+  `sourceChunks`. It holds a 128-bit fingerprint per chunk of the effective map records (subchunks,
+  Data2D, Data3D) after LevelDB sequence and tombstone resolution. Changed, deleted and new chunks
+  are the keys whose fingerprints differ.
+- **Exact dependencies.** A native tile depends on every chunk intersecting its surface input
+  (including the 256-block north/west shadow halo and the one-block east/south border) and its
+  biome-blend window (`tileDependencyBounds`). Each changed chunk marks exactly the tiles whose
+  dependency bounds it intersects, at every native zoom. An overview tile is redone when one of its
+  zoom-0 tiles is affected, including one that appears or disappears.
+- **Reuse.** Unaffected tiles are copied from the published generation after their SHA-256 is
+  checked. New tiles are rendered, tiles that lost their coverage are dropped, and hidden zoom-0
+  overview sources are always rendered. The new generation is verified as before.
+- **Fallback.** A full render runs, with a reason in the result, when there is no published
+  generation, or its renderer revision, appearance resources, grid or render settings differ, or
+  its chunk index is missing or does not match its digest.
+
+The batch result reports `update` (mode, reason, changed chunks, rendered, composed and reused
+tiles); it is not stored in the manifest.
+
+Local measurements, Overworld and Nether -4..+2. Updated snapshots are copies of the local snapshot
+with one appended LevelDB log that rewrites whole chunks, deletes some and adds one. Every update
+was compared with a full render of the same snapshot: same generation, zero differing tiles.
+
+| Update                                   | Changed chunks | Rendered + composed / reused | 2 workers | 1 worker |
+| ---------------------------------------- | -------------: | ---------------------------: | --------: | -------: |
+| Unchanged Overworld                      |              0 |                    0 / 376 |    3.4 s |   3.5 s |
+| Unchanged Nether                         |              0 |                    0 / 184 |    2.0 s |   2.0 s |
+| 20 neighbouring chunks, 2 deleted, 1 new |             23 |                 117 / 280 |   11.9 s |  15.0 s |
+| 400 neighbouring chunks, 10 deleted, 1 new |          411 |                 171 / 226 |   12.0 s |  17.4 s |
+| 170 scattered chunks, 5 deleted, 1 new   |            176 |                 319 / 78 |   14.6 s |  22.1 s |
+| Full render of an updated Overworld      |              — |                   397 / 0 |   15.2 s |       — |
+
+An unchanged dimension costs indexing, fingerprinting and copying (about 0.4 s of indexing here,
+the rest is file copies and verification). An update costs much less than its share of tiles
+suggests, because each rendered tile still extracts its whole 256-block shadow halo, mostly from
+unchanged chunks that no longer get reused by neighbouring rendered tiles. Scattered changes reach
+most tiles through the halo. Keeping extracted chunk surfaces between runs, keyed by their
+fingerprints, would make small updates proportional to their size; it is not implemented.
+
+For scale: the reference renderer, with height shading and no halo, redrew 4,805 changed Overworld
+chunks of a larger world and kept 672 unchanged tiles in 57 s on one core, and checked an unchanged
+Nether in 4 s.

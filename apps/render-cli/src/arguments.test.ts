@@ -37,6 +37,7 @@ describe("generic batch CLI", () => {
         "--shadows",
         "off",
         "--zooms=-4,-1",
+        "--incremental",
       ]),
     ).toMatchObject({
       dimensions: ["nether", "end", "overworld"],
@@ -45,6 +46,7 @@ describe("generic batch CLI", () => {
       limits: { workers: 1, timeoutMs: 20000 },
       shadows: "off",
       zooms: [-4, -1],
+      incremental: true,
     });
     expect(parseBatchArguments(["--help"])).toBe("help");
   });

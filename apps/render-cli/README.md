@@ -92,7 +92,8 @@ An ordinary error, timeout or cancellation leaves the previous pointer unchanged
 the current run's staging files, temporary manifest and lock. If cancellation races the final rename,
 a successful rename is the commit point and the call succeeds. A second identical export still
 renders all requested tiles, verifies the existing immutable payload and publishes the same bytes.
-This is deterministic output, not incremental rendering.
+With `--incremental`, tiles whose source chunks, shadow halo and biome-blend window are unchanged are
+copied from the published generation instead; the result is byte-identical to a full render.
 
 All inputs and existing output components reject symbolic links and Windows junctions, including
 linked database files. An unrelated or unsupported root manifest and a corrupt colliding immutable
@@ -142,8 +143,8 @@ validate all checksums. It does not read archives directly. Snapshot creation st
 `--bounds=x0,z0,x1,z1` intersects the plan using exclusive block bounds, within +/-30000000. Every
 intersecting tile remains a full 256px image with normal XYZ alignment. Negative coordinates use floor
 division. Whole overview tiles also include their stored source cells outside the requested bounds.
-Zooms -4..+2 are the default; explicit +3 is compatible. Incremental dependency tracking follows
-separately.
+Zooms -4..+2 are the default; explicit +3 is compatible. Incremental updates are described in
+[2D export performance](../../docs/2d-performance.md).
 
 ## Exit contract and validation
 

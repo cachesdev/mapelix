@@ -29,6 +29,7 @@ export type {
   BatchResult,
   BatchManifest,
   BatchTile,
+  BatchUpdate,
   PublishedBatchManifest,
 } from "./types.js";
 
@@ -122,6 +123,7 @@ export async function renderBatch(options: BatchOptions): Promise<BatchResult> {
     unpublished = undefined;
     result = {
       manifest,
+      update: prepared.update,
       manifestPath,
       elapsedMs: performance.now() - started,
       peakRssMiB: peakRss / 1024 ** 2,

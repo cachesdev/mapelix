@@ -32,6 +32,12 @@ function withSurfaceProfiles(world: BedrockWorld): MapWorld {
     getTileCoverage(dimension) {
       return world.getTileCoverage(surfaceProfile(dimension).dimension);
     },
+    ...(world.getChunkFingerprints === undefined
+      ? {}
+      : {
+          getChunkFingerprints: (dimension: Parameters<MapWorld["getTileCoverage"]>[0]) =>
+            world.getChunkFingerprints!(surfaceProfile(dimension).dimension),
+        }),
     close: (options) => world.close(options),
   };
 }

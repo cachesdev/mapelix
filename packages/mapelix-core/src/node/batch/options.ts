@@ -78,6 +78,7 @@ export function normalizeBatch(options: BatchOptions): NormalizedBatch {
     biomeBlendRadius,
     correctReferenceBugs: options.correctReferenceBugs ?? false,
     bounds,
+    incremental: options.incremental ?? false,
     limits,
   };
 }

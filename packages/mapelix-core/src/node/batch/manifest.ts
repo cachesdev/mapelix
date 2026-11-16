@@ -43,7 +43,11 @@ export async function verifyGeneration(
   signal: AbortSignal,
 ): Promise<void> {
   signal.throwIfAborted();
-  const expectedFiles = ["manifest.json", ...manifest.tiles.map((tile) => tile.path)].sort();
+  const expectedFiles = [
+    "manifest.json",
+    ...(manifest.sourceChunks === undefined ? [] : [manifest.sourceChunks.path]),
+    ...manifest.tiles.map((tile) => tile.path),
+  ].sort();
   const files = await assertTreeNoLinks(directory);
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles))
     throw new Error("Generation file inventory mismatch");
@@ -56,7 +60,10 @@ export async function verifyGeneration(
   );
   if (stored.bytes !== Buffer.byteLength(expected) || stored.sha256 !== sha256(expected))
     throw new Error("Generation manifest mismatch");
-  for (const tile of manifest.tiles) {
+  for (const tile of [
+    ...(manifest.sourceChunks === undefined ? [] : [manifest.sourceChunks]),
+    ...manifest.tiles,
+  ]) {
     signal.throwIfAborted();
     const actual = await identifyFile(
       ownedPath(directory, tile.path),

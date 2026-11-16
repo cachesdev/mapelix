@@ -82,7 +82,13 @@ describe("bounded overview export", () => {
     expect(result.manifest.work!.temporaryPngBytes).toBeGreaterThan(0);
     expect(result.manifest.tiles.every((tile) => tile.z === -4 || tile.z === -1)).toBe(true);
     const rootEntries = await readdir(join(output, result.manifest.tileBase));
-    expect(rootEntries.sort()).toEqual(["manifest.json", "nether", "overworld", "the-end"]);
+    expect(rootEntries.sort()).toEqual([
+      "manifest.json",
+      "nether",
+      "overworld",
+      "source-chunks.json",
+      "the-end",
+    ]);
     expect(
       (await readdir(join(output, result.manifest.tileBase, "overworld", "tiles"))).sort(),
     ).toEqual(["-1", "-4"]);
@@ -104,6 +110,7 @@ describe("bounded overview export", () => {
     const bytes =
       result.manifest.pngBytes +
       result.manifest.work!.temporaryPngBytes +
+      result.manifest.sourceChunks!.bytes +
       Buffer.byteLength(before) +
       (await readFile(join(output, result.manifest.tileBase, "manifest.json"))).byteLength;
     await expect(

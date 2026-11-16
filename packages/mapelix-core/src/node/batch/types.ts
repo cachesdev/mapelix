@@ -34,6 +34,11 @@ export interface BatchOptions {
   readonly biomeBlendRadius?: number;
   readonly correctReferenceBugs?: boolean;
   readonly bounds?: BatchBounds;
+  /**
+   * Reuse unchanged tiles of the published generation when it used the same renderer and
+   * settings; only tiles whose dependencies changed are rendered. Falls back to a full render.
+   */
+  readonly incremental?: boolean;
   readonly limits?: Partial<BatchLimits>;
   readonly signal?: AbortSignal;
 }
@@ -48,6 +53,7 @@ export interface NormalizedBatch {
   readonly biomeBlendRadius: number;
   readonly correctReferenceBugs: boolean;
   readonly bounds: BatchBounds | null;
+  readonly incremental: boolean;
   readonly limits: BatchLimits;
 }
 
@@ -91,6 +97,8 @@ export interface BatchManifest {
   readonly tileCount: number;
   readonly pngBytes: number;
   readonly tiles: readonly BatchTile[];
+  /** Per-chunk source fingerprints used to update the next generation incrementally. */
+  readonly sourceChunks?: FileIdentity;
   /** Present for overview exports; temporary sources are not published inventory entries. */
   readonly work?: {
     readonly tileJobs: number;
@@ -105,8 +113,21 @@ export interface PublishedBatchManifest extends BatchManifest {
   readonly tileBase: string;
 }
 
+/** How a generation was produced; reported to the caller, not stored in the manifest. */
+export interface BatchUpdate {
+  readonly mode: "full" | "incremental";
+  /** Why a requested incremental update rendered everything. */
+  readonly reason?: string;
+  readonly previousGeneration?: string;
+  readonly changedChunks: number;
+  readonly renderedTiles: number;
+  readonly composedOverviews: number;
+  readonly reusedTiles: number;
+}
+
 export interface BatchResult {
   readonly manifest: PublishedBatchManifest;
+  readonly update: BatchUpdate;
   readonly manifestPath: string;
   readonly elapsedMs: number;
   readonly peakRssMiB: number;
@@ -121,6 +142,7 @@ export interface PreparedBatch {
   readonly manifest: BatchManifest;
   readonly generation: string;
   readonly publicationBytes: number;
+  readonly update: BatchUpdate;
 }
 
 export type BatchWorkerMessage =

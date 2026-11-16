@@ -20,6 +20,7 @@ export {
 } from "./tile.js";
 export {
   createBedrockWorld,
+  tileDependencyBounds,
   type BedrockWorld,
   type CloseWorldOptions,
   type EffectiveBedrockRecord,

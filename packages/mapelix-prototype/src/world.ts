@@ -32,6 +32,12 @@ export type EffectiveBedrockRecord = Pick<LevelDbRecord, "key" | "value">;
 export interface BedrockWorld {
   renderTile(coordinates: TileCoordinates, options?: RenderTileOptions): Promise<RenderedTile>;
   getTileCoverage(dimension: Dimension): readonly TileCoverage[];
+  /**
+   * Content fingerprints of every chunk with map records (subchunks, Data2D, Data3D), keyed
+   * `x,z` in chunk coordinates. Equal fingerprints mean equal effective records. Optional;
+   * worlds without it cannot be updated incrementally.
+   */
+  getChunkFingerprints?(dimension: Dimension): ReadonlyMap<string, string>;
   /** Stops accepting work and releases resources after draining or aborting accepted renders. */
   close(options?: CloseWorldOptions): Promise<void>;
 }
@@ -419,6 +425,26 @@ function setBiomeChunk<T>(
  */
 export function createBedrockWorld(records: Iterable<EffectiveBedrockRecord>): BedrockWorld {
   return new RecordBedrockWorld(records);
+}
+
+/**
+ * Every block whose stored chunk records can change the pixels of a tile: the surface input,
+ * including the shadow halo, and the biome-blend window. A tile can only change when a chunk
+ * intersecting these bounds changes, appears or is deleted.
+ */
+export function tileDependencyBounds(
+  coordinates: TileCoordinates,
+  options: { readonly shadows?: boolean; readonly biomeBlendRadius?: number } = {},
+): BlockBounds {
+  const bounds = tileBounds(coordinates);
+  const input = tileInputBounds(coordinates, options.shadows !== false);
+  const blend = options.biomeBlendRadius ?? 0;
+  return {
+    minX: Math.min(input.minX, bounds.minX - blend),
+    minZ: Math.min(input.minZ, bounds.minZ - blend),
+    maxX: Math.max(input.maxX, bounds.maxX + blend),
+    maxZ: Math.max(input.maxZ, bounds.maxZ + blend),
+  };
 }
 
 export function tileInputBounds(coordinates: TileCoordinates, shadows: boolean): BlockBounds {

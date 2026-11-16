@@ -135,6 +135,7 @@ describe("atomic snapshot batch export", () => {
     const first = await renderBatch(options);
     const bytes =
       first.manifest.pngBytes +
+      first.manifest.sourceChunks!.bytes +
       (await readFile(first.manifestPath)).byteLength +
       (await readFile(join(output, first.manifest.tileBase, "manifest.json"))).byteLength;
     await expect(

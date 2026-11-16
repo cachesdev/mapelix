@@ -116,6 +116,8 @@ when forced workers are requested. An optional startup `signal` cancels index re
 Each renderer keeps bounded caches of database records and extracted chunk surfaces, so
 neighbouring tiles and native zooms do not decode the same chunks again. `renderCacheMiB` sets
 the budget per renderer (default 256, `0` disables reuse); pixels are identical either way.
+Batch exports store per-chunk source fingerprints; `incremental: true` then re-renders only tiles
+whose dependencies changed and copies the others, with output identical to a full render.
 
 ## Cleanup
 

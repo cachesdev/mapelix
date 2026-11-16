@@ -13,6 +13,7 @@ Read-only classic 2D export. The output parent must already exist.
   --biome-blend-radius <n>    0..16 blocks (default: 0)
   --correct-reference-bugs   Opt into corrected reference shadow rounding
   --bounds <x0,z0,x1,z1>      Exclusive block bounds; intersecting tiles remain full
+  --incremental              Reuse unchanged tiles of the published generation
   --workers <n>              1..16 worker threads (default: 2)
   --max-pending <n>          Accepted jobs, 1..1024 (default: worker count)
   --max-tiles <n>            Published tiles plus temporary zoom-0 sources (default: 10000)
@@ -47,6 +48,7 @@ export function parseBatchArguments(args: readonly string[]): BatchOptions | "he
       shadows: { type: "string" },
       "biome-blend-radius": { type: "string" },
       "correct-reference-bugs": { type: "boolean" },
+      incremental: { type: "boolean" },
       bounds: { type: "string" },
       workers: { type: "string" },
       "max-pending": { type: "string" },
@@ -115,5 +117,6 @@ export function parseBatchArguments(args: readonly string[]): BatchOptions | "he
       ? {}
       : { correctReferenceBugs: values["correct-reference-bugs"] }),
     ...(bounds === undefined ? {} : { bounds }),
+    ...(values.incremental === undefined ? {} : { incremental: values.incremental }),
   };
 }

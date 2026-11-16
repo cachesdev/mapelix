@@ -24,6 +24,7 @@ try {
         generation: result.manifest.generation,
         tiles: result.manifest.tileCount,
         pngBytes: result.manifest.pngBytes,
+        update: result.update,
         elapsedMs: Math.round(result.elapsedMs),
         peakRssMiB: Math.round(result.peakRssMiB * 100) / 100,
       })}\n`,

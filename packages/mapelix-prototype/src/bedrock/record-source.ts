@@ -19,6 +19,8 @@ export interface LevelDbRecordOptions {
   readonly includeKey?: (key: Uint8Array) => boolean;
   /** Returns a compact value to retain in a key index, or undefined to keep the value lazy. */
   readonly retainValue?: (key: Uint8Array, value: Uint8Array) => Uint8Array | undefined;
+  /** Returns a compact content digest kept with each index entry, for change detection. */
+  readonly digestValue?: (key: Uint8Array, value: Uint8Array) => Uint8Array;
 }
 
 /** A live record location without its potentially large value. */
@@ -27,6 +29,8 @@ export interface LevelDbRecordIndexEntry {
   readonly sequence: bigint;
   readonly source: string;
   readonly value?: Uint8Array;
+  /** Present when the index was created with `digestValue`. */
+  readonly digest?: Uint8Array;
 }
 
 interface VersionedRecord extends LevelDbRecord {
@@ -158,6 +162,7 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
     const previous = latest.get(encodedKey);
     const retainedValue =
       value === undefined ? undefined : options.retainValue?.(key, value)?.slice();
+    const digest = value === undefined ? undefined : options.digestValue?.(key, value);
     const candidate: VersionedIndexEntry = {
       key: key.slice(),
       sequence,
@@ -165,6 +170,7 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
       deleted: value === undefined,
       order,
       ...(retainedValue === undefined ? {} : { value: retainedValue }),
+      ...(digest === undefined ? {} : { digest }),
     };
 
     if (

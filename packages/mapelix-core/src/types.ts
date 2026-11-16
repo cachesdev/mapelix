@@ -21,5 +21,7 @@ export interface MapRenderOptions extends Omit<RenderTileOptions, "surfaceRange"
 export interface MapWorld {
   renderTile(coordinates: TileCoordinates, options?: MapRenderOptions): Promise<RenderedTile>;
   getTileCoverage(dimension: Dimension): readonly TileCoverage[];
+  /** Chunk content fingerprints keyed `x,z`; required for incremental batch updates. */
+  getChunkFingerprints?(dimension: Dimension): ReadonlyMap<string, string>;
   close(options?: CloseWorldOptions): Promise<void>;
 }

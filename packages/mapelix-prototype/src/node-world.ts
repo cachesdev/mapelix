@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -48,8 +49,15 @@ export interface BedrockWorldDirectory {
    * has its own). Zero disables reuse between tiles. Defaults to 256.
    */
   readonly renderCacheMiB?: number;
+  /** Digest every map record at startup so `getChunkFingerprints` can detect changed chunks. */
+  readonly chunkFingerprints?: boolean;
   /** Cancels startup reads; close({ abort: true }) cancels an opened world. */
   readonly signal?: AbortSignal;
+}
+
+interface ChunkDigest {
+  readonly xor: Uint8Array;
+  count: number;
 }
 
 interface IndexedTile {
@@ -82,6 +90,7 @@ class IndexedBedrockWorld implements BedrockWorld {
   private readonly renderAbort = new AbortController();
   private readonly renderCache: TileRenderCache;
   private readonly styleIds = new WeakMap<SurfaceStyle, number>();
+  private readonly fingerprints: Map<number, Map<string, ChunkDigest>> | undefined;
 
   constructor(
     databaseDirectory: string,
@@ -89,6 +98,7 @@ class IndexedBedrockWorld implements BedrockWorld {
     renderConcurrency: number,
     forceWorkers: boolean,
     renderCacheMiB: number,
+    fingerprints: boolean,
   ) {
     this.databaseDirectory = databaseDirectory;
     this.forceWorkers = forceWorkers;
@@ -98,10 +108,25 @@ class IndexedBedrockWorld implements BedrockWorld {
         : undefined;
     this.renderCache = new TileRenderCache(this.workerPool === undefined ? renderCacheMiB : 0);
     const buildingTiles = new Map<string, BuildingTile>();
+    this.fingerprints = fingerprints ? new Map() : undefined;
     for (const record of records) {
       const location = classifyMapRecordKey(record.key);
       if (location === undefined) {
         continue;
+      }
+      if (this.fingerprints !== undefined) {
+        const chunks = this.fingerprints.get(location.dimension) ?? new Map<string, ChunkDigest>();
+        this.fingerprints.set(location.dimension, chunks);
+        const chunkKey = `${location.x},${location.z}`;
+        const chunk = chunks.get(chunkKey) ?? { xor: new Uint8Array(16), count: 0 };
+        chunks.set(chunkKey, chunk);
+        // Keys are unique within a chunk, so an XOR of keyed record digests is order-independent.
+        const recordDigest = createHash("sha256")
+          .update(record.key)
+          .update(record.digest ?? new Uint8Array())
+          .digest();
+        for (let index = 0; index < 16; index += 1) chunk.xor[index]! ^= recordDigest[index]!;
+        chunk.count += 1;
       }
       const tileX = floorDiv(location.x, 16);
       const tileY = floorDiv(location.z, 16);
@@ -162,6 +187,17 @@ class IndexedBedrockWorld implements BedrockWorld {
       () => undefined,
     );
     return pending;
+  }
+
+  getChunkFingerprints(dimension: Dimension): ReadonlyMap<string, string> {
+    if (this.closePromise !== undefined) throw new Error("The Bedrock world is closed");
+    if (this.fingerprints === undefined)
+      throw new Error("Open the world with chunkFingerprints: true to read chunk fingerprints");
+    const result = new Map<string, string>();
+    for (const [chunkKey, chunk] of this.fingerprints.get(DIMENSION_IDS[dimension]) ?? []) {
+      result.set(chunkKey, `${Buffer.from(chunk.xor).toString("hex")}${chunk.count.toString(16)}`);
+    }
+    return result;
   }
 
   getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
@@ -354,6 +390,12 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
         ? value.subarray(512)
         : undefined;
     },
+    ...(input.chunkFingerprints === true
+      ? {
+          digestValue: (_key: Uint8Array, value: Uint8Array) =>
+            createHash("sha256").update(value).digest().subarray(0, 16),
+        }
+      : {}),
   });
   for (const entry of databaseFiles) {
     input.signal?.throwIfAborted();
@@ -370,6 +412,7 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     renderConcurrency,
     input.forceWorkers === true,
     input.renderCacheMiB ?? DEFAULT_RENDER_CACHE_MIB,
+    input.chunkFingerprints === true,
   );
 }
 
