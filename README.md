@@ -68,14 +68,18 @@ const world = await openBedrockWorld({
   renderConcurrency: 2,
 });
 
-const tile = await world.renderTile({
-  dimension: "overworld",
-  z: 2,
-  x: -32,
-  y: -49,
-});
+try {
+  const tile = await world.renderTile({
+    dimension: "overworld",
+    z: 2,
+    x: -32,
+    y: -49,
+  });
 
-await writeLeafletTile(tile, { root: "generated-tiles" });
+  await writeLeafletTile(tile, { root: "generated-tiles" });
+} finally {
+  await world.close();
+}
 ```
 
 This writes `generated-tiles/2/-32/-49.png`. Leaflet can request the output with

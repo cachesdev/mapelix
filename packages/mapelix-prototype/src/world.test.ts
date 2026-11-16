@@ -148,6 +148,18 @@ function stackedSubchunk(
 }
 
 describe("createBedrockWorld", () => {
+  it("releases its records and rejects further reads after an idempotent close", async () => {
+    const world = createBedrockWorld([singleBlockSubchunk(0, 0, 4, "minecraft:grass_block")]);
+    const pending = world.renderTile({ dimension: "overworld", z: 2, x: 0, y: 0 });
+    await Promise.all([world.close(), world.close({ abort: true })]);
+
+    expect((await pending).png.byteLength).toBeGreaterThan(0);
+    await expect(world.renderTile({ dimension: "overworld", z: 2, x: 0, y: 0 })).rejects.toThrow(
+      "The Bedrock world is closed",
+    );
+    expect(() => world.getTileCoverage("overworld")).toThrow("The Bedrock world is closed");
+  });
+
   it("renders a decoded surface at the correct negative tile coordinate", async () => {
     const world = createBedrockWorld([singleBlockSubchunk(-1, 0, 4, "minecraft:grass_block")]);
     const tile = await world.renderTile({ dimension: "overworld", z: 0, x: -1, y: 0 });

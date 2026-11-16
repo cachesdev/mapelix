@@ -19,6 +19,7 @@ export {
 export {
   createBedrockWorld,
   type BedrockWorld,
+  type CloseWorldOptions,
   type EffectiveBedrockRecord,
   type RenderTileOptions,
   type TileCoverage,

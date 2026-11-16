@@ -30,6 +30,13 @@ export type EffectiveBedrockRecord = Pick<LevelDbRecord, "key" | "value">;
 export interface BedrockWorld {
   renderTile(coordinates: TileCoordinates, options?: RenderTileOptions): Promise<RenderedTile>;
   getTileCoverage(dimension: Dimension): readonly TileCoverage[];
+  /** Stops accepting work and releases resources after draining or aborting accepted renders. */
+  close(options?: CloseWorldOptions): Promise<void>;
+}
+
+export interface CloseWorldOptions {
+  /** Reject queued/running renders with AbortError and stop workers instead of draining them. */
+  readonly abort?: boolean;
 }
 
 export interface RenderTileOptions extends RenderSurfaceOptions {
@@ -54,6 +61,7 @@ export const SHADOW_RENDER_HALO = 256;
 
 class RecordBedrockWorld implements BedrockWorld {
   readonly tileRecords = new Map<string, EffectiveBedrockRecord[]>();
+  private closed = false;
 
   constructor(records: Iterable<EffectiveBedrockRecord>) {
     for (const record of records) {
@@ -74,6 +82,7 @@ class RecordBedrockWorld implements BedrockWorld {
     coordinates: TileCoordinates,
     options: RenderTileOptions = {},
   ): Promise<RenderedTile> {
+    if (this.closed) throw new Error("The Bedrock world is closed");
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
@@ -201,6 +210,7 @@ class RecordBedrockWorld implements BedrockWorld {
   }
 
   getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
+    if (this.closed) throw new Error("The Bedrock world is closed");
     const dimensionId = DIMENSION_IDS[dimension];
     const prefix = `${dimensionId}/`;
     const coverage: TileCoverage[] = [];
@@ -219,6 +229,12 @@ class RecordBedrockWorld implements BedrockWorld {
       });
     }
     return coverage;
+  }
+
+  close(): Promise<void> {
+    this.closed = true;
+    this.tileRecords.clear();
+    return Promise.resolve();
   }
 }
 

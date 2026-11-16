@@ -15,6 +15,7 @@ import {
   type PackedKeyGroup,
 } from "./node-tile-render.js";
 import { TileRenderWorkerPool } from "./node-worker-pool.js";
+import { renderAbortError } from "./render-abort.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -27,6 +28,7 @@ import {
 import {
   tileInputBounds,
   type BedrockWorld,
+  type CloseWorldOptions,
   type RenderTileOptions,
   type TileCoverage,
 } from "./world.js";
@@ -61,6 +63,8 @@ class IndexedBedrockWorld implements BedrockWorld {
   readonly databaseDirectory: string;
   private readonly workerPool: TileRenderWorkerPool | undefined;
   private renderQueue: Promise<void> = Promise.resolve();
+  private closePromise: Promise<void> | undefined;
+  private readonly renderAbort = new AbortController();
 
   constructor(
     databaseDirectory: string,
@@ -114,12 +118,16 @@ class IndexedBedrockWorld implements BedrockWorld {
   }
 
   renderTile(coordinates: TileCoordinates, options: RenderTileOptions = {}): Promise<RenderedTile> {
+    if (this.closePromise !== undefined)
+      return Promise.reject(new Error("The Bedrock world is closed"));
     const job = this.createRenderJob(coordinates, options);
     if (this.workerPool !== undefined && Object.keys(options).length === 0) {
       return this.workerPool.render(job);
     }
 
-    const pending = this.renderQueue.then(() => renderIndexedTile(job, options));
+    const pending = this.renderQueue.then(() =>
+      renderIndexedTile(job, options, this.renderAbort.signal),
+    );
     this.renderQueue = pending.then(
       () => undefined,
       () => undefined,
@@ -128,6 +136,7 @@ class IndexedBedrockWorld implements BedrockWorld {
   }
 
   getTileCoverage(dimension: Dimension): readonly TileCoverage[] {
+    if (this.closePromise !== undefined) throw new Error("The Bedrock world is closed");
     const prefix = `${DIMENSION_IDS[dimension]}/`;
     const coverage: TileCoverage[] = [];
     for (const [key, tile] of this.tiles) {
@@ -142,6 +151,21 @@ class IndexedBedrockWorld implements BedrockWorld {
       });
     }
     return coverage;
+  }
+
+  close(options: CloseWorldOptions = {}): Promise<void> {
+    if (options.abort === true) this.renderAbort.abort(renderAbortError());
+    const workersClosed = this.workerPool?.close(options);
+    this.closePromise ??= this.drainAndClose(workersClosed);
+    return this.closePromise;
+  }
+
+  private async drainAndClose(workersClosed: Promise<void> | undefined): Promise<void> {
+    try {
+      await Promise.all([this.renderQueue, workersClosed]);
+    } finally {
+      this.tiles.clear();
+    }
   }
 
   private createRenderJob(

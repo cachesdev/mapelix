@@ -1,6 +1,14 @@
 {
   "extends": ["//"],
   "tasks": {
+    "test:unit": {
+      "dependsOn": ["build", "transit"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build", "transit"],
+      "outputs": []
+    },
     "benchmark": {
       "dependsOn": ["build"],
       "cache": false,

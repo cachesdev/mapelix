@@ -29,7 +29,9 @@ export interface IndexedTileRenderJob {
 export async function renderIndexedTile(
   job: IndexedTileRenderJob,
   options: RenderTileOptions = {},
+  signal?: AbortSignal,
 ): Promise<RenderedTile> {
+  signal?.throwIfAborted();
   const records: EffectiveBedrockRecord[] = job.biomeRecords.map((record) => {
     const value = new Uint8Array(512 + record.value.byteLength);
     value.set(record.value, 512);
@@ -45,8 +47,9 @@ export async function renderIndexedTile(
     }
     const file: NamedLevelDbFile = {
       name: source.name,
-      bytes: await readFile(join(job.databaseDirectory, source.name)),
+      bytes: await readFile(join(job.databaseDirectory, source.name), { signal }),
     };
+    signal?.throwIfAborted();
     records.push(
       ...readLevelDbRecords([file], {
         includeKey: (key) => keys.has(hex(key)),
@@ -54,7 +57,15 @@ export async function renderIndexedTile(
     );
   }
 
-  return createBedrockWorld(records).renderTile(job.coordinates, options);
+  const world = createBedrockWorld(records);
+  try {
+    signal?.throwIfAborted();
+    const tile = await world.renderTile(job.coordinates, options);
+    signal?.throwIfAborted();
+    return tile;
+  } finally {
+    await world.close();
+  }
 }
 
 function hex(bytes: Uint8Array): string {

@@ -11,8 +11,12 @@ const world = await openBedrockWorld({
   directory: "/srv/amelix/world",
   renderConcurrency: 2,
 });
-const tile = await world.renderTile({ dimension: "overworld", z: 0, x: 0, y: 0 });
-await writeLeafletTile(tile, { root: "generated-tiles" });
+try {
+  const tile = await world.renderTile({ dimension: "overworld", z: 0, x: 0, y: 0 });
+  await writeLeafletTile(tile, { root: "generated-tiles" });
+} finally {
+  await world.close();
+}
 ```
 
 This writes `generated-tiles/0/0/0.png`. A Leaflet grid layer can request the output with `/tiles/{z}/{x}/{y}.png`.
@@ -20,6 +24,30 @@ This writes `generated-tiles/0/0/0.png`. A Leaflet grid layer can request the ou
 Tiles are always 256 by 256 pixels. Native zooms 0 through 3 render blocks at 1×1, 2×2, 4×4, and 8×8 pixels, so each higher zoom covers half as many blocks per axis. Tile `y` follows Minecraft Z. Missing chunks are transparent.
 
 For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file access and accepts Bedrock key/value records directly. This is the intended Canopy seam.
+
+## Lifecycle
+
+Both world constructors return a `BedrockWorld` with an asynchronous, idempotent `close()`.
+Closing rejects new render requests immediately, waits for every accepted render (including queued
+work), terminates worker threads, and releases the retained record index. Render failures remain on
+their original promises and do not prevent cleanup. After closing starts, `getTileCoverage()` throws
+and `renderTile()` returns a rejected promise.
+
+Use `await world.close({ abort: true })` to reject queued and running requests with an error named
+`AbortError` and terminate workers instead of waiting for their renders. It can also interrupt a
+graceful close already in progress; both calls await the same cleanup. Awaiting close guarantees that
+every accepted request has settled and all workers have stopped. Repeating either form is safe.
+
+In the main-process rendering path, file reads are abortable and cancellation is checked before and
+after synchronous decoding/rendering. JavaScript cannot interrupt a synchronous operation on its own
+thread: a close request takes effect when that thread can run it. Byte-backed renders are synchronous
+and closing does not revoke a tile that has already finished. Hosts that require a hard wall-clock
+limit must also supervise the rendering process.
+
+The directory reader opens files only for individual reads, which close their own file handles.
+`close()` releases its in-memory index and worker resources. Idle workers do not keep a process alive,
+but long-lived callers should still use `try`/`finally` to release resources explicitly. Byte-backed
+worlds created by `createBedrockWorld()` release their retained records when closed.
 
 ## Prototype boundaries
 

@@ -1,12 +1,102 @@
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
 import { openBedrockWorld } from "./node-world.js";
 
+const run = promisify(execFile);
+const lifecycleScript = fileURLToPath(new URL("../test/world-lifecycle.mjs", import.meta.url));
+
 describe("openBedrockWorld", () => {
+  it.each([1, 2])(
+    "aborts accepted renders and exits with %i workers",
+    async (concurrency) => {
+      const result = await runLifecycle("abort", concurrency);
+      expect(result).toMatchObject({
+        sameClosePromise: true,
+        terminated: concurrency === 1 ? 0 : concurrency,
+        messagePorts: 0,
+        rejectedAfterClose: true,
+        coverageRejected: true,
+      });
+      expect(result.rejected!.length).toBeGreaterThan(0);
+      expect(result.fulfilled! + result.rejected!.length).toBe(5);
+      expect(result.rejectedNames).toEqual(result.rejected!.map(() => "AbortError"));
+      expect(result.rejected!.every((message) => /abort/i.test(message))).toBe(true);
+    },
+    15_000,
+  );
+
+  it("can escalate a graceful close to abort without leaving accepted promises pending", async () => {
+    const result = await runLifecycle("abort-escalate", 2);
+    expect(result).toMatchObject({
+      sameClosePromise: true,
+      terminated: 2,
+      messagePorts: 0,
+    });
+    expect(result.fulfilled! + result.rejected!.length).toBe(5);
+    expect(result.rejected!.length).toBeGreaterThan(0);
+    expect(result.rejectedNames).toEqual(result.rejected!.map(() => "AbortError"));
+  }, 15_000);
+
+  it.each(["read-error-idle", "worker-exit-idle"])(
+    "exits naturally after %s even without an explicit close",
+    async (scenario) => {
+      const result = await runLifecycle(scenario, 2);
+      expect(result).toMatchObject({ completed: true, terminated: 0 });
+      expect(result.failure).toEqual(
+        expect.stringContaining(scenario === "read-error-idle" ? "ENOENT" : "render worker exited"),
+      );
+    },
+    15_000,
+  );
+
+  it.each([1, 2, 4])(
+    "drains accepted renders, closes %i workers, and exits without process.exit",
+    async (concurrency) => {
+      const result = await runLifecycle("drain", concurrency);
+      expect(result).toMatchObject({
+        fulfilled: 4,
+        rejected: ["Expected render failure"],
+        identicalPngs: true,
+        sameClosePromise: true,
+        terminated: concurrency === 1 ? 0 : concurrency,
+        messagePorts: 0,
+        rejectedAfterClose: true,
+        coverageRejected: true,
+      });
+    },
+    15_000,
+  );
+
+  it("replaces a worker lost during close only to finish accepted queued renders", async () => {
+    const result = await runLifecycle("worker-exit", 2);
+    expect(result).toMatchObject({
+      fulfilled: 4,
+      identicalPngs: true,
+      terminated: 2,
+      messagePorts: 0,
+    });
+    expect(result.rejected).toEqual([expect.stringContaining("render worker exited with code")]);
+  }, 15_000);
+
+  it("lets existing callers exit naturally with an unused idle worker", async () => {
+    expect(await runLifecycle("idle", 2)).toMatchObject({ completed: true, terminated: 0 });
+  }, 15_000);
+
+  it("closes a pool that has never rendered a tile", async () => {
+    expect(await runLifecycle("unused", 2)).toMatchObject({
+      completed: true,
+      terminated: 2,
+      messagePorts: 0,
+    });
+  }, 15_000);
+
   it("rejects invalid render concurrency before reading the world", async () => {
     await expect(
       openBedrockWorld({ directory: "/not-read", renderConcurrency: 0 }),
@@ -90,6 +180,32 @@ describe("openBedrockWorld", () => {
     }
   });
 });
+
+interface LifecycleResult {
+  readonly fulfilled?: number;
+  readonly rejected?: readonly string[];
+  readonly rejectedNames?: readonly string[];
+  readonly failure?: string;
+}
+
+async function runLifecycle(scenario: string, concurrency: number): Promise<LifecycleResult> {
+  const directory = await mkdtemp(join(tmpdir(), "mapelix-lifecycle-"));
+  try {
+    await mkdir(join(directory, "db"));
+    await writeFile(
+      join(directory, "db", "000001.log"),
+      levelDbLog([singleBlockSubchunk(0, 0, 4, 0, 0), data2DChunk(0, 0, 1)]),
+    );
+    const { stdout } = await run(
+      process.execPath,
+      [lifecycleScript, directory, scenario, String(concurrency)],
+      { timeout: 10_000 },
+    );
+    return JSON.parse(stdout) as LifecycleResult;
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
 
 function int32(value: number): number[] {
   return [value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff];
