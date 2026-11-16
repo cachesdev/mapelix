@@ -3,6 +3,7 @@ export { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./bl
 export { openBedrockWorld, type BedrockWorldDirectory } from "./node-world.js";
 export { writeLeafletTile, type LeafletTileOutput } from "./node-output.js";
 export type { SurfaceRange } from "./surface-range.js";
+export type { SurfaceBlockStyle, SurfaceStyle, SurfaceStyleVariant } from "./surface-style.js";
 export {
   MAX_NATIVE_ZOOM,
   TILE_SIZE,

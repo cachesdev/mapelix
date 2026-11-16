@@ -16,6 +16,9 @@ Production rewrite work starts from the acceptance baseline and ledger in `REWRI
   dimension/height profiles and types; `./node` adapts read-only snapshot and effective-record
   rendering with those profiles. It reuses the reference renderer through an explicit surface-range
   option; reference defaults and 3D scene contexts are unchanged.
+  Its portable `./appearance` entry owns the shared sampled catalog and tuned color/alias rules used
+  by 2D and the scene package. The Node adapter derives a serializable top-view profile with palette
+  variants, biome-tint policy and ground-cover rules. Callers can retain the reference appearance.
 - A future Canopy adapter can supply changed records without changing the renderer.
 
 The module boundary is byte-oriented. Bedrock decoding must not depend on HTTP, Canopy, Leaflet, or a graphical user interface.

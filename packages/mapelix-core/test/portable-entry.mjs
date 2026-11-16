@@ -10,7 +10,13 @@ const hooks = registerHooks({
 });
 try {
   const { surfaceProfile } = await import("../dist/index.js");
-  console.log(JSON.stringify(surfaceProfile("nether")));
+  const { BEDROCK_BLOCK_COLORS } = await import("@mapelix/core/appearance");
+  console.log(
+    JSON.stringify({
+      ...surfaceProfile("nether"),
+      appearanceEntries: Object.keys(BEDROCK_BLOCK_COLORS).length,
+    }),
+  );
 } finally {
   hooks.deregister();
 }

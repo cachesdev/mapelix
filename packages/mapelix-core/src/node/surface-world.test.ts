@@ -167,7 +167,8 @@ describe("dimension-aware classic map surfaces", () => {
       underwaterName: "minecraft:stone",
     });
     const glass = sample(await render(records, coordinates, { topY: 73 }))!;
-    expect(glass.colorLayers).toEqual([
+    expect(glass.colorLayers).toHaveLength(2);
+    expect(glass.colorLayers).toMatchObject([
       { name: "minecraft:red_stained_glass", count: 1 },
       { name: "minecraft:water", count: 1, fluidDepth: 4, underwaterName: "minecraft:stone" },
     ]);

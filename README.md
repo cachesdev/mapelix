@@ -94,6 +94,9 @@ The production-facing [`@mapelix/core`](packages/mapelix-core/README.md) package
 profiles for Overworld, Nether and End. Its Node adapter defaults the Nether to an included Y90 cut
 and accepts exact per-render `topY` overrides. The root profile entry has no Node.js runtime imports.
 The archived prototype API and the existing 3D viewer retain their defaults.
+Core also supplies the shared 2D/3D color catalog and top-view ground-cover rules by default. Select
+`appearance: "reference"` to retain its previous appearance; see the
+[2D color catalog](docs/2d-block-colors.md) for coverage and provenance.
 
 ## Run it locally
 

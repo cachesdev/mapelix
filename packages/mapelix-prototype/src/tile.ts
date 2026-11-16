@@ -1,3 +1,5 @@
+import type { SurfaceBlockStyle } from "./surface-style.js";
+
 export const TILE_SIZE = 256;
 export const MAX_NATIVE_ZOOM = 3;
 
@@ -35,6 +37,7 @@ export interface RenderedSurface {
 
 export interface SurfaceBlock {
   readonly name: string;
+  readonly style?: SurfaceBlockStyle;
   readonly y: number;
   /** Supporting terrain height when decorative cover must not alter lighting or cast shadows. */
   readonly supportY?: number;
@@ -44,6 +47,7 @@ export interface SurfaceBlock {
   readonly fluidDepth?: number;
   /** First non-water block below a water surface, used for visual compositing. */
   readonly underwaterName?: string;
+  readonly underwaterStyle?: SurfaceBlockStyle;
   /** Top-down visible color runs when translucent blocks expose lower materials. */
   readonly colorLayers?: readonly SurfaceColorLayer[];
   /** Exact vertical opacity runs for 3D shadows. Omit to use the surface-height fallback. */
@@ -52,9 +56,11 @@ export interface SurfaceBlock {
 
 export interface SurfaceColorLayer {
   readonly name: string;
+  readonly style?: SurfaceBlockStyle;
   readonly count: number;
   readonly fluidDepth?: number;
   readonly underwaterName?: string;
+  readonly underwaterStyle?: SurfaceBlockStyle;
 }
 
 export interface ShadowOpacityRun {

@@ -33,6 +33,10 @@ describe("classic surface profiles", () => {
   it("keeps the public profile entry importable without Node builtins", async () => {
     const script = fileURLToPath(new URL("../test/portable-entry.mjs", import.meta.url));
     const { stdout } = await promisify(execFile)(process.execPath, [script], { timeout: 5000 });
-    expect(JSON.parse(stdout)).toMatchObject({ dimension: "nether", topY: 90 });
+    expect(JSON.parse(stdout)).toMatchObject({
+      dimension: "nether",
+      topY: 90,
+      appearanceEntries: 1276,
+    });
   });
 });

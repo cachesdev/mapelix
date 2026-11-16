@@ -109,11 +109,15 @@ lines.push(
 );
 for (const [block, keys] of colorStates) lines.push(`  ${block}: ${JSON.stringify(keys)},`);
 lines.push("};", "");
+lines.push(
+  "export const BEDROCK_BLOCK_IDS: readonly string[] = " +
+    JSON.stringify([...knownBlocks].map((name) => name.replace(/^minecraft:/, "")).sort(compare)) +
+    ";",
+  "",
+);
 const output =
   outputArgument === undefined
-    ? fileURLToPath(
-        new URL("../../mapelix-scene-prototype/src/blocks/bedrock-colors.ts", import.meta.url),
-      )
+    ? fileURLToPath(new URL("../../mapelix-core/src/appearance/bedrock-colors.ts", import.meta.url))
     : resolve(outputArgument);
 await writeFile(output, lines.join("\n"));
 if (reportArgument !== undefined) {

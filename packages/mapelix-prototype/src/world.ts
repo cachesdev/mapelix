@@ -12,6 +12,7 @@ import { decodeSubchunk, type DecodedSubchunk } from "./bedrock/subchunk.js";
 import { encodePng } from "./png.js";
 import { renderSurface, type RenderSurfaceOptions } from "./render.js";
 import { assertSurfaceRange, type SurfaceRange } from "./surface-range.js";
+import { surfaceBlockStyle, type SurfaceBlockStyle } from "./surface-style.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -59,6 +60,10 @@ const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
   "the-end": 2,
 };
 
+interface SurfaceSubchunk extends DecodedSubchunk {
+  readonly styles?: readonly (SurfaceBlockStyle | undefined)[];
+}
+
 /** uNmINeD-compatible horizontal input halo for the default 3D shadow pass. */
 export const SHADOW_RENDER_HALO = 256;
 
@@ -90,7 +95,7 @@ class RecordBedrockWorld implements BedrockWorld {
     assertSurfaceRange(range);
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
-    const chunks = new Map<string, DecodedSubchunk[]>();
+    const chunks = new Map<string, SurfaceSubchunk[]>();
     const biomeChunks = new Map<number, Map<number, DecodedData2D>>();
     const biome3DChunks = new Map<number, Map<number, DecodedData3D>>();
     const storageTileX = floorDiv(bounds.minX, TILE_SIZE);
@@ -141,7 +146,22 @@ class RecordBedrockWorld implements BedrockWorld {
             continue;
           }
 
-          const subchunk = decodeSubchunk(record.key, record.value);
+          const decoded = decodeSubchunk(record.key, record.value, {
+            includeStates: options.surfaceStyle !== undefined,
+          });
+          const subchunk: SurfaceSubchunk | undefined =
+            decoded === undefined || options.surfaceStyle === undefined
+              ? decoded
+              : {
+                  ...decoded,
+                  styles: decoded.primary.palette.map((name, index) =>
+                    surfaceBlockStyle(
+                      options.surfaceStyle,
+                      name,
+                      decoded.primary.states?.[index] ?? {},
+                    ),
+                  ),
+                };
           if (subchunk === undefined) continue;
           const chunkKey = `${key.x},${key.z}`;
           const group = chunks.get(chunkKey) ?? [];
@@ -299,7 +319,7 @@ function writeChunkSurface(
   tileMinZ: number,
   chunkX: number,
   chunkZ: number,
-  subchunks: readonly DecodedSubchunk[],
+  subchunks: readonly SurfaceSubchunk[],
   biomes: DecodedData2D | undefined,
   biomes3D: DecodedData3D | undefined,
   range: SurfaceRange | undefined,
@@ -335,7 +355,7 @@ function writeChunkSurface(
 }
 
 function findSurfaceBlock(
-  subchunks: readonly DecodedSubchunk[],
+  subchunks: readonly SurfaceSubchunk[],
   localX: number,
   localZ: number,
   range: SurfaceRange | undefined,
@@ -354,41 +374,47 @@ function findSurfaceBlock(
       const blockIndex = localX * 256 + localZ * 16 + localY;
       const paletteIndex = subchunk.primary.indexes[blockIndex];
       const name = paletteIndex === undefined ? undefined : subchunk.primary.palette[paletteIndex];
+      const style = paletteIndex === undefined ? undefined : subchunk.styles?.[paletteIndex];
       if (name !== undefined && !isAir(name)) {
         const y = subchunk.y * 16 + localY;
-        addShadowVoxel(shadowRuns, y, blockShadowOpacity(name));
+        addShadowVoxel(shadowRuns, y, blockShadowOpacity(name, style));
         if (surface !== undefined) continue;
         if (
           decorativeCover === undefined &&
           waterSurface === undefined &&
-          isTranslucentGlass(name)
+          isTranslucentGlass(name, style)
         ) {
           translucentTopY ??= y;
-          addColorLayer(colorLayers, name);
+          addColorLayer(colorLayers, name, style);
           continue;
         }
         if (waterSurface !== undefined) {
           if (isWater(name)) {
             fluidDepth += 1;
           } else {
-            surface = { ...waterSurface, fluidDepth, underwaterName: name };
+            surface = {
+              ...waterSurface,
+              fluidDepth,
+              underwaterName: name,
+              ...(style === undefined ? {} : { underwaterStyle: style }),
+            };
           }
           continue;
         }
         if (decorativeCover !== undefined) {
-          if (isDecorativeCover(name)) continue;
+          if (isDecorativeCover(name, style)) continue;
           surface = { ...decorativeCover, supportY: y };
           continue;
         }
-        if (isDecorativeCover(name)) {
-          decorativeCover = { name, y };
+        if (isDecorativeCover(name, style)) {
+          decorativeCover = { name, y, ...(style === undefined ? {} : { style }) };
           continue;
         }
         if (!isWater(name)) {
-          surface = { name, y };
+          surface = { name, y, ...(style === undefined ? {} : { style }) };
           continue;
         }
-        waterSurface = { name, y };
+        waterSurface = { name, y, ...(style === undefined ? {} : { style }) };
         fluidDepth = 1;
       }
     }
@@ -400,8 +426,12 @@ function findSurfaceBlock(
       colorLayers.push({
         name: surface.name,
         count: 1,
+        ...(surface.style === undefined ? {} : { style: surface.style }),
         ...(surface.fluidDepth === undefined ? {} : { fluidDepth: surface.fluidDepth }),
         ...(surface.underwaterName === undefined ? {} : { underwaterName: surface.underwaterName }),
+        ...(surface.underwaterStyle === undefined
+          ? {}
+          : { underwaterStyle: surface.underwaterStyle }),
       });
     }
     const top = colorLayers[0]!;
@@ -409,18 +439,43 @@ function findSurfaceBlock(
       name: top.name,
       y: translucentTopY!,
       colorLayers,
+      ...(top.style === undefined ? {} : { style: top.style }),
     };
   }
   return surface === undefined ? undefined : { ...surface, shadowRuns };
 }
 
-function addColorLayer(layers: SurfaceColorLayer[], name: string): void {
+function addColorLayer(
+  layers: SurfaceColorLayer[],
+  name: string,
+  style: SurfaceBlockStyle | undefined,
+): void {
   const previous = layers.at(-1);
-  if (previous?.name === name && previous.fluidDepth === undefined) {
-    layers[layers.length - 1] = { name, count: previous.count + 1 };
+  if (
+    previous?.name === name &&
+    previous.fluidDepth === undefined &&
+    sameStyle(previous.style, style)
+  ) {
+    layers[layers.length - 1] = { ...previous, count: previous.count + 1 };
     return;
   }
-  layers.push({ name, count: 1 });
+  layers.push({ name, count: 1, ...(style === undefined ? {} : { style }) });
+}
+
+function sameStyle(
+  left: SurfaceBlockStyle | undefined,
+  right: SurfaceBlockStyle | undefined,
+): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.biomeTint === right.biomeTint &&
+      left.color.red === right.color.red &&
+      left.color.green === right.color.green &&
+      left.color.blue === right.color.blue &&
+      left.color.alpha === right.color.alpha)
+  );
 }
 
 function addShadowVoxel(runs: ShadowOpacityRun[], y: number, opacity: number): void {
@@ -433,18 +488,22 @@ function addShadowVoxel(runs: ShadowOpacityRun[], y: number, opacity: number): v
   runs.push({ minY: y, maxY: y, opacity });
 }
 
-function blockShadowOpacity(name: string): number {
-  if (isDecorativeCover(name) || /torch/.test(name)) return 0;
+function blockShadowOpacity(name: string, style: SurfaceBlockStyle | undefined): number {
+  if (isDecorativeCover(name, style) || /torch/.test(name)) return 0;
   if (isWater(name)) return 25 / 255;
   if (/leaves/.test(name)) return 0.6;
   return 1;
 }
 
-function isTranslucentGlass(name: string): boolean {
-  return /(?:^|:)(?:[a-z_]+_stained_)?glass(?:_pane)?$/.test(name);
+function isTranslucentGlass(name: string, style: SurfaceBlockStyle | undefined): boolean {
+  return (
+    /(?:^|:)(?:[a-z_]+_stained_)?glass(?:_pane)?$/.test(name) ||
+    (style !== undefined && /(?:^|:)stained_glass(?:_pane)?$/.test(name))
+  );
 }
 
-function isDecorativeCover(name: string): boolean {
+function isDecorativeCover(name: string, style: SurfaceBlockStyle | undefined): boolean {
+  if (style?.decorative === true) return true;
   const separator = name.indexOf(":");
   const block = separator === -1 ? name : name.slice(separator + 1);
   return (

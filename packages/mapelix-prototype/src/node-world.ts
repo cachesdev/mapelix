@@ -125,7 +125,7 @@ class IndexedBedrockWorld implements BedrockWorld {
     const job = this.createRenderJob(coordinates, options);
     if (
       this.workerPool !== undefined &&
-      Object.keys(options).every((key) => key === "surfaceRange")
+      Object.keys(options).every((key) => key === "surfaceRange" || key === "surfaceStyle")
     ) {
       return this.workerPool.render(job);
     }
@@ -215,6 +215,7 @@ class IndexedBedrockWorld implements BedrockWorld {
       sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
       biomeRecords,
       ...(options.surfaceRange === undefined ? {} : { surfaceRange: options.surfaceRange }),
+      ...(options.surfaceStyle === undefined ? {} : { surfaceStyle: options.surfaceStyle }),
     };
   }
 }

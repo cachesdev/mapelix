@@ -55,7 +55,18 @@ The opt-in `surfaceRange` render option supplies a dimension's full, half-open `
 and its included `topY`. It clips surface selection and shadow runs and enables fixed-slot Data3D
 biomes, including repeat-below storages. Omitting it preserves the archived rendering behavior.
 The production [`@mapelix/core`](../mapelix-core/README.md) adapter validates vanilla dimension
-profiles and supplies this range. Range-only requests remain eligible for tile workers.
+profiles and supplies this range.
+
+The additive `surfaceStyle` option maps exact block names to RGBA colors, biome-tint policy,
+color-changing state variants and optional `decorative` classification. Fixed colors bypass generic
+biome grass/foliage tint; other entries retain an explicit tint. Declarative variants are resolved
+once per decoded palette entry, including in translucent layers. Decorative
+cover uses the terrain's support height and contributes no full-block shadow opacity. Core owns
+the production catalog; omitting this option retains the archived palette and classification.
+The shared source is `@mapelix/core/appearance`, also used by the 3D scene renderer. The reference
+adapter receives only its serialized top-view profile and has no runtime dependency on core.
+Requests containing only a range/style remain eligible for tile workers. Existing custom color
+resolver callbacks take precedence over declarative colors and retain their scheduling behavior.
 
 - Reads Bedrock LevelDB `.ldb`, `.sst`, and `.log` files, including tombstones and sequence ordering.
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.

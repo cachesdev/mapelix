@@ -1,8 +1,8 @@
 # `@mapelix/core`
 
-Production-facing classic 2D surface profiles and a small renderer adapter. The reference renderer
-remains in `@mapelix/prototype`; this package introduces the production boundary without duplicating
-its algorithms or changing its default appearance.
+Production-facing classic 2D profiles, shared block colors and a small renderer adapter.
+The reference renderer remains in `@mapelix/prototype`; this package applies production profiles
+without duplicating its algorithms or changing the archived defaults.
 
 ## Dimension profiles
 
@@ -69,14 +69,48 @@ Use an immutable snapshot; the existing reader's LevelDB checksum/manifest limit
 - Data3D biome slots start at the dimension's physical minimum, independently of missing block
   sections or the visible cut. A `0xff` storage repeats the previous biome slot. Data2D remains the
   fallback when the visible voxel has no Data3D value.
-- Existing classic colors, relief, opacity shadows and 256px XYZ coordinates are reused. Native
+- Classic rendering, relief, opacity shadows and 256px XYZ coordinates are reused. Native
   zooms 0..3 are currently inherited from the reference renderer. Overview zoom generation and a
   batch command are separate work; this package does not yet provide them.
 - The reference renderer still uses its archived behavior unless given the new `surfaceRange`
   option. This package supplies that opt-in range; callers do not need to construct it themselves.
 
-Requests containing only a surface range use the existing worker pool. Other reference rendering
-options retain their existing scheduling behavior until the batch renderer's worker-profile work.
+## Appearance
+
+The default `appearance: "modern"` uses the same catalog and color-resolution rules as the 3D
+renderer. The portable `@mapelix/core/appearance` entry owns 1,276 sampled palettes, their conditional
+variants, the complete 1,466-identifier registry and the existing tuned color/alias rules. The scene
+package consumes this entry through its compatibility imports; there is no separate 2D RGB table.
+Biome definitions remain shared through `legacyBiomeStyle` in the reference package.
+
+The 2D adapter selects the upward-facing color, including horizontal logs, and resolves color-changing
+palette states before surface extraction. Fixed poplar/pale-oak foliage survives biome changes;
+ordinary grass, foliage and water still use the shared biome definitions with classic 2D lighting.
+
+Listed small ground decorations use the terrain's support height and add no full-block shadow
+opacity, including in the neighboring shadow input. Their visible names and included block heights
+remain available in surface diagnostics.
+
+Select `appearance: "reference"` to retain the previous colors and decorative classification while
+keeping the dimension bounds, biome layout and included `topY` behavior:
+
+```ts
+const reference = await world.renderTile(
+  { dimension: "overworld", z: 2, x: 0, y: 0 },
+  { appearance: "reference" },
+);
+```
+
+An unsupported appearance is refused with `RangeError`. A supplied `resolveBlockStyle` callback
+takes precedence over the fixed catalog colors. These are classic flat colors, with no resource-pack
+textures or block-model rendering. See the [2D color catalog](../../docs/2d-block-colors.md) for
+the shared source, top-view adaptations and limitations. Bed dye variants are available when supplied
+in palette states; the 2D snapshot reader does not yet read bed dyes from block entities.
+
+Requests containing only the declarative height/appearance profiles use the existing worker pool.
+`renderConcurrency: 1` retains the reference adapter's main-process execution; larger values use
+workers. Other reference rendering options retain their existing scheduling behavior until the
+batch renderer's worker-profile work.
 `includeSurface: true` adds diagnostic block, height, biome and opacity-run metadata.
 
 ## Cleanup
@@ -98,5 +132,6 @@ pnpm exec turbo run check lint --filter=@mapelix/core
 
 Tests cover all three dimensions, exact included cuts, negative coordinates and heights, missing and
 repeated biome slots, water/glass/decorative layers, shadow casters outside the cut, real worker
-transport and reader/byte-renderer parity. A child-process import test rejects Node builtins to
-verify the root entry's portable boundary. The existing 3D application remains unchanged.
+transport, recent block colors across biomes, negative tile seams and reader/byte-renderer parity.
+A child-process import test rejects Node builtins to verify both the root and appearance entries.
+The existing 3D application and its rendering behavior remain unchanged.

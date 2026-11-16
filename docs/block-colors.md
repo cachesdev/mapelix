@@ -13,7 +13,7 @@ Extract the full samples into an ignored directory. From the repository root:
 ```sh
 pnpm --filter @mapelix/prototype exec node scripts/generate-scene-palette.mjs \
   <absolute-path-to-extracted-bedrock-samples> \
-  ../mapelix-scene-prototype/src/blocks/bedrock-colors.ts \
+  ../mapelix-core/src/appearance/bedrock-colors.ts \
   ../../docs/block-colors-coverage.json
 ```
 
@@ -39,14 +39,20 @@ PNG and raw/RLE true-color TGA are supported. Cropped mattress UVs exclude unuse
 entity pixels and bed legs. Animated strips produce a stable mean, not an animation.
 An input fingerprint and fixed traversal make generation and error reports reproducible.
 
+The generated catalog and complete identifier list are now owned by the portable
+`@mapelix/core/appearance` entry. The existing scene `bedrock-colors.ts` path re-exports that same
+object. Tuned color and legacy-alias decisions are shared there as well. Regeneration updates the
+common source rather than a renderer-specific copy. Classic 2D adaptations are documented in
+[2D block colors](2d-block-colors.md).
+
 ## Rendering and beds
 
 Existing shapes, materials, shaders, AO, visibility and LOD policies remain.
 Samples override rules that conflated ores, copper oxidation, lava/magma,
 Nether bricks, soul ground, roots/fungi, wart growth, blackstone variants and
 froglights. Existing tuned terrain and foliage colors otherwise stay in use;
-fixed cherry, azalea, pale-oak and poplar colors are retained. The 2D block-style
-palette is unchanged.
+fixed cherry, azalea, pale-oak and poplar colors are retained. The archived 2D block-style palette is
+unchanged; the production modern 2D profile uses the shared catalog with top-view adaptations.
 
 The scene reader handles Bedrock tag `0x31` as optional block-entity metadata.
 It validates bed dyes (0-15), chunk coordinates, dimension and height. The shared

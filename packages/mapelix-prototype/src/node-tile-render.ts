@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { readLevelDbRecords, type NamedLevelDbFile } from "./bedrock/record-source.js";
 import type { RenderedTile, TileCoordinates } from "./tile.js";
 import type { SurfaceRange } from "./surface-range.js";
+import type { SurfaceStyle } from "./surface-style.js";
 import {
   createBedrockWorld,
   type EffectiveBedrockRecord,
@@ -26,6 +27,7 @@ export interface IndexedTileRenderJob {
   readonly sources: readonly IndexedTileSource[];
   readonly biomeRecords: readonly EffectiveBedrockRecord[];
   readonly surfaceRange?: SurfaceRange;
+  readonly surfaceStyle?: SurfaceStyle;
 }
 
 export async function renderIndexedTile(
@@ -65,6 +67,7 @@ export async function renderIndexedTile(
     const tile = await world.renderTile(job.coordinates, {
       ...options,
       ...(job.surfaceRange === undefined ? {} : { surfaceRange: job.surfaceRange }),
+      ...(job.surfaceStyle === undefined ? {} : { surfaceStyle: job.surfaceStyle }),
     });
     signal?.throwIfAborted();
     return tile;

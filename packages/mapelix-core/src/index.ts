@@ -12,5 +12,6 @@ export type {
   TileCoverage,
   CloseWorldOptions,
   MapRenderOptions,
+  MapAppearance,
   MapWorld,
 } from "./types.js";

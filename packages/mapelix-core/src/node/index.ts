@@ -7,6 +7,7 @@ import {
 } from "@mapelix/prototype";
 
 import { surfaceProfile } from "../surface-profiles.js";
+import { MODERN_SURFACE_STYLE } from "../surface-appearance.js";
 import type { MapWorld } from "../types.js";
 
 export type { BedrockWorldDirectory as MapWorldDirectory, EffectiveBedrockRecord };
@@ -15,9 +16,16 @@ export type { BedrockWorldDirectory as MapWorldDirectory, EffectiveBedrockRecord
 function withSurfaceProfiles(world: BedrockWorld): MapWorld {
   return {
     async renderTile(coordinates, options = {}) {
-      const { topY, ...renderOptions } = options;
+      const { topY, appearance = "modern", ...renderOptions } = options;
+      if (appearance !== "modern" && appearance !== "reference") {
+        throw new RangeError("Unsupported map appearance");
+      }
       const profile = surfaceProfile(coordinates.dimension, topY);
-      return world.renderTile(coordinates, { ...renderOptions, surfaceRange: profile });
+      return world.renderTile(coordinates, {
+        ...renderOptions,
+        surfaceRange: profile,
+        ...(appearance === "reference" ? {} : { surfaceStyle: MODERN_SURFACE_STYLE }),
+      });
     },
     getTileCoverage(dimension) {
       return world.getTileCoverage(surfaceProfile(dimension).dimension);

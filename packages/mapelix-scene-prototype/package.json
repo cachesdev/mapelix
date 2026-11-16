@@ -42,6 +42,7 @@
     "transit": "node -e \"\""
   },
   "dependencies": {
+    "@mapelix/core": "workspace:*",
     "@mapelix/prototype": "workspace:*"
   },
   "devDependencies": {
