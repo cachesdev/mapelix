@@ -51,6 +51,12 @@ worlds created by `createBedrockWorld()` release their retained records when clo
 
 ## Prototype boundaries
 
+The opt-in `surfaceRange` render option supplies a dimension's full, half-open `minY`/`maxY` bounds
+and its included `topY`. It clips surface selection and shadow runs and enables fixed-slot Data3D
+biomes, including repeat-below storages. Omitting it preserves the archived rendering behavior.
+The production [`@mapelix/core`](../mapelix-core/README.md) adapter validates vanilla dimension
+profiles and supplies this range. Range-only requests remain eligible for tile workers.
+
 - Reads Bedrock LevelDB `.ldb`, `.sst`, and `.log` files, including tombstones and sequence ordering.
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.
 - Uses the primary block storage layer. It does not render waterlogging overlays, entities, structures, or texture packs.

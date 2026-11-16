@@ -11,6 +11,7 @@ import type { LevelDbRecord } from "./bedrock/record-source.js";
 import { decodeSubchunk, type DecodedSubchunk } from "./bedrock/subchunk.js";
 import { encodePng } from "./png.js";
 import { renderSurface, type RenderSurfaceOptions } from "./render.js";
+import { assertSurfaceRange, type SurfaceRange } from "./surface-range.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -40,6 +41,8 @@ export interface CloseWorldOptions {
 }
 
 export interface RenderTileOptions extends RenderSurfaceOptions {
+  /** Opt-in dimension bounds, included top-Y cut and fixed-slot Data3D layout. */
+  readonly surfaceRange?: SurfaceRange;
   /** Include block name, Y, biome, and shadow-run surface samples in the returned tile. */
   readonly includeSurface?: boolean;
 }
@@ -83,6 +86,8 @@ class RecordBedrockWorld implements BedrockWorld {
     options: RenderTileOptions = {},
   ): Promise<RenderedTile> {
     if (this.closed) throw new Error("The Bedrock world is closed");
+    const range = options.surfaceRange;
+    assertSurfaceRange(range);
     const bounds = tileBounds(coordinates);
     const dimension = DIMENSION_IDS[coordinates.dimension];
     const chunks = new Map<string, DecodedSubchunk[]>();
@@ -104,7 +109,9 @@ class RecordBedrockWorld implements BedrockWorld {
             const data = decodeData2D(record.key, record.value);
             if (data !== undefined) setBiomeChunk(biomeChunks, mapKey.x, mapKey.z, data);
           } else if (mapKey.tag === DATA_3D_TAG) {
-            const data = decodeData3D(record.key, record.value);
+            const data = decodeData3D(record.key, record.value, {
+              repeatBelow: range !== undefined,
+            });
             if (data !== undefined) setBiomeChunk(biome3DChunks, mapKey.x, mapKey.z, data);
           }
         }
@@ -128,7 +135,8 @@ class RecordBedrockWorld implements BedrockWorld {
             key.x * 16 < inputBounds.minX ||
             key.x * 16 >= inputBounds.maxX ||
             key.z * 16 < inputBounds.minZ ||
-            key.z * 16 >= inputBounds.maxZ
+            key.z * 16 >= inputBounds.maxZ ||
+            (range !== undefined && (key.y * 16 > range.topY || key.y * 16 + 15 < range.minY))
           ) {
             continue;
           }
@@ -167,6 +175,7 @@ class RecordBedrockWorld implements BedrockWorld {
         subchunks,
         biomeChunks.get(key.x)?.get(key.z),
         biome3DChunks.get(key.x)?.get(key.z),
+        range,
       );
     }
 
@@ -293,14 +302,21 @@ function writeChunkSurface(
   subchunks: readonly DecodedSubchunk[],
   biomes: DecodedData2D | undefined,
   biomes3D: DecodedData3D | undefined,
+  range: SurfaceRange | undefined,
 ): void {
-  const biomeSectionYs = subchunks
-    .map((subchunk) => subchunk.y)
-    .filter((y) => y >= -4 && y <= 19)
-    .sort((left, right) => left - right);
+  const biomeSectionYs =
+    range === undefined
+      ? subchunks
+          .map((subchunk) => subchunk.y)
+          .filter((y) => y >= -4 && y <= 19)
+          .sort((left, right) => left - right)
+      : Array.from(
+          { length: (range.maxY - range.minY) / 16 },
+          (_, index) => range.minY / 16 + index,
+        );
   for (let localZ = 0; localZ < 16; localZ += 1) {
     for (let localX = 0; localX < 16; localX += 1) {
-      const surface = findSurfaceBlock(subchunks, localX, localZ);
+      const surface = findSurfaceBlock(subchunks, localX, localZ, range);
       if (surface === undefined) {
         continue;
       }
@@ -322,6 +338,7 @@ function findSurfaceBlock(
   subchunks: readonly DecodedSubchunk[],
   localX: number,
   localZ: number,
+  range: SurfaceRange | undefined,
 ): SurfaceBlock | undefined {
   let decorativeCover: SurfaceBlock | undefined;
   let waterSurface: SurfaceBlock | undefined;
@@ -331,7 +348,9 @@ function findSurfaceBlock(
   let translucentTopY: number | undefined;
   const shadowRuns: ShadowOpacityRun[] = [];
   for (const subchunk of subchunks) {
-    for (let localY = 15; localY >= 0; localY -= 1) {
+    const minLocalY = range === undefined ? 0 : Math.max(0, range.minY - subchunk.y * 16);
+    const maxLocalY = range === undefined ? 15 : Math.min(15, range.topY - subchunk.y * 16);
+    for (let localY = maxLocalY; localY >= minLocalY; localY -= 1) {
       const blockIndex = localX * 256 + localZ * 16 + localY;
       const paletteIndex = subchunk.primary.indexes[blockIndex];
       const name = paletteIndex === undefined ? undefined : subchunk.primary.palette[paletteIndex];

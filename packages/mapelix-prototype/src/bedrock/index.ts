@@ -14,7 +14,12 @@ export {
   type BedrockSubchunkKey,
 } from "./chunk-key.js";
 export { data2DBiomeAt, decodeData2D, type DecodedData2D } from "./data-2d.js";
-export { data3DBiomeAt, decodeData3D, type DecodedData3D } from "./data-3d.js";
+export {
+  data3DBiomeAt,
+  decodeData3D,
+  type DecodedData3D,
+  type DecodeData3DOptions,
+} from "./data-3d.js";
 export {
   isNbtCompound,
   readLittleEndianNbtCompound,

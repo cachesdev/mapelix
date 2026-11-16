@@ -12,6 +12,10 @@ Production rewrite work starts from the acceptance baseline and ledger in `REWRI
 - `packages/mapelix-scene-prototype` is the second prototype. It owns the seekable LevelDB reader, block appearance, voxel meshing at every level of detail, and the binary scene region format. Its `./format` entry has no Node.js dependency. It reuses the Bedrock decoders from `@mapelix/prototype/bedrock`.
 - `apps/prototype-viewer-3d` is a disposable SvelteKit and three.js consumer of the scene prototype. It owns the persistent region cache, the region worker count, streaming, and all rendering.
 - Production packages and apps must use new directories and the `@mapelix/core` package name.
+- `packages/mapelix-core` starts the production surface boundary: its root entry owns browser-safe
+  dimension/height profiles and types; `./node` adapts read-only snapshot and effective-record
+  rendering with those profiles. It reuses the reference renderer through an explicit surface-range
+  option; reference defaults and 3D scene contexts are unchanged.
 - A future Canopy adapter can supply changed records without changing the renderer.
 
 The module boundary is byte-oriented. Bedrock decoding must not depend on HTTP, Canopy, Leaflet, or a graphical user interface.

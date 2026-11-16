@@ -2,6 +2,7 @@ export { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-sty
 export { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
 export { openBedrockWorld, type BedrockWorldDirectory } from "./node-world.js";
 export { writeLeafletTile, type LeafletTileOutput } from "./node-output.js";
+export type { SurfaceRange } from "./surface-range.js";
 export {
   MAX_NATIVE_ZOOM,
   TILE_SIZE,

@@ -31,6 +31,24 @@ function data3DValue(sectionSix: readonly number[]): Uint8Array {
 }
 
 describe("decodeData3D", () => {
+  it("expands repeated fixed slots only when requested", () => {
+    const key = new Uint8Array([...int32(0), ...int32(0), ...int32(1), DATA_3D_TAG]);
+    const value = new Uint8Array(512 + 11);
+    value.set([1, ...int32(8), 0xff, 1, ...int32(179)], 512);
+    expect(decodeData3D(key, value)!.storages).toHaveLength(1);
+    const decoded = decodeData3D(key, value, { repeatBelow: true })!;
+    expect(data3DBiomeAt(decoded, [0, 1, 2], 0, 0, 0)).toBe(8);
+    expect(data3DBiomeAt(decoded, [0, 1, 2], 0, 16, 0)).toBe(8);
+    expect(data3DBiomeAt(decoded, [0, 1, 2], 0, 32, 0)).toBe(179);
+  });
+
+  it("does not invent a biome for an initial repeat without a previous storage", () => {
+    const key = new Uint8Array([...int32(0), ...int32(0), DATA_3D_TAG]);
+    const value = new Uint8Array(513);
+    value[512] = 0xff;
+    expect(decodeData3D(key, value, { repeatBelow: true })!.storages).toHaveLength(0);
+  });
+
   it("decodes fixed and packed palettes in X/Z/Y order across negative section slots", () => {
     const localX = 3;
     const localZ = 7;

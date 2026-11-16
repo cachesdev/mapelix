@@ -16,6 +16,7 @@ import {
 } from "./node-tile-render.js";
 import { TileRenderWorkerPool } from "./node-worker-pool.js";
 import { renderAbortError } from "./render-abort.js";
+import { assertSurfaceRange } from "./surface-range.js";
 import {
   TILE_SIZE,
   floorDiv,
@@ -120,8 +121,12 @@ class IndexedBedrockWorld implements BedrockWorld {
   renderTile(coordinates: TileCoordinates, options: RenderTileOptions = {}): Promise<RenderedTile> {
     if (this.closePromise !== undefined)
       return Promise.reject(new Error("The Bedrock world is closed"));
+    assertSurfaceRange(options.surfaceRange);
     const job = this.createRenderJob(coordinates, options);
-    if (this.workerPool !== undefined && Object.keys(options).length === 0) {
+    if (
+      this.workerPool !== undefined &&
+      Object.keys(options).every((key) => key === "surfaceRange")
+    ) {
       return this.workerPool.render(job);
     }
 
@@ -209,6 +214,7 @@ class IndexedBedrockWorld implements BedrockWorld {
       databaseDirectory: this.databaseDirectory,
       sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
       biomeRecords,
+      ...(options.surfaceRange === undefined ? {} : { surfaceRange: options.surfaceRange }),
     };
   }
 }

@@ -88,6 +88,13 @@ This writes `generated-tiles/2/-32/-49.png`. Leaflet can request the output with
 See [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md) for the complete prototype
 API and its current boundaries.
 
+## Classic 2D surface profiles
+
+The production-facing [`@mapelix/core`](packages/mapelix-core/README.md) package adds classic 2D
+profiles for Overworld, Nether and End. Its Node adapter defaults the Nether to an included Y90 cut
+and accepts exact per-render `topY` overrides. The root profile entry has no Node.js runtime imports.
+The archived prototype API and the existing 3D viewer retain their defaults.
+
 ## Run it locally
 
 Mapelix uses [Mise](https://mise.jdx.dev/) to install and select Node.js 24 and pnpm 11. After
