@@ -70,8 +70,8 @@ Use an immutable snapshot; the existing reader's LevelDB checksum/manifest limit
   sections or the visible cut. A `0xff` storage repeats the previous biome slot. Data2D remains the
   fallback when the visible voxel has no Data3D value.
 - Classic rendering, relief, opacity shadows and 256px XYZ coordinates are reused. Native
-  zooms 0..3 are currently inherited from the reference renderer. Overview zoom generation and a
-  batch command are separate work; this package does not yet provide them.
+  zooms 0..3 are currently inherited from the reference renderer. Overview zoom generation remains
+  separate work; the batch exporter below uses these native levels.
 - The reference renderer still uses its archived behavior unless given the new `surfaceRange`
   option. This package supplies that opt-in range; callers do not need to construct it themselves.
 
@@ -107,10 +107,11 @@ textures or block-model rendering. See the [2D color catalog](../../docs/2d-bloc
 the shared source, top-view adaptations and limitations. Bed dye variants are available when supplied
 in palette states; the 2D snapshot reader does not yet read bed dyes from block entities.
 
-Requests containing only the declarative height/appearance profiles use the existing worker pool.
-`renderConcurrency: 1` retains the reference adapter's main-process execution; larger values use
-workers. Other reference rendering options retain their existing scheduling behavior until the
-batch renderer's worker-profile work.
+All serializable render options use the worker pool when it is enabled, including shadow toggles,
+biome blending, reference corrections and surface diagnostics. `renderConcurrency: 1` retains the
+reference adapter's main-process execution unless `forceWorkers: true` is supplied. Larger values
+use workers. A `resolveBlockStyle` callback uses the main-process fallback, or is refused clearly
+when forced workers are requested. An optional startup `signal` cancels index reads.
 `includeSurface: true` adds diagnostic block, height, biome and opacity-run metadata.
 
 ## Cleanup
@@ -120,6 +121,34 @@ aborts unfinished requests with `AbortError`, and can escalate a graceful close.
 safe. Further rendering is refused after closing starts. Main-process synchronous work has the same
 cooperative cancellation limitation documented in the
 [reference lifecycle contract](../mapelix-prototype/README.md#lifecycle).
+
+## Batch export
+
+The opt-in Node entry owns a generic exporter with a bounded worker queue, read-only snapshot
+fingerprinting, a versioned manifest and atomic publication. It is independent of HTTP and any host:
+
+```ts
+import { renderBatch } from "@mapelix/core/node/batch";
+
+const result = await renderBatch({
+  world: "/srv/snapshots/world",
+  output: "/srv/maps/export", // Parent must exist; input and output must be disjoint.
+  dimensions: ["overworld", "nether", "end"],
+  zooms: [0, 1, 2],
+  limits: { workers: 2, maxPending: 2, maxTiles: 10000, timeoutMs: 300000 },
+  signal: AbortSignal.timeout(300000),
+});
+console.log(result.manifestPath);
+```
+
+The caller gets a `PublishedBatchManifest`, elapsed milliseconds and sampled process-wide peak RSS.
+The default memory budget is 2048 MiB. It is a sampled budget, with possible overshoot; the deadline
+requests cancellation and permits 250 ms for an aborting close before worker-tree termination.
+Cleanup completes before rejection. A final successful publication rename wins a cancellation race.
+
+The CLI is [`@mapelix/render-cli`](../../apps/render-cli/README.md). Its documentation defines every
+limit, manifest field, output path and filesystem assumption, including crash/power-loss limitations.
+The root portable entries do not import this Node exporter.
 
 ## Validation
 

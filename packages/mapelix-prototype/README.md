@@ -65,8 +65,11 @@ cover uses the terrain's support height and contributes no full-block shadow opa
 the production catalog; omitting this option retains the archived palette and classification.
 The shared source is `@mapelix/core/appearance`, also used by the 3D scene renderer. The reference
 adapter receives only its serialized top-view profile and has no runtime dependency on core.
-Requests containing only a range/style remain eligible for tile workers. Existing custom color
-resolver callbacks take precedence over declarative colors and retain their scheduling behavior.
+All serializable render options remain eligible for tile workers, including shadows, biome blending,
+reference corrections and surface diagnostics. Existing custom color resolver callbacks take
+precedence over declarative colors and use the main-process fallback. `forceWorkers: true` on
+`openBedrockWorld` enables workers even at concurrency one and refuses nonserializable callbacks.
+Its optional `signal` cancels startup file reads; close an opened world to cancel its renders.
 
 - Reads Bedrock LevelDB `.ldb`, `.sst`, and `.log` files, including tombstones and sequence ordering.
 - Decodes persistent palette subchunks v8 and v9. Other subchunk versions fail with a clear error.

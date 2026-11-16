@@ -98,6 +98,12 @@ Core also supplies the shared 2D/3D color catalog and top-view ground-cover rule
 `appearance: "reference"` to retain its previous appearance; see the
 [2D color catalog](docs/2d-block-colors.md) for coverage and provenance.
 
+The generic [`@mapelix/render-cli`](apps/render-cli/README.md) exports classic tiles from a read-only
+snapshot, with explicit worker, pending-job, tile, byte, time and sampled memory limits. It publishes
+a versioned JSON manifest atomically after a complete verified export. The reusable API is
+`@mapelix/core/node/batch`. Native zooms 0..2 are the default; overview levels and incremental reuse
+remain follow-ups.
+
 ## Run it locally
 
 Mapelix uses [Mise](https://mise.jdx.dev/) to install and select Node.js 24 and pnpm 11. After

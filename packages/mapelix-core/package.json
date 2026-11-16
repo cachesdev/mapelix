@@ -16,6 +16,10 @@
       "types": "./dist/appearance/index.d.ts",
       "import": "./dist/appearance/index.js"
     },
+    "./node/batch": {
+      "types": "./dist/node/batch/index.d.ts",
+      "import": "./dist/node/batch/index.js"
+    },
     "./node": {
       "types": "./dist/node/index.d.ts",
       "import": "./dist/node/index.js"

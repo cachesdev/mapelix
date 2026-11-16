@@ -88,16 +88,19 @@ export class TileRenderWorkerPool {
 
   private dispatch(): void {
     for (const slot of this.slots) {
-      if (slot.active !== undefined) {
-        continue;
+      while (slot.active === undefined) {
+        const pending = this.queue.shift();
+        if (pending === undefined) return;
+        slot.active = pending;
+        slot.worker.ref();
+        try {
+          slot.worker.postMessage({ id: pending.id, job: pending.job });
+        } catch (cause) {
+          slot.active = undefined;
+          slot.worker.unref();
+          pending.reject(cause instanceof Error ? cause : new Error(String(cause)));
+        }
       }
-      const pending = this.queue.shift();
-      if (pending === undefined) {
-        return;
-      }
-      slot.active = pending;
-      slot.worker.ref();
-      slot.worker.postMessage({ id: pending.id, job: pending.job });
     }
   }
 

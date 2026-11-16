@@ -39,6 +39,10 @@ export interface BedrockWorldDirectory {
   readonly directory: string;
   /** Maximum number of tiles rendered in parallel. One renders in the main process. */
   readonly renderConcurrency?: number;
+  /** Use an abortable worker even at concurrency one; callbacks are then unsupported. */
+  readonly forceWorkers?: boolean;
+  /** Cancels startup reads; close({ abort: true }) cancels an opened world. */
+  readonly signal?: AbortSignal;
 }
 
 interface IndexedTile {
@@ -63,6 +67,7 @@ class IndexedBedrockWorld implements BedrockWorld {
   readonly tiles = new Map<string, IndexedTile>();
   readonly databaseDirectory: string;
   private readonly workerPool: TileRenderWorkerPool | undefined;
+  private readonly forceWorkers: boolean;
   private renderQueue: Promise<void> = Promise.resolve();
   private closePromise: Promise<void> | undefined;
   private readonly renderAbort = new AbortController();
@@ -71,10 +76,14 @@ class IndexedBedrockWorld implements BedrockWorld {
     databaseDirectory: string,
     records: Iterable<LevelDbRecordIndexEntry>,
     renderConcurrency: number,
+    forceWorkers: boolean,
   ) {
     this.databaseDirectory = databaseDirectory;
+    this.forceWorkers = forceWorkers;
     this.workerPool =
-      renderConcurrency > 1 ? new TileRenderWorkerPool(renderConcurrency) : undefined;
+      renderConcurrency > 1 || forceWorkers
+        ? new TileRenderWorkerPool(renderConcurrency)
+        : undefined;
     const buildingTiles = new Map<string, BuildingTile>();
     for (const record of records) {
       const location = classifyMapRecordKey(record.key);
@@ -123,10 +132,12 @@ class IndexedBedrockWorld implements BedrockWorld {
       return Promise.reject(new Error("The Bedrock world is closed"));
     assertSurfaceRange(options.surfaceRange);
     const job = this.createRenderJob(coordinates, options);
-    if (
-      this.workerPool !== undefined &&
-      Object.keys(options).every((key) => key === "surfaceRange" || key === "surfaceStyle")
-    ) {
+    if (this.forceWorkers && options.resolveBlockStyle !== undefined) {
+      return Promise.reject(
+        new TypeError("Worker rendering does not support resolveBlockStyle callbacks"),
+      );
+    }
+    if (this.workerPool !== undefined && options.resolveBlockStyle === undefined) {
       return this.workerPool.render(job);
     }
 
@@ -216,6 +227,16 @@ class IndexedBedrockWorld implements BedrockWorld {
       biomeRecords,
       ...(options.surfaceRange === undefined ? {} : { surfaceRange: options.surfaceRange }),
       ...(options.surfaceStyle === undefined ? {} : { surfaceStyle: options.surfaceStyle }),
+      options: {
+        ...(options.shadows === undefined ? {} : { shadows: options.shadows }),
+        ...(options.biomeBlendRadius === undefined
+          ? {}
+          : { biomeBlendRadius: options.biomeBlendRadius }),
+        ...(options.correctReferenceBugs === undefined
+          ? {}
+          : { correctReferenceBugs: options.correctReferenceBugs }),
+        ...(options.includeSurface === undefined ? {} : { includeSurface: options.includeSurface }),
+      },
     };
   }
 }
@@ -270,6 +291,7 @@ function filterKeyGroup(
  * the temporary memory used by concurrent HTTP requests.
  */
 export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<BedrockWorld> {
+  input.signal?.throwIfAborted();
   const renderConcurrency = input.renderConcurrency ?? 1;
   if (!Number.isSafeInteger(renderConcurrency) || renderConcurrency < 1) {
     throw new RangeError(
@@ -296,13 +318,20 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     },
   });
   for (const entry of databaseFiles) {
+    input.signal?.throwIfAborted();
     index.addFile({
       name: entry.name,
-      bytes: await readFile(join(databaseDirectory, entry.name)),
+      bytes: await readFile(join(databaseDirectory, entry.name), { signal: input.signal }),
     });
   }
 
-  return new IndexedBedrockWorld(databaseDirectory, index.drainRecords(), renderConcurrency);
+  input.signal?.throwIfAborted();
+  return new IndexedBedrockWorld(
+    databaseDirectory,
+    index.drainRecords(),
+    renderConcurrency,
+    input.forceWorkers === true,
+  );
 }
 
 function indexTileKey(dimension: number, x: number, y: number): string {

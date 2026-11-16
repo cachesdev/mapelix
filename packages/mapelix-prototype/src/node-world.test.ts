@@ -14,6 +14,37 @@ const lifecycleScript = fileURLToPath(new URL("../test/world-lifecycle.mjs", imp
 
 describe("openBedrockWorld", () => {
   it.each([1, 2])(
+    "keeps serializable render options in %i real workers",
+    async (concurrency) => {
+      expect(await runLifecycle("options", concurrency, "worker-options.mjs")).toMatchObject({
+        completed: true,
+        jobs: 4,
+        messagePorts: 0,
+      });
+    },
+    15_000,
+  );
+
+  it.each(["callback", "clone-error"])(
+    "settles %s failures and remains usable",
+    async (scenario) => {
+      expect(await runLifecycle(scenario, 1, "worker-options.mjs")).toMatchObject({
+        completed: true,
+        messagePorts: 0,
+      });
+    },
+    15_000,
+  );
+
+  it("rejects already cancelled startup before reading any files", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      openBedrockWorld({ directory: "/not-read", signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it.each([1, 2])(
     "aborts accepted renders and exits with %i workers",
     async (concurrency) => {
       const result = await runLifecycle("abort", concurrency);
@@ -188,7 +219,11 @@ interface LifecycleResult {
   readonly failure?: string;
 }
 
-async function runLifecycle(scenario: string, concurrency: number): Promise<LifecycleResult> {
+async function runLifecycle(
+  scenario: string,
+  concurrency: number,
+  script?: string,
+): Promise<LifecycleResult> {
   const directory = await mkdtemp(join(tmpdir(), "mapelix-lifecycle-"));
   try {
     await mkdir(join(directory, "db"));
@@ -198,7 +233,14 @@ async function runLifecycle(scenario: string, concurrency: number): Promise<Life
     );
     const { stdout } = await run(
       process.execPath,
-      [lifecycleScript, directory, scenario, String(concurrency)],
+      [
+        script === undefined
+          ? lifecycleScript
+          : fileURLToPath(new URL(`../test/${script}`, import.meta.url)),
+        directory,
+        scenario,
+        String(concurrency),
+      ],
       { timeout: 10_000 },
     );
     return JSON.parse(stdout) as LifecycleResult;

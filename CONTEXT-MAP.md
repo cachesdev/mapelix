@@ -19,6 +19,10 @@ Production rewrite work starts from the acceptance baseline and ledger in `REWRI
   Its portable `./appearance` entry owns the shared sampled catalog and tuned color/alias rules used
   by 2D and the scene package. The Node adapter derives a serializable top-view profile with palette
   variants, biome-tint policy and ground-cover rules. Callers can retain the reference appearance.
+- `@mapelix/core/node/batch` owns bounded snapshot export, deterministic version-1 manifests and
+  verified immutable tile payloads with atomic publication. A supervised coordinator keeps indexing
+  and tile workers cancellable. `apps/render-cli` is the generic command-line consumer; deployment,
+  snapshot creation and retention policy stay with the host. Portable entries do not import it.
 - A future Canopy adapter can supply changed records without changing the renderer.
 
 The module boundary is byte-oriented. Bedrock decoding must not depend on HTTP, Canopy, Leaflet, or a graphical user interface.

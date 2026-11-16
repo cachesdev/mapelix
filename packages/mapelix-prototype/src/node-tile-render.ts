@@ -28,6 +28,10 @@ export interface IndexedTileRenderJob {
   readonly biomeRecords: readonly EffectiveBedrockRecord[];
   readonly surfaceRange?: SurfaceRange;
   readonly surfaceStyle?: SurfaceStyle;
+  readonly options?: Pick<
+    RenderTileOptions,
+    "shadows" | "biomeBlendRadius" | "correctReferenceBugs" | "includeSurface"
+  >;
 }
 
 export async function renderIndexedTile(
@@ -65,6 +69,7 @@ export async function renderIndexedTile(
   try {
     signal?.throwIfAborted();
     const tile = await world.renderTile(job.coordinates, {
+      ...job.options,
       ...options,
       ...(job.surfaceRange === undefined ? {} : { surfaceRange: job.surfaceRange }),
       ...(job.surfaceStyle === undefined ? {} : { surfaceStyle: job.surfaceStyle }),

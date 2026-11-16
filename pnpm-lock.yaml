@@ -132,6 +132,31 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  apps/render-cli:
+    dependencies:
+      '@mapelix/core':
+        specifier: workspace:*
+        version: link:../../packages/mapelix-core
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.13
+        version: 24.10.13
+      oxfmt:
+        specifier: 0.61.0
+        version: 0.61.0(svelte@5.56.1)
+      oxlint:
+        specifier: 1.76.0
+        version: 1.76.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 7.0.2001
+        version: 7.0.2001
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.0
+        version: 4.1.0(@types/node@24.10.13)(vite@8.2.1(@types/node@24.10.13))
+
   packages/mapelix-core:
     dependencies:
       '@mapelix/prototype':
