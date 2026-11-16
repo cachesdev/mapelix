@@ -101,8 +101,9 @@ Core also supplies the shared 2D/3D color catalog and top-view ground-cover rule
 The generic [`@mapelix/render-cli`](apps/render-cli/README.md) exports classic tiles from a read-only
 snapshot, with explicit worker, pending-job, tile, byte, time and sampled memory limits. It publishes
 a versioned JSON manifest atomically after a complete verified export. The reusable API is
-`@mapelix/core/node/batch`. Native zooms 0..2 are the default; overview levels and incremental reuse
-remain follow-ups.
+`@mapelix/core/node/batch`. Zooms -4..+2 are the default, including transparent overview tiles derived
+from native zoom zero. See the [overview grid and filtering contract](docs/2d-overviews.md).
+Incremental reuse remains a follow-up.
 
 ## Run it locally
 

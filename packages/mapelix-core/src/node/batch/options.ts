@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { surfaceProfile } from "../../surface-profiles.js";
+import { DEFAULT_MAP_ZOOMS, mapPixelsPerBlock } from "../../tile-grid.js";
 import type { Dimension } from "../../types.js";
 import type { BatchLimits, BatchOptions, NormalizedBatch } from "./types.js";
 
@@ -38,12 +39,9 @@ export function normalizeBatch(options: BatchOptions): NormalizedBatch {
   ].sort();
   if (dimensions.length === 0) throw new RangeError("At least one dimension is required");
   const profiles = dimensions.map((dimension) => surfaceProfile(dimension, options.topY));
-  const zooms = [...new Set(options.zooms ?? [0, 1, 2])].sort((a, b) => a - b);
-  if (zooms.length === 0 || zooms.some((z) => !Number.isSafeInteger(z) || z < 0 || z > 3)) {
-    throw new RangeError(
-      "Native zooms must be integers within 0..3; overview zooms are not available yet",
-    );
-  }
+  const zooms = [...new Set(options.zooms ?? DEFAULT_MAP_ZOOMS)].sort((a, b) => a - b);
+  if (zooms.length === 0) throw new RangeError("At least one map zoom is required");
+  zooms.forEach(mapPixelsPerBlock);
   const limits = { ...DEFAULT_BATCH_LIMITS, ...options.limits };
   limits.maxPending = options.limits?.maxPending ?? limits.workers;
   for (const [name, value] of Object.entries(limits)) positiveInteger(name, value);

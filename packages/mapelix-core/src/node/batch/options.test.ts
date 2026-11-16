@@ -33,7 +33,7 @@ describe("bounded batch planning", () => {
     { limits: { timeoutMs: 2 ** 31 } },
     { dimensions: [] },
     { zooms: [] },
-    { zooms: [-1] },
+    { zooms: [-5] },
     { zooms: [4] },
     { biomeBlendRadius: 17 },
     { topY: 320 },

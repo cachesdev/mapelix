@@ -36,6 +36,7 @@ describe("generic batch CLI", () => {
         "20",
         "--shadows",
         "off",
+        "--zooms=-4,-1",
       ]),
     ).toMatchObject({
       dimensions: ["nether", "end", "overworld"],
@@ -43,6 +44,7 @@ describe("generic batch CLI", () => {
       bounds: { minX: -64, minZ: -64, maxX: 0, maxZ: 0 },
       limits: { workers: 1, timeoutMs: 20000 },
       shadows: "off",
+      zooms: [-4, -1],
     });
     expect(parseBatchArguments(["--help"])).toBe("help");
   });
@@ -143,6 +145,13 @@ describe("generic batch CLI", () => {
         }),
       ).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining("maxTiles") });
       expect(await readFile(join(output, "manifest.json"), "utf8")).toBe(before);
+      const overview = await run(process.execPath, [...args, "--zooms=-4,-1", "--max-tiles", "3"], {
+        timeout: 10000,
+      });
+      expect(JSON.parse(overview.stdout)).toMatchObject({ tiles: 2 });
+      const manifest = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));
+      expect(manifest.grid.zooms).toEqual([-4, -1]);
+      expect(manifest.work).toMatchObject({ tileJobs: 3, temporaryTiles: 1 });
       expect((await readdir(output)).filter((name) => name.startsWith(".mapelix"))).toEqual([]);
     } finally {
       await rm(root, { recursive: true, force: true });

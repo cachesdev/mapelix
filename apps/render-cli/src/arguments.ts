@@ -6,7 +6,7 @@ export const HELP = `Usage: mapelix-render --world <snapshot> --output <director
 
 Read-only classic 2D export. The output parent must already exist.
   --dimension <name>          Repeat or comma-separate overworld,nether,end (default: all)
-  --zooms <integers>          Native zooms (default: 0,1,2; supported: 0..3)
+  --zooms <integers>          Default: -4,-3,-2,-1,0,1,2; explicit +3 is also supported
   --top-y <integer>           Highest included block; defaults to dimension profiles
   --appearance <name>        modern (default) or reference
   --shadows <mode>           opacity (default) or off
@@ -15,15 +15,15 @@ Read-only classic 2D export. The output parent must already exist.
   --bounds <x0,z0,x1,z1>      Exclusive block bounds; intersecting tiles remain full
   --workers <n>              1..16 worker threads (default: 2)
   --max-pending <n>          Accepted jobs, 1..1024 (default: worker count)
-  --max-tiles <n>            Preflight tile limit (default: 10000)
-  --max-output-bytes <n>     New PNGs plus both manifests (default: 1073741824)
+  --max-tiles <n>            Published tiles plus temporary zoom-0 sources (default: 10000)
+  --max-output-bytes <n>     All new PNGs plus both manifests (default: 1073741824)
   --max-input-file-bytes <n> Per database/level.dat file (default: 268435456)
   --timeout-seconds <n>      Whole run deadline (default: 300)
   --memory-budget-mib <n>    Sampled whole-process RSS budget (default: 2048)
   --help                    Show this help
 
 On success, stdout contains one JSON summary. Errors go to stderr with nonzero exit.
-Overview zooms and incremental reuse are separate follow-ups.
+Use --zooms=-4,-1 for an overview-only export. Incremental reuse is a separate follow-up.
 `;
 
 function integer(name: string, text: string): number {

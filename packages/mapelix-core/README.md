@@ -70,8 +70,8 @@ Use an immutable snapshot; the existing reader's LevelDB checksum/manifest limit
   sections or the visible cut. A `0xff` storage repeats the previous biome slot. Data2D remains the
   fallback when the visible voxel has no Data3D value.
 - Classic rendering, relief, opacity shadows and 256px XYZ coordinates are reused. Native
-  zooms 0..3 are currently inherited from the reference renderer. Overview zoom generation remains
-  separate work; the batch exporter below uses these native levels.
+  zooms 0..3 are inherited from the reference renderer. The separate overview compositor and batch
+  exporter add -4..-1 from native zoom-zero pixels, without changing the native rendering path.
 - The reference renderer still uses its archived behavior unless given the new `surfaceRange`
   option. This package supplies that opt-in range; callers do not need to construct it themselves.
 
@@ -134,7 +134,7 @@ const result = await renderBatch({
   world: "/srv/snapshots/world",
   output: "/srv/maps/export", // Parent must exist; input and output must be disjoint.
   dimensions: ["overworld", "nether", "end"],
-  zooms: [0, 1, 2],
+  zooms: [-4, -3, -2, -1, 0, 1, 2], // Default classic range; explicit native +3 is still supported.
   limits: { workers: 2, maxPending: 2, maxTiles: 10000, timeoutMs: 300000 },
   signal: AbortSignal.timeout(300000),
 });
@@ -149,6 +149,13 @@ Cleanup completes before rejection. A final successful publication rename wins a
 The CLI is [`@mapelix/render-cli`](../../apps/render-cli/README.md). Its documentation defines every
 limit, manifest field, output path and filesystem assumption, including crash/power-loss limitations.
 The root portable entries do not import this Node exporter.
+
+The portable root also exports `mapPixelsPerBlock`, `mapTileBounds`, `mapTileAncestor` and
+`DEFAULT_MAP_ZOOMS`. The Node entry exposes `createOverviewTile` for synchronous/asynchronous
+iterables of zoom-zero RGBA, plus `encodePng` and expected-size `decodePng`. Missing sources stay
+transparent; colors use alpha-weighted area sums with one rounding step at the target zoom.
+`MapWorld.renderTile` itself remains native-only. See the [overview contract](../../docs/2d-overviews.md)
+for negative coordinates, seam behavior, source reuse and resource accounting.
 
 ## Validation
 

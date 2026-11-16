@@ -9,12 +9,14 @@ const hooks = registerHooks({
   },
 });
 try {
-  const { surfaceProfile } = await import("../dist/index.js");
+  const { surfaceProfile, mapPixelsPerBlock, mapTileBounds } = await import("../dist/index.js");
   const { BEDROCK_BLOCK_COLORS } = await import("@mapelix/core/appearance");
   console.log(
     JSON.stringify({
       ...surfaceProfile("nether"),
       appearanceEntries: Object.keys(BEDROCK_BLOCK_COLORS).length,
+      overviewPixelsPerBlock: mapPixelsPerBlock(-4),
+      overviewMinX: mapTileBounds({ dimension: "overworld", z: -4, x: -1, y: 0 }).minX,
     }),
   );
 } finally {

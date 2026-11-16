@@ -11,7 +11,7 @@ pnpm exec turbo run build --filter=@mapelix/render-cli
 node apps/render-cli/dist/index.js --help
 node apps/render-cli/dist/index.js \
   --world /srv/snapshots/world --output /srv/maps/export \
-  --dimension overworld,nether,end --zooms 0,1,2 \
+  --dimension overworld,nether,end --zooms=-4,-3,-2,-1,0,1,2 \
   --workers 2 --max-pending 2 --max-tiles 10000 \
   --timeout-seconds 300 --memory-budget-mib 2048
 ```
@@ -20,7 +20,7 @@ The output's parent must already exist. Use a stable, read-only snapshot, never 
 database. The command does not create a snapshot or require a running Minecraft server. Output is
 confined to the explicitly named directory, which must be disjoint from the input in both directions.
 An empty selected dimension succeeds with no tiles. Stored chunks expand only into their own native
-tiles, so distant explored areas do not fill the rectangle between them.
+tiles and overview ancestors, so distant explored areas do not fill the rectangle between them.
 
 All dimensions use their core profiles: Overworld Y-64..319, Nether Y0..127 with included `topY=90`,
 and End Y0..255. `--top-y` overrides the included cut in every selected dimension and must be valid
@@ -30,6 +30,11 @@ Modern flat colors are the default. `--appearance reference` retains the previou
 keeping dimension profiles. `--shadows opacity` uses the renderer's existing opacity shadows;
 `--shadows off` disables them. Textures and isometric image output are outside this command.
 
+The default zooms are -4..+2; explicit native +3 remains supported. For an overview-only selection,
+use `--zooms=-4,-1`. Zoom-zero sources are rendered once and streamed from PNGs with alpha-weighted
+area filtering. They are reused from the published inventory or kept temporarily within staging.
+See the [overview contract](../../docs/2d-overviews.md) for grid, filtering and source-work details.
+
 ## Limits
 
 Every limit is checked before acceptance where possible, and errors have nonzero exit status.
@@ -38,8 +43,8 @@ Every limit is checked before acceptance where possible, and errors have nonzero
 | ------------------------ | -----------: | -------------------------------------------------------------------------- |
 | `--workers`              |            2 | Concurrent tile workers, 1..16; even one uses a worker                     |
 | `--max-pending`          | Worker count | Accepted jobs including running renders and PNG writes, 1..1024            |
-| `--max-tiles`            |        10000 | Sparse preflight tile count, before any render is accepted                 |
-| `--max-output-bytes`     |   1073741824 | New PNG bytes plus the immutable and publication manifests                 |
+| `--max-tiles`            |        10000 | Published tiles plus temporary zoom-0 sources, before rendering            |
+| `--max-output-bytes`     |   1073741824 | All new PNGs, including temporary sources, plus both manifests             |
 | `--max-input-file-bytes` |    268435456 | Maximum size of any consumed database file or `level.dat`                  |
 | `--timeout-seconds`      |          300 | Deadline covering validation, hashing, indexing, rendering and publication |
 | `--memory-budget-mib`    |         2048 | Process-wide resident memory budget sampled every 25 ms                    |
@@ -61,8 +66,9 @@ or container memory limit when a hard memory ceiling is required. The file-size 
 reference indexer's single-file reads; it does not make the full index seekable. The memory budget
 counts other work in the same process when the API is embedded.
 
-The output-byte limit applies to this export's data, not existing exports or filesystem allocation
-overhead. Lock contents and filenames are metadata. Quotas and retention belong to the host.
+The output-byte limit includes generated source PNGs even after they are removed, and excludes
+existing exports and filesystem allocation overhead. Lock contents and filenames are metadata.
+Quotas and retention belong to the host.
 
 ## Publication and files
 
@@ -114,11 +120,12 @@ The exported TypeScript contracts are `BatchManifest`, `PublishedBatchManifest` 
 | `renderer`                            | Package name, version and content revision of compiled 2D code plus Node/zlib runtime                                        |
 | `resources.appearanceSha256`          | Derived shared modern top-view appearance profile digest                                                                     |
 | `source`                              | Revision and sorted `{path, bytes, sha256}` identities for consumed `.ldb`/`.sst`/`.log` files and optional `level.dat`      |
-| `grid`                                | XYZ, 256 pixels, X east, Y south, `pixelsPerBlock = 2^zoom`, native zoom list                                                |
+| `grid`                                | XYZ, 256 pixels, X east, Y south, `pixelsPerBlock = 2^zoom`, requested zoom list and optional overview filter                |
 | `render`                              | Dimension profiles and exact included cuts, appearance, shadows, biome blend, reference correction and optional block bounds |
 | `tileCount`, `pngBytes`               | Inventory count and total PNG bytes                                                                                          |
 | `tiles`                               | Sorted `{dimension,z,x,y,path,bytes,sha256}` entries; dimension/zoom/X/Y order                                               |
 | `generation`, `tileBase`              | Root pointer only; immutable-manifest digest and relative payload base                                                       |
+| `work`                                | Overview exports only: planned tile jobs, temporary source count and temporary PNG bytes                                     |
 
 The generation is the SHA-256 of the exact UTF-8 immutable manifest (two-space JSON plus a newline).
 It excludes the root pointer's `generation` and `tileBase` to avoid a recursive digest. Input/output
@@ -134,8 +141,9 @@ validate all checksums. It does not read archives directly. Snapshot creation st
 
 `--bounds=x0,z0,x1,z1` intersects the plan using exclusive block bounds, within +/-30000000. Every
 intersecting tile remains a full 256px image with normal XYZ alignment. Negative coordinates use floor
-division. Only native zooms 0..3 are available here; overview zooms -4..-1 and incremental dependency
-tracking follow separately. The default ends at +2 for the classic overview map.
+division. Whole overview tiles also include their stored source cells outside the requested bounds.
+Zooms -4..+2 are the default; explicit +3 is compatible. Incremental dependency tracking follows
+separately.
 
 ## Exit contract and validation
 

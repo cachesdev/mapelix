@@ -23,6 +23,9 @@ Production rewrite work starts from the acceptance baseline and ledger in `REWRI
   verified immutable tile payloads with atomic publication. A supervised coordinator keeps indexing
   and tile workers cancellable. `apps/render-cli` is the generic command-line consumer; deployment,
   snapshot creation and retention policy stay with the host. Portable entries do not import it.
+  Portable XYZ grid helpers cover -4..+3; the default export ends at +2. The Node overview compositor
+  streams zoom-0 RGBA with alpha-weighted area sums. Batch planning reuses stored zoom-zero PNGs,
+  accounts for temporary source work and removes unpublished source files before publication.
 - A future Canopy adapter can supply changed records without changing the renderer.
 
 The module boundary is byte-oriented. Bedrock decoding must not depend on HTTP, Canopy, Leaflet, or a graphical user interface.

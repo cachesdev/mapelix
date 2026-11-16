@@ -25,6 +25,12 @@ Tiles are always 256 by 256 pixels. Native zooms 0 through 3 render blocks at 1Ã
 
 For a future live source, `createBedrockWorld(effectiveRecords)` bypasses file access and accepts Bedrock key/value records directly. This is the intended Canopy seam.
 
+The Node-only `@mapelix/prototype/png` adapter exposes the existing `encodePng` codec and an
+expected-size `decodePng(bytes, width, height)` function. Core reuses these for overview PNGs without
+duplicating the codec or adding an image dependency. Decoding rejects mismatched header dimensions
+before inflation; callers choose the expected dimensions. The native renderer's PNG encoding is
+unchanged.
+
 ## Lifecycle
 
 Both world constructors return a `BedrockWorld` with an asynchronous, idempotent `close()`.

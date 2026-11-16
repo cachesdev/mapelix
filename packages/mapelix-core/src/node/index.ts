@@ -11,6 +11,8 @@ import { MODERN_SURFACE_STYLE } from "../surface-appearance.js";
 import type { MapWorld } from "../types.js";
 
 export type { BedrockWorldDirectory as MapWorldDirectory, EffectiveBedrockRecord };
+export { createOverviewTile, type OverviewSourceTile } from "./overview.js";
+export { decodePng, encodePng } from "@mapelix/prototype/png";
 
 /** Adapts the reference renderer without coupling the portable profile entry to Node. */
 function withSurfaceProfiles(world: BedrockWorld): MapWorld {

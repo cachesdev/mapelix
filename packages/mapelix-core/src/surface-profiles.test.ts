@@ -37,6 +37,8 @@ describe("classic surface profiles", () => {
       dimension: "nether",
       topY: 90,
       appearanceEntries: 1276,
+      overviewPixelsPerBlock: 1 / 16,
+      overviewMinX: -4096,
     });
   });
 });

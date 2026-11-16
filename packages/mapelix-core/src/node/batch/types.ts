@@ -14,7 +14,7 @@ export interface BatchLimits {
   /** Accepted render jobs, including running jobs and completed tiles being written. */
   readonly maxPending: number;
   readonly maxTiles: number;
-  /** New PNGs and both manifests, excluding already published exports. */
+  /** New PNGs (including temporary overview sources) and both manifests. */
   readonly maxOutputBytes: number;
   readonly maxInputFileBytes: number;
   readonly timeoutMs: number;
@@ -78,6 +78,7 @@ export interface BatchManifest {
     readonly yAxis: "south";
     readonly pixelsPerBlock: "2^zoom";
     readonly zooms: readonly number[];
+    readonly overview?: { readonly sourceZoom: 0; readonly filter: "area-premultiplied-srgb-v1" };
   };
   readonly render: {
     readonly profiles: readonly SurfaceProfile[];
@@ -90,6 +91,12 @@ export interface BatchManifest {
   readonly tileCount: number;
   readonly pngBytes: number;
   readonly tiles: readonly BatchTile[];
+  /** Present for overview exports; temporary sources are not published inventory entries. */
+  readonly work?: {
+    readonly tileJobs: number;
+    readonly temporaryTiles: number;
+    readonly temporaryPngBytes: number;
+  };
 }
 
 export interface PublishedBatchManifest extends BatchManifest {
