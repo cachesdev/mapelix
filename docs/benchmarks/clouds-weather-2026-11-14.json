@@ -61,8 +61,8 @@
     "extraPostProcessingPasses": 0
   },
   "limitations": [
-    "Generated disposable worlds and desktop Chrome; production VM and mobile frame rates are not measured.",
-    "Renderer counters and collected JS heap measure logical allocations, not physical GPU residency or VM RSS.",
+    "Generated disposable worlds and desktop Chrome; production server and mobile frame rates are not measured.",
+    "Renderer counters and collected JS heap measure logical allocations, not physical GPU residency or process RSS.",
     "Weather is cosmetic and independently selected; roof shelter uses loaded terrain height approximations."
   ]
 }

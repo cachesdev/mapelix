@@ -108,4 +108,4 @@ backend with cosmetic thunderstorms requested. Resource counters stay within
 the existing lifecycle limits; disposal removes the owned canvas and overlays.
 See [measurements](benchmarks/clouds-weather-2026-11-14.json) for exact counters,
 buffer budgets and test duration. These checks use generated disposable worlds;
-they do not measure production VM RSS, physical GPU residency or mobile FPS.
+they do not measure production server RSS, physical GPU residency or mobile FPS.

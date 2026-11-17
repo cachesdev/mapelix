@@ -169,7 +169,7 @@ snapshot, with one worker retaining at most three dimension builders. Reachable
 heap at switches 104 and 1,040 is 11.55 and 11.66 MiB. In the second half it stays
 within 11.49–11.69 MiB; process RSS fluctuates within 174.87–216.71 MiB. Native
 allocation high-water marks and transient ArrayBuffer finalization differ from
-reachable JS heap, so these numbers do not establish production VM headroom.
+reachable JS heap, so these numbers do not establish production server headroom.
 
 One real Overworld cave sample at X -1/Z 0, window [-64, -32), produces 22,428
 bytes / 1,183 quads at L0 in 65.48 ms and 112,908 bytes / 6,675 quads at L1 in

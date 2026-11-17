@@ -90,7 +90,7 @@
     },
     "tailRssMiB": [174.87109375, 216.70703125],
     "tailHeapMiB": [11.486244201660156, 11.68572998046875],
-    "note": "Transient ArrayBuffer finalization and allocator high-water accounting differ from reachable JS heap; forced GC at equivalent checkpoints; this is not the production VM"
+    "note": "Transient ArrayBuffer finalization and allocator high-water accounting differ from reachable JS heap; forced GC at equivalent checkpoints; this is not a production server"
   },
   "lifecycle": [
     {

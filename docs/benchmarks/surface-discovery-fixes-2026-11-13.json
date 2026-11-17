@@ -82,7 +82,7 @@
     "Surface certification is conservative and needs already loaded exact terrain; zoom in if only coarse terrain is available.",
     "Fully enclosed source blocks remain markers/index entries when the mesh has no exposed face.",
     "At shallow pitch the bounded cave orbit may not clear every surrounding rock face; Recover view remains available.",
-    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or VM RSS.",
+    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or process RSS.",
     "Browser tests use generated disposable worlds."
   ]
 }

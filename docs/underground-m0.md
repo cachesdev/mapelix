@@ -23,7 +23,7 @@ below Y 0, and emits source-natural faces without an artificial cut-plane cap.
 Existing detailed block models, materials, packed quads and lava flags are reused.
 
 Environment: Windows, Node 24.14.1, AMD Ryzen 7 7800X3D, 16 logical CPUs. This is
-the development machine, **not the production VM**. Each matrix case has a fresh
+the development machine, **not a production server**. Each matrix case has a fresh
 worker, an initial application-cache-cold build and ten additional builds, with
 two discarded warmups. Median and empirical p95 use eight measurements; this small
 sample is descriptive, not a production latency SLA. Filesystem caches are not
@@ -189,7 +189,7 @@ discovery data. No obsolete revision cleanup is changed here.
 Suggested initial cave budgets are **16 MiB encoded RAM and 128 MiB disk**, each
 configurable and separate from protected Surface data. These values do not prove
 that the production service fits its MemoryHigh limit. Worker/decoded caches and
-temporary meshing allocations still need the production VM check.
+temporary meshing allocations still need a production server check.
 
 ## Engine view-switch memory
 
@@ -207,7 +207,7 @@ allocator warm-up, then fluctuates between 185 and 228 MiB in that final half,
 ending at 186 MiB. Some checkpoints include temporary buffer finalization spikes;
 ArrayBuffer accounting is not interpreted as an instantaneous live-buffer census.
 No continuing growth proportional to the number of view switches is observed.
-This does not substitute for the integrated Linux/VM lifecycle test.
+This does not substitute for the lifecycle test on a Linux server.
 
 ## 104-switch RAM and GPU lifecycle
 

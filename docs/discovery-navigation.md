@@ -194,7 +194,7 @@ Equivalent warmed checkpoints retain 18 textures; uniform buffers decrease
 75→70 (WebGPU) and 77→72 (WebGL). The final 36-switch collected-heap differences
 are 249,964 and 272,004 bytes, below the existing 512 KiB allowance. These are
 logical renderer allocations and collected JS heap, not physical GPU residency
-or VM RSS. Card disposal removes the single owned DOM section; no GPU resource
+or process RSS. Card disposal removes the single owned DOM section; no GPU resource
 is added for the card. See the [measurement summary](benchmarks/surface-discovery-fixes-2026-11-13.json).
 
 Browser servers are temporary; no local preview is left running and production

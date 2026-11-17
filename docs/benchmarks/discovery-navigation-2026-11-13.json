@@ -67,7 +67,7 @@
   "limitations": [
     "Depth proximity uses loaded column tops, including foliage/roofs and coarse LODs.",
     "Unknown column heights retain Surface discoveries rather than guessing buried depth.",
-    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or VM RSS.",
+    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or process RSS.",
     "All browser cases use generated disposable worlds."
   ]
 }

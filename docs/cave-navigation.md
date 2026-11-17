@@ -53,8 +53,8 @@ body download. A 429/503 `Retry-After` (seconds or HTTP date) pauses both kinds 
 download, including queued requests. Other failures use bounded exponential
 backoff (1–30 seconds). Retry state retains at most 256 URL keys. Cancelled queued
 jobs detach listeners; disposal releases their promises and timers. Surface
-streaming retains its existing parallelism. The proxy continues to own the
-90/minute visitor limit; the viewer waits for its advertised retry delay.
+streaming retains its existing parallelism. Request rate limits stay with
+the serving host; the viewer waits for its advertised retry delay.
 
 Source discovery packets/cache identities remain independent of depth. Existing
 encoded/GPU budgets, LOD 0/1 and maximum 128-block cave reach are unchanged.
@@ -137,7 +137,7 @@ checkpoints (switches 20 to 104) give:
 Additional shader/JS paths warm when the reuse pool is disabled. The final
 36-switch heap differences are 401,432/414,108 bytes, within the existing 512 KiB
 regression allowance. GPU counters remain stable; these are logical renderer
-allocations and collected JS heap, not physical GPU residency or VM RSS.
+allocations and collected JS heap, not physical GPU residency or process RSS.
 
 On the user's copied snapshot, WebGPU follows an Overworld slice from -32..0 to
 -16..16 and a Nether slice from 16..48 to 32..64, with discoveries enabled and

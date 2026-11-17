@@ -1,7 +1,7 @@
 {
   "base": "67a354035e6f39a8a4fd68e32962ed7bdd8473a9",
   "date": "2026-11-13",
-  "method": "Windows desktop, Node 24.14.1; individual all-height source tiles over 64-block-radius rectangles; application-cache-cold tiles, OS cache not purged; 8 post-warm-up grouping samples; not a production VM benchmark",
+  "method": "Windows desktop, Node 24.14.1; individual all-height source tiles over 64-block-radius rectangles; application-cache-cold tiles, OS cache not purged; 8 post-warm-up grouping samples; not a production server benchmark",
   "results": [
     {
       "dimension": "overworld",
@@ -2050,7 +2050,7 @@
   "limitations": [
     "Real snapshot has no End chunks; generated End covers regressions",
     "Logical renderer counters are not physical VRAM",
-    "Desktop measurements do not establish production VM headroom",
+    "Desktop measurements do not establish production server headroom",
     "Source grouping is limited to loaded saved chunks and selected filters; markers are capped at the nearest 128",
     "Container contents and live entities are not indexed",
     "Production server, host controls, bounded disk caching and deployment are out of scope"

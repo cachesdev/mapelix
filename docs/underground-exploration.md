@@ -160,7 +160,7 @@ three simulated visitors (three cave regions plus three source indexes) in
 The generation/mixed-workload harness peaks at 251.22 MiB process RSS and settles
 at 182.39 MiB RSS / 10.98 MiB heap after collection. A separate full key inventory
 raises the harness high-water mark; that inventory is not part of an ordinary
-discovery request. None of these Windows figures establish production VM headroom.
+discovery request. None of these Windows figures establish production server headroom.
 
 The supplied snapshot has 487 occupied Overworld source tiles and 222 Nether
 source tiles: **709 possible occupied index entries for one snapshot/schema**,

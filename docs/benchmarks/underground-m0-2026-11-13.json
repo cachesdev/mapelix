@@ -13,7 +13,7 @@
     "node": "v24.14.1",
     "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           ",
     "logicalCpus": 16,
-    "os": "Windows local development machine; not production VM"
+    "os": "Windows local development machine; not a production server"
   },
   "inventory": [
     {

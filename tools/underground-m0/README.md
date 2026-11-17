@@ -1,7 +1,7 @@
 # Underground Milestone 0 measurement tools
 
 Experimental tools based on `e02cf7c`. They do not implement a public API or change
-the scene server, panel, integration worktree, production world, or shipped viewer.
+any server, production world or shipped viewer.
 Generated engine copies, fixtures, region files, Chrome profiles and measurements
 stay below the ignored `.local/` directories of this checkout.
 
@@ -53,7 +53,7 @@ $env:M0_SERVER_SWITCHES = '1040'
 node --expose-gc tools/underground-m0/server-lifecycle.mjs
 ```
 
-This is not Claude's integrated pool lifecycle or a production latency benchmark.
+This is not a server pool lifecycle test or a production latency benchmark.
 
 ## Browser lifecycle experiments
 
