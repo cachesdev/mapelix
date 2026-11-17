@@ -12,6 +12,52 @@ importers:
         specifier: 2.10.3
         version: 2.10.3
 
+  apps/mapelix-demo:
+    dependencies:
+      '@mapelix/viewer':
+        specifier: workspace:*
+        version: link:../../packages/mapelix-viewer
+    devDependencies:
+      '@mapelix/render-cli':
+        specifier: workspace:*
+        version: link:../render-cli
+      '@playwright/test':
+        specifier: 1.60.0
+        version: 1.60.0
+      '@sveltejs/adapter-node':
+        specifier: 5.5.4
+        version: 5.5.4(@sveltejs/kit@2.63.0(@sveltejs/vite-plugin-svelte@7.1.2(svelte@5.56.1)(vite@8.0.16(@types/node@24.10.13)))(svelte@5.56.1)(typescript@6.0.3)(vite@8.0.16(@types/node@24.10.13)))
+      '@sveltejs/kit':
+        specifier: 2.63.0
+        version: 2.63.0(@sveltejs/vite-plugin-svelte@7.1.2(svelte@5.56.1)(vite@8.0.16(@types/node@24.10.13)))(svelte@5.56.1)(typescript@6.0.3)(vite@8.0.16(@types/node@24.10.13))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 7.1.2
+        version: 7.1.2(svelte@5.56.1)(vite@8.0.16(@types/node@24.10.13))
+      '@types/node':
+        specifier: 24.10.13
+        version: 24.10.13
+      leaflet:
+        specifier: 1.9.4
+        version: 1.9.4
+      prettier:
+        specifier: 3.8.3
+        version: 3.8.3
+      prettier-plugin-svelte:
+        specifier: 4.1.0
+        version: 4.1.0(prettier@3.8.3)(svelte@5.56.1)
+      svelte:
+        specifier: 5.56.1
+        version: 5.56.1
+      svelte-check:
+        specifier: 4.6.0
+        version: 4.6.0(picomatch@4.0.5)(svelte@5.56.1)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.10.13)
+
   apps/prototype-viewer:
     dependencies:
       '@mapelix/prototype':

@@ -1,0 +1,24 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "env": ["MAPELIX_TEST_BROWSER", "MAPELIX_E2E_TILES_DIRECTORY"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["build/**", ".svelte-kit/**", "!.svelte-kit/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["MAPELIX_TILES_DIRECTORY"]
+    },
+    "preview": {
+      "cache": false,
+      "persistent": true,
+      "env": ["HOST", "MAPELIX_TILES_DIRECTORY", "PORT"]
+    }
+  }
+}
