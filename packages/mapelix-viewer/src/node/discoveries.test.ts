@@ -1,26 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ build: vi.fn(), revision: "snapshot-a" }));
-vi.mock("./scene-world", () => ({
-  getSnapshotRevision: async () => mocks.revision,
-  getSceneWorld: async () => ({ buildDiscoveries: mocks.build }),
-}));
+import { createDiscoveryCache } from "./discoveries";
+
+const mocks = { build: vi.fn(), revision: "snapshot-a" };
+const cache = (memoryMiB = 4) =>
+  createDiscoveryCache({
+    memoryMiB,
+    getSnapshotRevision: async () => mocks.revision,
+    getSceneWorld: async () => ({ buildDiscoveries: mocks.build }),
+  });
 
 beforeEach(() => {
-  vi.resetModules();
-  vi.unstubAllEnvs();
   mocks.revision = "snapshot-a";
   mocks.build.mockReset();
 });
 
 describe("independent discovery cache", () => {
   it("reuses source indexes, evicts by bytes and separates snapshots and dimensions", async () => {
-    vi.stubEnv("MAPELIX_DISCOVERY_MEMORY_MIB", "1");
     mocks.build.mockImplementation(async () => ({
       bytes: new Uint8Array(600 * 1024),
       milliseconds: 1,
     }));
-    const { loadDiscoveries } = await import("./discoveries");
+    const loadDiscoveries = cache(1);
     const signal = new AbortController().signal;
     await loadDiscoveries("overworld", { x: 0, z: 0 }, signal);
     expect((await loadDiscoveries("overworld", { x: 0, z: 0 }, signal)).cacheStatus).toBe("memory");
@@ -39,7 +40,7 @@ describe("independent discovery cache", () => {
           finish = resolve;
         }),
     );
-    const { loadDiscoveries } = await import("./discoveries");
+    const loadDiscoveries = cache();
     const a = new AbortController(),
       b = new AbortController();
     const first = loadDiscoveries("overworld", { x: 0, z: 0 }, a.signal);
@@ -63,7 +64,7 @@ describe("independent discovery cache", () => {
           ),
         ),
     );
-    const { loadDiscoveries } = await import("./discoveries");
+    const loadDiscoveries = cache();
     const controller = new AbortController();
     const result = loadDiscoveries("overworld", { x: 0, z: 0 }, controller.signal);
     const rejected = expect(result).rejects.toMatchObject({ name: "AbortError" });

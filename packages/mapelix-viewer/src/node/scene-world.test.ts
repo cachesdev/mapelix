@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sceneContext } from "@mapelix/scene-prototype/dimensions";
+import { createSceneServer, type SceneServerOptions } from "./scene-world";
+
+const OPTIONS: SceneServerOptions = { worldDirectory: "/world", cacheDirectory: "/cache" };
 
 const mocks = vi.hoisted(() => ({
   disk: new Map<string, Uint8Array>(),
@@ -27,7 +30,6 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 beforeEach(() => {
-  vi.resetModules();
   mocks.disk.clear();
   mocks.opened.mockReset();
   mocks.built.mockReset();
@@ -41,11 +43,9 @@ beforeEach(() => {
     close: async () => {},
   }));
 });
-afterEach(() => vi.unstubAllEnvs());
 
 describe("dimension server caches", () => {
   it("bounds cave bytes independently of Surface and does not accumulate cave disk variants", async () => {
-    vi.stubEnv("MAPELIX_CAVE_MEMORY_MIB", "1");
     mocks.opened.mockImplementation(async () => ({
       info: { name: "Caves", spawn: { x: 0, y: 80, z: 0 } },
       buildRegion: async (request: { mode?: string; minY?: number }) => {
@@ -57,7 +57,7 @@ describe("dimension server caches", () => {
       },
       close: async () => {},
     }));
-    const server = await import("./scene-world");
+    const server = createSceneServer({ ...OPTIONS, caveMemoryMiB: 1 });
     const request = { level: 0, x: 0, z: 0 },
       signal = new AbortController().signal;
     await server.loadRegion(request, signal);
@@ -73,7 +73,7 @@ describe("dimension server caches", () => {
     expect(() => server.loadRegion({ ...request, level: 2 }, signal, a)).toThrow("LOD");
   });
   it("isolates memory, workers and persisted regions, including after a server restart", async () => {
-    const server = await import("./scene-world");
+    const server = createSceneServer(OPTIONS);
     const request = { level: 0, x: -1, z: 0 };
     const signal = new AbortController().signal;
     const contexts = [
@@ -98,8 +98,7 @@ describe("dimension server caches", () => {
       "the-end",
     ]);
     expect(mocks.disk.size).toBe(4);
-    vi.resetModules();
-    const restarted = await import("./scene-world");
+    const restarted = createSceneServer(OPTIONS);
     for (const [index, context] of contexts.entries()) {
       const stored = await restarted.loadRegion(request, signal, context);
       expect(stored.cacheStatus).toBe("disk");
@@ -109,7 +108,7 @@ describe("dimension server caches", () => {
   });
 
   it("provides dimension entry points without treating them as stored portal positions", async () => {
-    const server = await import("./scene-world");
+    const server = createSceneServer(OPTIONS);
     expect((await server.getWorldMetadata()).spawn).toEqual({ x: -61, y: 69, z: 25 });
     expect((await server.getWorldMetadata(sceneContext("nether"))).spawn).toEqual({
       x: -8,
