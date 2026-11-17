@@ -181,9 +181,16 @@ pnpm --filter @mapelix/viewer pack:release /path/to/empty/folder
 
 `release.json` gives the full `commit` (and `dirty`, false unless `--allow-dirty` packed
 uncommitted changes), the Node.js version, `embedApiVersion`, `regionFormatVersion`,
-`discoverySchemaVersion`, `renderCliVersion`, the entry paths `renderCli`
-(`node <release>/<renderCli> --help`), `sceneServer`, `viewer` and `viewerStyles`, and the
+`discoverySchemaVersion`, `textureFormatVersion` (the `atlas.bin` format),
+`texturePipelineVersion` (part of every texture revision), `renderCliVersion`, the entry paths
+`renderCli` (`node <release>/<renderCli> --help`), `sceneServer`, `textureCli`
+(`node <release>/<textureCli> <stack folder>`, see `docs/texture-stack.md`), `viewer` and
+`viewerStyles`, and the
 SHA-256 of every other file under `files`. A host can check those hashes before it runs the
 release. Only compiled modules ship, so the release computes the same scene revisions as the
 checkout it came from, and the same commit packs the same bytes: nothing records a time or a
 machine path.
+
+A release never holds block textures: the host gives its own packs to `createSceneServer`.
+Version 5 of the embed API only adds options; a host written for version 4 runs it unchanged,
+with textures off, and the region format is the same for every untextured region.

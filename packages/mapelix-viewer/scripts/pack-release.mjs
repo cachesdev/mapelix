@@ -157,6 +157,8 @@ const scene = (file) =>
   import(pathToFileURL(join(modules, "@mapelix", "scene-prototype", "dist", file)).href);
 const { REGION_FORMAT_VERSION } = await scene("format.js");
 const { DISCOVERY_SCHEMA_VERSION } = await scene("discoveries.js");
+const { ATLAS_FORMAT_VERSION } = await scene("textures/atlas-format.js");
+const { TEXTURE_PIPELINE_VERSION } = await scene("textures/resource-pack.js");
 const embedSource = await readFile(join(viewerPackage, "src", "embed.ts"), "utf8");
 const embedVersion = /EMBED_API_VERSION = (\d+)/.exec(embedSource)?.[1];
 if (embedVersion === undefined) throw new Error("EMBED_API_VERSION is missing from embed.ts");
@@ -196,9 +198,12 @@ const release = {
   embedApiVersion: Number(embedVersion),
   regionFormatVersion: REGION_FORMAT_VERSION,
   discoverySchemaVersion: DISCOVERY_SCHEMA_VERSION,
+  textureFormatVersion: ATLAS_FORMAT_VERSION,
+  texturePipelineVersion: TEXTURE_PIPELINE_VERSION,
   renderCliVersion: renderManifest.version,
   renderCli: posix(join(modules, "@mapelix", "render-cli", renderManifest.bin["mapelix-render"])),
   sceneServer: posix(join(viewerModule, "dist", "node", "index.js")),
+  textureCli: posix(join(viewerModule, "dist", "node", "texture-cli.js")),
   viewer: "viewer/mapelix-viewer.js",
   viewerStyles: "viewer/mapelix-viewer.css",
   files: Object.fromEntries(files),
