@@ -4,7 +4,10 @@ import {
   ATLAS_FORMAT_VERSION,
   MAX_ATLAS_SIDE,
   MAX_ATLAS_TILES,
+  MIN_ATLAS_TILE,
   atlasBytes,
+  atlasCellSize,
+  atlasGutter,
   atlasLevelCount,
   atlasLevelSize,
   encodeTextureAtlas,
@@ -16,6 +19,8 @@ import type { PackImage } from "./pack-image.js";
 import type {
   BlockTextureNames,
   Flipbook,
+  ResourcePack,
+  ResourcePackInfo,
   ResourcePackStack,
   TerrainEntry,
 } from "./resource-pack.js";
@@ -38,14 +43,22 @@ export interface TextureIndex {
   readonly terrain: Readonly<Record<string, TerrainEntry>>;
 }
 
+/** Packs and files an atlas was made of, for attribution. */
+export interface TextureNotice {
+  readonly pack: ResourcePackInfo;
+  /** Image files of the pack in the atlas, sorted. */
+  readonly files: readonly string[];
+}
+
 export interface BuiltTextureAtlas {
-  /** Names the atlas and every region textured with it: the stack fingerprint and the layout. */
+  /** The texture revision (`textureRevision`): names the atlas and every region textured with it. */
   readonly fingerprint: string;
   readonly atlas: TextureAtlas;
   readonly bytes: Uint8Array;
   readonly index: TextureIndex;
   /** GPU bytes of the atlas with its mipmaps. */
   readonly gpuBytes: number;
+  readonly notices: readonly TextureNotice[];
 }
 
 export const DEFAULT_ATLAS_OPTIONS = {
@@ -63,23 +76,54 @@ export function textureNames(index: TextureIndex): TextureNames {
 
 interface Source {
   readonly path: string;
-  readonly image: PackImage;
   readonly side: number;
   /** Frame indexes into the image's square frames, in play order. */
   readonly frames: readonly number[];
   readonly ticksPerFrame: number;
 }
 
-/** Builds the atlas of every block texture a stack defines. */
+function atlasOptions(options: TextureAtlasOptions): Required<TextureAtlasOptions> {
+  const maxTileSize = options.maxTileSize ?? DEFAULT_ATLAS_OPTIONS.maxTileSize;
+  const budgetBytes = options.budgetBytes ?? DEFAULT_ATLAS_OPTIONS.budgetBytes;
+  if (
+    !Number.isInteger(Math.log2(maxTileSize)) ||
+    maxTileSize < MIN_ATLAS_TILE ||
+    maxTileSize > 256
+  ) {
+    throw new RangeError("maxTileSize must be a power of two from 4 to 256");
+  }
+  if (!Number.isSafeInteger(budgetBytes) || budgetBytes < 1) {
+    throw new RangeError("budgetBytes must be a positive integer");
+  }
+  return { maxTileSize, budgetBytes };
+}
+
+/**
+ * The texture revision: names the atlas and every region textured with it. It follows from the
+ * stack fingerprint and the options alone, so it is known before the atlas is built.
+ */
+export function textureRevision(
+  stackFingerprint: string,
+  options: TextureAtlasOptions = {},
+): string {
+  const { maxTileSize, budgetBytes } = atlasOptions(options);
+  return createHash("sha256")
+    .update(
+      ["mapelix-atlas", ATLAS_FORMAT_VERSION, stackFingerprint, maxTileSize, budgetBytes].join("|"),
+    )
+    .digest("hex")
+    .slice(0, 20);
+}
+
+/**
+ * Builds the atlas of every block texture a stack defines. Images are read twice, once for
+ * their size and once to draw them, so only one decoded image is in memory at a time.
+ */
 export async function buildTextureAtlas(
   stack: ResourcePackStack,
   options: TextureAtlasOptions = {},
 ): Promise<BuiltTextureAtlas> {
-  const maxTileSize = options.maxTileSize ?? DEFAULT_ATLAS_OPTIONS.maxTileSize;
-  const budgetBytes = options.budgetBytes ?? DEFAULT_ATLAS_OPTIONS.budgetBytes;
-  if (!Number.isInteger(Math.log2(maxTileSize)) || maxTileSize < 1 || maxTileSize > 256) {
-    throw new RangeError("maxTileSize must be a power of two up to 256");
-  }
+  const { maxTileSize, budgetBytes } = atlasOptions(options);
 
   // The merged entries: each block and terrain name from the first pack defining it.
   const blocks: Record<string, BlockTextureNames> = {};
@@ -106,11 +150,11 @@ export async function buildTextureAtlas(
 
   const sources: Source[] = [];
   for (const path of paths) {
-    const image = await stack.readImage(path);
-    if (image === undefined) continue;
-    const side = Math.min(image.width, image.height);
+    const size = await stack.readImageSize(path);
+    if (size === undefined) continue;
+    const side = Math.min(size.width, size.height);
     const flipbook = flipbooks.get(path);
-    const available = Math.floor(image.height / side);
+    const available = Math.floor(size.height / side);
     const frames =
       flipbook === undefined
         ? [0]
@@ -119,7 +163,6 @@ export async function buildTextureAtlas(
           );
     sources.push({
       path,
-      image,
       side,
       frames: frames.length === 0 ? [0] : frames,
       ticksPerFrame: flipbook?.ticksPerFrame ?? 1,
@@ -133,34 +176,46 @@ export async function buildTextureAtlas(
     );
   }
 
-  // The tile size is the most common texture size, bounded by the options and the budget.
+  // The tile size is the most common texture size, bounded by the options, the budget and the
+  // largest texture every device can sample.
   const sides = new Map<number, number>();
   for (const source of sources)
     sides.set(source.side, (sides.get(source.side) ?? 0) + source.frames.length);
   const common = [...sides].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]![0];
-  let tileSize = 2 ** Math.floor(Math.log2(Math.min(common, maxTileSize)));
+  let tileSize = Math.max(
+    MIN_ATLAS_TILE,
+    2 ** Math.floor(Math.log2(Math.min(common, maxTileSize))),
+  );
   const columns = Math.ceil(Math.sqrt(count));
   const rows = Math.ceil(count / columns);
-  while (
-    tileSize > 1 &&
-    (atlasBytes({ tileSize, columns, rows }) > budgetBytes ||
-      columns * tileSize > MAX_ATLAS_SIDE ||
-      rows * tileSize > MAX_ATLAS_SIDE)
-  ) {
-    tileSize /= 2;
+  const fits = (tile: number): boolean =>
+    atlasBytes({ tileSize: tile, columns, rows }) <= budgetBytes &&
+    columns * atlasCellSize(tile) <= MAX_ATLAS_SIDE &&
+    rows * atlasCellSize(tile) <= MAX_ATLAS_SIDE;
+  while (tileSize > MIN_ATLAS_TILE && !fits(tileSize)) tileSize /= 2;
+  if (!fits(tileSize)) {
+    throw new RangeError(`${count} block textures do not fit in the texture budget`);
   }
 
-  const { width } = atlasLevelSize({ tileSize, columns, rows }, 0);
-  const base = new Uint8Array(width * rows * tileSize * 4);
+  const cell = atlasCellSize(tileSize);
+  const gutter = atlasGutter(tileSize);
+  const { width, height } = atlasLevelSize({ tileSize, columns, rows }, 0);
+  const base = new Uint8Array(width * height * 4);
   const tiles: AtlasTileInfo[] = [];
   const tileOf: Record<string, number> = {};
+  const used = new Map<ResourcePack, string[]>();
   for (const source of sources) {
+    const image = await stack.readImage(source.path);
+    if (image === undefined) continue;
+    const found = stack.locateImage(source.path)!;
+    used.set(found.pack, [...(used.get(found.pack) ?? []), found.file]);
     tileOf[source.path] = tiles.length;
     for (const [order, frame] of source.frames.entries()) {
       const tile = tiles.length;
-      const x0 = (tile % columns) * tileSize;
-      const y0 = Math.floor(tile / columns) * tileSize;
-      const average = resample(source.image, source.side, frame, tileSize, base, width, x0, y0);
+      const x0 = (tile % columns) * cell + gutter;
+      const y0 = Math.floor(tile / columns) * cell + gutter;
+      const average = resample(image, source.side, frame, tileSize, base, width, x0, y0);
+      wrapGutter(base, width, x0, y0, tileSize, gutter);
       tiles.push({
         ...average,
         frames: order === 0 ? source.frames.length : 0,
@@ -174,17 +229,36 @@ export async function buildTextureAtlas(
     levels.push(halve(levels[level - 1]!, atlasLevelSize({ tileSize, columns, rows }, level - 1)));
   }
   const atlas: TextureAtlas = { tileSize, columns, rows, tiles, levels };
-  const fingerprint = createHash("sha256")
-    .update(`mapelix-atlas-v${ATLAS_FORMAT_VERSION}\0${stack.fingerprint}\0${tileSize}\0${columns}`)
-    .digest("hex")
-    .slice(0, 20);
+  const fingerprint = textureRevision(stack.fingerprint, { maxTileSize, budgetBytes });
   return {
     fingerprint,
     atlas,
     bytes: encodeTextureAtlas(atlas),
     index: { fingerprint, tiles: tileOf, blocks, terrain },
     gpuBytes: atlasBytes(atlas),
+    notices: stack.packs
+      .filter((pack) => used.has(pack))
+      .map((pack) => ({ pack: pack.info, files: used.get(pack)!.sort() })),
   };
+}
+
+/** Fills the gutter around the tile at `(x0, y0)` with the tile repeated. */
+function wrapGutter(
+  pixels: Uint8Array,
+  width: number,
+  x0: number,
+  y0: number,
+  tileSize: number,
+  gutter: number,
+): void {
+  const wrap = (value: number): number => ((value % tileSize) + tileSize) % tileSize;
+  for (let y = -gutter; y < tileSize + gutter; y++) {
+    for (let x = -gutter; x < tileSize + gutter; x++) {
+      if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) continue;
+      const from = ((y0 + wrap(y)) * width + x0 + wrap(x)) * 4;
+      pixels.copyWithin(((y0 + y) * width + x0 + x) * 4, from, from + 4);
+    }
+  }
 }
 
 /**

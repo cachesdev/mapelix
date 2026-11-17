@@ -14,8 +14,17 @@ function fakeServer() {
   return {
     getWorldMetadata: vi.fn(async () => ({ revision: "r1", name: "Fixture" })),
     getRevision: vi.fn(async () => "r1"),
-    loadTextureAtlas: vi.fn(async (fingerprint: string) =>
-      fingerprint === "a".repeat(20) ? new Uint8Array([1, 2, 3]) : undefined,
+    loadTextureAtlas: vi.fn(async (revision: string, load?: { cacheOnly?: boolean }) =>
+      revision === "a".repeat(20) && load?.cacheOnly !== true
+        ? {
+            bytes: new Uint8Array([1, 2, 3]),
+            gzip: new Uint8Array([4]),
+            brotli: new Uint8Array([5]),
+            notices: [{ pack: { name: "P", version: "1.0.0", uuid: "u" }, files: ["a.png"] }],
+          }
+        : revision === "c".repeat(20)
+          ? Promise.reject(new Error("Resource pack x: broken"))
+          : undefined,
     ),
     getSnapshotRevision: vi.fn(async () => "s1"),
     loadRegion: vi.fn(async (_request: unknown) => ({
@@ -54,17 +63,57 @@ describe("scene handler", () => {
     expect(await handle(get("/world/world.json", { method: "POST" }))).toBeUndefined();
   });
 
-  it("serves a texture atlas by fingerprint as immutable", async () => {
-    const handle = createSceneHandler(fakeServer() as unknown as SceneServer, "/world");
-    const atlas = await handle(new Request(`http://local/world/textures/${"a".repeat(20)}.bin`));
-    expect(atlas?.status).toBe(200);
-    expect(atlas?.headers.get("cache-control")).toContain("immutable");
-    expect(new Uint8Array(await atlas!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
-    const other = await handle(new Request(`http://local/world/textures/${"b".repeat(20)}.bin`));
-    expect(other?.status).toBe(404);
-    expect((await handle(new Request("http://local/world/textures/../x.bin")))?.status).not.toBe(
-      200,
-    );
+  it("serves a texture revision's atlas, encoded as the client accepts, and its notices", async () => {
+    const server = fakeServer();
+    const handle = createSceneHandler(server as unknown as SceneServer, "/world");
+    const path = `/world/textures/${"a".repeat(20)}`;
+    const plain = await handle(get(`${path}/atlas.bin`));
+    expect(plain?.status).toBe(200);
+    expect(plain?.headers.get("cache-control")).toContain("immutable");
+    expect(plain?.headers.get("vary")).toBe("accept-encoding");
+    expect(plain?.headers.get("content-encoding")).toBeNull();
+    expect(new Uint8Array(await plain!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    for (const [accept, encoding, byte] of [
+      ["gzip, deflate, br", "br", 5],
+      ["gzip", "gzip", 4],
+    ] as const) {
+      const encoded = await handle(
+        get(`${path}/atlas.bin`, { headers: { "accept-encoding": accept } }),
+      );
+      expect(encoded?.headers.get("content-encoding")).toBe(encoding);
+      expect(encoded?.headers.get("content-length")).toBe("1");
+      expect(new Uint8Array(await encoded!.arrayBuffer())).toEqual(new Uint8Array([byte]));
+    }
+    const notices = await handle(get(`${path}/notices.json`));
+    expect(await notices?.json()).toEqual([
+      { pack: { name: "P", version: "1.0.0", uuid: "u" }, files: ["a.png"] },
+    ]);
+    expect((await handle(get(`/world/textures/${"b".repeat(20)}/atlas.bin`)))?.status).toBe(404);
+    const failed = await handle(get(`/world/textures/${"c".repeat(20)}/atlas.bin`));
+    expect(failed?.status).toBe(503);
+    expect(await failed?.json()).toEqual({
+      message: "Textures are unavailable: Resource pack x: broken",
+    });
+    for (const bad of [
+      "/world/textures/../x.bin",
+      `/world/textures/${"a".repeat(20)}.bin`,
+      `${path}/other.bin`,
+    ]) {
+      expect(await handle(get(bad)), bad).toBeUndefined();
+    }
+
+    // A cache-only handler never builds the atlas.
+    const cached = createSceneHandler(server as unknown as SceneServer, "/world", {
+      cacheOnly: true,
+      maxBuilds: 4,
+    });
+    const refused = await cached(get(`${path}/atlas.bin`));
+    expect(refused?.status).toBe(404);
+    expect(await refused?.json()).toMatchObject({ error: "not-cached" });
+    expect(server.loadTextureAtlas.mock.calls.at(-1)).toEqual([
+      "a".repeat(20),
+      { cacheOnly: true },
+    ]);
   });
 
   it("refuses invalid requests and stale revisions with JSON errors", async () => {

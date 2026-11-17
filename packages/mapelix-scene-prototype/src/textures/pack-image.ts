@@ -24,6 +24,32 @@ export function decodePackImage(bytes: Uint8Array, path: string, limits: ImageLi
   throw new Error("only PNG and TGA images are read");
 }
 
+/** Reads a PNG or TGA texture's size from its header alone, checked against `limits`. */
+export function packImageSize(
+  bytes: Uint8Array,
+  path: string,
+  limits: ImageLimits,
+): { readonly width: number; readonly height: number } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let width: number;
+  let height: number;
+  if (path.endsWith(".png")) {
+    if (bytes.byteLength < 33 || PNG_SIGNATURE.some((value, index) => bytes[index] !== value)) {
+      throw new Error("not a PNG image");
+    }
+    width = view.getUint32(16);
+    height = view.getUint32(20);
+  } else if (path.endsWith(".tga")) {
+    if (bytes.byteLength < 18) throw new Error("TGA image is truncated");
+    width = view.getUint16(12, true);
+    height = view.getUint16(14, true);
+  } else {
+    throw new Error("only PNG and TGA images are read");
+  }
+  checkSize(width, height, limits);
+  return { width, height };
+}
+
 function checkSize(width: number, height: number, limits: ImageLimits): void {
   if (width < 1 || height < 1) throw new Error("image has no pixels");
   if (width > limits.maxImageSide || height > limits.maxImageSide) {

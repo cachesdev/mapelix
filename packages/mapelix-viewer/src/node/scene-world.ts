@@ -34,8 +34,13 @@ import {
   type RegionServiceStats,
 } from "./region-service.js";
 import { engineFingerprint, worldRevision } from "./revision.js";
-import { loadSceneTextures, type SceneTextures } from "./textures.js";
-import type { ResourcePackInfo } from "@mapelix/scene-prototype/textures";
+import { SceneTextures, type SceneAtlas } from "./textures.js";
+import type {
+  PackLimits,
+  ResourcePackInfo,
+  TextureNotice,
+  TextureStackSource,
+} from "@mapelix/scene-prototype/textures";
 
 export type { CacheStatus } from "./region-service.js";
 
@@ -69,16 +74,25 @@ export interface SceneServerOptions {
   /** Cache, pool and build events, for the host's log. */
   readonly onEvent?: SceneEvent;
   /**
-   * Bedrock resource packs (folders, zip or .mcpack files), highest priority first, whose block
-   * textures the viewer may draw near the camera. A texture missing from one pack comes from
-   * the next. Without packs nothing changes.
+   * Block textures from a stack of Bedrock resource packs, which the viewer may draw near the
+   * camera. Without it nothing changes; a stack that cannot be read leaves the world untextured.
    */
-  readonly resourcePacks?: readonly string[];
-  /** Largest texture tile side, a power of two (default 32). */
-  readonly textureMaxTileSize?: number;
-  /** GPU memory the texture atlas may take with its mipmaps (default 32). */
-  readonly textureBudgetMiB?: number;
+  readonly textures?: SceneTextureOptions;
 }
+
+/**
+ * Where the packs come from and what they may cost. `stack` is a read-only folder holding the
+ * packs and `mapelix-stack.json` (see `docs/texture-stack.md`); `packs` lists folders, `.zip`
+ * or `.mcpack` files, highest priority first.
+ */
+export type SceneTextureOptions = TextureStackSource & {
+  /** Largest texture tile side, a power of two from 4 to 256 (default 32). */
+  readonly maxTileSize?: number;
+  /** GPU memory the atlas may take with its mipmaps (default 32). */
+  readonly budgetMiB?: number;
+  /** Bounds on reading the packs, per pack and for the stack. */
+  readonly limits?: Partial<PackLimits>;
+};
 
 /** A served region or discovery index and where it came from. */
 export type LoadedRegion = RegionResult;
@@ -94,20 +108,37 @@ export interface WorldMetadata extends SceneContext {
   readonly caves: typeof CAVE_LIMITS;
   readonly snapshotRevision: string;
   readonly discoveries: typeof DISCOVERY_LIMITS;
-  /** Present when resource packs were given and their textures could be read. */
+  /** Present when a texture stack was given and its packs could be read. */
   readonly textures?: WorldTextures;
 }
 
-/** The texture atlas a client may load from `textures/<fingerprint>.bin`. */
+/**
+ * Textures a client may draw: the atlas at `textures/<revision>/atlas.bin` and textured
+ * regions with `textures=<revision>` in their query string.
+ */
 export interface WorldTextures {
-  readonly fingerprint: string;
-  readonly tileSize: number;
-  readonly tiles: number;
-  /** GPU bytes of the atlas with its mipmaps. */
-  readonly gpuBytes: number;
-  /** The packs in use, highest priority first. */
+  /** Changes with any pack, the pack order or the atlas options, apart from the world revision. */
+  readonly revision: string;
+  /** The packs in use, highest priority first, as their manifests describe them. */
   readonly packs: readonly ResourcePackInfo[];
 }
+
+/** The texture stack in use, for a health page. */
+export type TextureStats =
+  | (WorldTextures & {
+      /** `stored` once the atlas is built or read, `failed` when its build failed. */
+      readonly state: "stored" | "not-built" | "failed";
+      readonly error?: string;
+      readonly atlas?: {
+        readonly tileSize: number;
+        readonly tiles: number;
+        readonly gpuBytes: number;
+        readonly bytes: number;
+        readonly gzipBytes: number;
+        readonly brotliBytes: number;
+      };
+    })
+  | { readonly error: string };
 
 export interface PrewarmOptions {
   /** At most this many Surface regions, coarse levels and the middle of the world first. */
@@ -134,8 +165,8 @@ export interface SceneServerStats {
     readonly cache: DiskCacheStats;
   };
   readonly prewarm: PrewarmResult;
-  /** The textures in use, the reason they are not, or nothing without packs. */
-  readonly textures?: WorldTextures | { readonly error: string };
+  /** The textures in use, the reason they are not, or nothing without a stack. */
+  readonly textures?: TextureStats;
 }
 
 /** The world folder holds no Bedrock world: a configuration error that a retry cannot fix. */
@@ -199,11 +230,22 @@ export function createSceneServer(options: SceneServerOptions) {
       positiveInteger(options.discoveryDiskCacheMiB ?? 64, "discoveryDiskCacheMiB") * MIB,
     discoveryPending: positiveInteger(options.discoveryMaxPending ?? 8, "discoveryMaxPending"),
   };
-  const resourcePacks = [...(options.resourcePacks ?? [])].map((pack) => resolve(pack));
-  const textureMaxTileSize = options.textureMaxTileSize ?? 32;
-  if (!Number.isInteger(Math.log2(textureMaxTileSize)) || textureMaxTileSize > 256)
-    throw new RangeError("textureMaxTileSize must be a power of two up to 256");
-  const textureBudget = positiveInteger(options.textureBudgetMiB ?? 32, "textureBudgetMiB") * MIB;
+  const textureOptions = options.textures;
+  const textureSource: TextureStackSource | undefined =
+    textureOptions === undefined
+      ? undefined
+      : "stack" in textureOptions
+        ? { stack: resolve(textureOptions.stack) }
+        : { packs: textureOptions.packs.map((pack) => resolve(pack)) };
+  const textureMaxTileSize = textureOptions?.maxTileSize ?? 32;
+  if (
+    !Number.isInteger(Math.log2(textureMaxTileSize)) ||
+    textureMaxTileSize < 4 ||
+    textureMaxTileSize > 256
+  )
+    throw new RangeError("textures.maxTileSize must be a power of two from 4 to 256");
+  const textureBudget =
+    positiveInteger(textureOptions?.budgetMiB ?? 32, "textures.budgetMiB") * MIB;
   const onEvent = options.onEvent;
   const event = (name: string, detail: Record<string, unknown>) => onEvent?.(name, detail);
   let opening: Promise<Opened> | undefined;
@@ -249,12 +291,16 @@ export function createSceneServer(options: SceneServerOptions) {
     // Packs are optional: one that cannot be read leaves the world untextured, not unavailable.
     let textures: SceneTextures | undefined;
     let textureError: string | undefined;
-    if (resourcePacks.length > 0) {
+    if (textureSource !== undefined) {
       try {
-        textures = await loadSceneTextures(
-          resourcePacks,
+        textures = await SceneTextures.open(
+          textureSource,
           cacheDirectory,
-          { maxTileSize: textureMaxTileSize, budgetBytes: textureBudget },
+          {
+            maxTileSize: textureMaxTileSize,
+            budgetBytes: textureBudget,
+            ...(textureOptions?.limits === undefined ? {} : { limits: textureOptions.limits }),
+          },
           event,
         );
       } catch (cause) {
@@ -362,14 +408,32 @@ export function createSceneServer(options: SceneServerOptions) {
       caves: CAVE_LIMITS,
       snapshotRevision: world.revision,
       discoveries: DISCOVERY_LIMITS,
-      ...(world.textures === undefined ? {} : { textures: worldTextures(world.textures) }),
+      ...(world.textures === undefined
+        ? {}
+        : { textures: { revision: world.textures.revision, packs: world.textures.packs } }),
     };
   }
 
-  /** The encoded atlas named `fingerprint`, or undefined when no such atlas is served. */
-  async function loadTextureAtlas(fingerprint: string): Promise<Uint8Array | undefined> {
+  /**
+   * The atlas of texture `revision`, built on first use and stored; undefined for another
+   * revision, without textures, or with `cacheOnly` when it is not stored yet. A failed build
+   * rejects.
+   */
+  async function loadTextureAtlas(
+    revision: string,
+    load: Pick<LoadOptions, "cacheOnly"> = {},
+  ): Promise<SceneAtlas | undefined> {
     const world = await ready();
-    return world.textures?.fingerprint === fingerprint ? world.textures.bytes : undefined;
+    if (world.textures?.revision !== revision) return undefined;
+    return world.textures.load(load.cacheOnly === true);
+  }
+
+  /** The packs and files the atlas of `revision` was made of, for attribution. */
+  async function loadTextureNotices(
+    revision: string,
+    load: Pick<LoadOptions, "cacheOnly"> = {},
+  ): Promise<readonly TextureNotice[] | undefined> {
+    return (await loadTextureAtlas(revision, load))?.notices;
   }
 
   /**
@@ -486,7 +550,7 @@ export function createSceneServer(options: SceneServerOptions) {
         discoveries: discoveryPrewarm?.progress ?? IDLE,
       },
       ...(world.textures !== undefined
-        ? { textures: worldTextures(world.textures) }
+        ? { textures: textureStats(world.textures) }
         : world.textureError !== undefined
           ? { textures: { error: world.textureError } }
           : {}),
@@ -509,6 +573,7 @@ export function createSceneServer(options: SceneServerOptions) {
     loadRegion,
     loadDiscoveries,
     loadTextureAtlas,
+    loadTextureNotices,
     getRevision,
     getSnapshotRevision: getRevision,
     prewarm,
@@ -517,13 +582,25 @@ export function createSceneServer(options: SceneServerOptions) {
   };
 }
 
-function worldTextures(textures: SceneTextures): WorldTextures {
+function textureStats(textures: SceneTextures): TextureStats {
+  const atlas = textures.ready;
+  const base = { revision: textures.revision, packs: textures.packs };
+  if (atlas === undefined) {
+    return textures.error === undefined
+      ? { ...base, state: "not-built" }
+      : { ...base, state: "failed", error: textures.error };
+  }
   return {
-    fingerprint: textures.fingerprint,
-    tileSize: textures.tileSize,
-    tiles: textures.tiles,
-    gpuBytes: textures.gpuBytes,
-    packs: textures.packs,
+    ...base,
+    state: "stored",
+    atlas: {
+      tileSize: atlas.tileSize,
+      tiles: atlas.tiles,
+      gpuBytes: atlas.gpuBytes,
+      bytes: atlas.bytes.byteLength,
+      gzipBytes: atlas.gzip.byteLength,
+      brotliBytes: atlas.brotli.byteLength,
+    },
   };
 }
 

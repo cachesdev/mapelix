@@ -233,10 +233,11 @@ describe("scene server", () => {
     await server.close();
   });
 
-  it("serves the atlas of its resource packs, keeps it on disk and lists the packs", async () => {
-    const pack = join(root, "pack.mcpack");
+  it("serves the atlas of a stack folder, built once on demand, and lists the packs", async () => {
+    const stack = join(root, "stack");
+    await mkdir(stack);
     await writeFile(
-      pack,
+      join(stack, "pack.mcpack"),
       makeZip(
         packFiles({
           name: "Synthetic",
@@ -248,35 +249,77 @@ describe("scene server", () => {
         }),
       ),
     );
+    await writeFile(
+      join(stack, "mapelix-stack.json"),
+      JSON.stringify({
+        format: "mapelix-texture-stack",
+        version: 1,
+        packs: [
+          { path: "pack.mcpack", uuid: "00000000-0000-4000-8000-0000000000c1", version: "1.2.3" },
+        ],
+      }),
+    );
     const events: string[] = [];
     const textured = {
       ...options,
-      resourcePacks: [pack],
+      textures: { stack },
       onEvent: (name: string) => void events.push(name),
     };
     const server = createSceneServer(textured);
     const metadata = await server.getWorldMetadata();
-    expect(metadata.textures).toMatchObject({
-      tileSize: 16,
-      tiles: 1,
+    expect(metadata.textures).toEqual({
+      revision: expect.stringMatching(/^[0-9a-f]{20}$/) as unknown,
       packs: [
         { name: "Synthetic", version: "1.2.3", uuid: "00000000-0000-4000-8000-0000000000c1" },
       ],
     });
-    const fingerprint = metadata.textures!.fingerprint;
-    const atlas = decodeTextureAtlas((await server.loadTextureAtlas(fingerprint))!);
+    const revision = metadata.textures!.revision;
+    expect(revision).not.toBe(metadata.revision);
+    // Opening reads the packs; the atlas waits for its first request, and cache-only never builds.
+    expect((await server.stats()).textures).toMatchObject({ revision, state: "not-built" });
+    expect(await server.loadTextureAtlas(revision, { cacheOnly: true })).toBeUndefined();
+    const loaded = (await server.loadTextureAtlas(revision))!;
+    const atlas = decodeTextureAtlas(loaded.bytes);
+    // The tile starts after its 4-pixel gutter, which repeats it.
+    const at = (4 * 24 + 4) * 4;
+    expect(Array.from(atlas.levels[0]!.subarray(at, at + 4))).toEqual([9, 8, 7, 255]);
     expect(Array.from(atlas.levels[0]!.subarray(0, 4))).toEqual([9, 8, 7, 255]);
+    expect(loaded.brotli.byteLength).toBeLessThan(loaded.bytes.byteLength);
+    expect(await server.loadTextureNotices(revision)).toEqual([
+      {
+        pack: expect.objectContaining({ name: "Synthetic" }) as unknown,
+        files: ["textures/blocks/stone.png"],
+      },
+    ]);
     expect(await server.loadTextureAtlas("0".repeat(20))).toBeUndefined();
-    expect((await server.stats()).textures).toMatchObject({ fingerprint });
+    expect((await server.stats()).textures).toMatchObject({
+      revision,
+      state: "stored",
+      atlas: {
+        tileSize: 16,
+        tiles: 1,
+        gpuBytes: atlas.levels.reduce((s, l) => s + l.byteLength, 0),
+      },
+    });
     await server.close();
-    expect(events).toContain("textures.built");
+    expect(events.filter((name) => name === "textures.built")).toHaveLength(1);
 
+    // A restart reads the stored atlas, which a cache-only request may then serve.
     const restarted = createSceneServer(textured);
-    expect((await restarted.getWorldMetadata()).textures?.fingerprint).toBe(fingerprint);
+    expect((await restarted.getWorldMetadata()).textures?.revision).toBe(revision);
+    expect(await restarted.loadTextureAtlas(revision, { cacheOnly: true })).toBeDefined();
     await restarted.close();
     expect(events).toContain("textures.cache-hit");
 
-    // Without packs the metadata does not change at all.
+    // Another stack is another revision; the old atlas leaves the disk.
+    const other = createSceneServer({ ...textured, textures: { stack, maxTileSize: 8 } });
+    const changed = (await other.getWorldMetadata()).textures!.revision;
+    expect(changed).not.toBe(revision);
+    expect(await readdir(join(options.cacheDirectory, "textures", "atlas-v2"))).toEqual([]);
+    await other.close();
+    expect(events).toContain("textures.cache-removed");
+
+    // Without a stack the metadata does not change at all.
     const plain = createSceneServer(options);
     expect(await plain.getWorldMetadata()).not.toHaveProperty("textures");
     await plain.close();
@@ -285,7 +328,8 @@ describe("scene server", () => {
   it("serves the world untextured when a pack cannot be read, and says why", async () => {
     const broken = join(root, "broken.zip");
     await writeFile(broken, "not a zip");
-    const server = createSceneServer({ ...options, resourcePacks: [broken] });
+    const server = createSceneServer({ ...options, textures: { packs: [broken] } });
+
     expect(await server.getWorldMetadata()).not.toHaveProperty("textures");
     expect((await server.stats()).textures).toEqual({
       error: expect.stringMatching(/broken\.zip: is not a zip archive/) as unknown,

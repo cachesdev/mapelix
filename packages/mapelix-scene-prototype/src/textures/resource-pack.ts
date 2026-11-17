@@ -1,8 +1,15 @@
 import { createHash } from "node:crypto";
 
 import { openPackFiles, packSubfolder, type PackFiles } from "./pack-files.js";
-import { IMAGE_EXTENSIONS, decodePackImage, parsePackJson, type PackImage } from "./pack-image.js";
+import {
+  IMAGE_EXTENSIONS,
+  decodePackImage,
+  packImageSize,
+  parsePackJson,
+  type PackImage,
+} from "./pack-image.js";
 import { ResourcePackError, packLimits, type PackLimits } from "./pack-limits.js";
+import { readStackFile } from "./stack-file.js";
 
 /** What a pack says about itself in `manifest.json`, for the host to show. */
 export interface ResourcePackInfo {
@@ -216,6 +223,38 @@ function blockFaces(value: unknown): BlockTextureNames | undefined {
   };
 }
 
+/** The version of the texture pipeline; part of every stack and pack fingerprint. */
+export const TEXTURE_PIPELINE_VERSION = 2;
+
+const PACK_JSON = [
+  "manifest.json",
+  "blocks.json",
+  "textures/terrain_texture.json",
+  "textures/flipbook_textures.json",
+] as const;
+
+/**
+ * Names one pack's content: its manifest, its block JSON files and every PNG and TGA image it
+ * holds. A host may pin it in `mapelix-stack.json`; `validateTextureStack` reports it.
+ */
+export async function packFingerprint(pack: ResourcePack): Promise<string> {
+  const hash = createHash("sha256");
+  hash.update(`mapelix-texture-pack-v${TEXTURE_PIPELINE_VERSION}\n`);
+  hash.update(`${pack.info.uuid}\0${pack.info.version}\0${pack.info.name}\n`);
+  const paths = [...pack.files.sizes.keys()]
+    .filter(
+      (path) =>
+        (PACK_JSON as readonly string[]).includes(path) ||
+        IMAGE_EXTENSIONS.some((extension) => path.endsWith(extension)),
+    )
+    .sort();
+  for (const path of paths) hash.update(`${path}\0${await pack.files.digest(path)}\n`);
+  return hash.digest("hex").slice(0, 20);
+}
+
+/** Where a stack's packs come from: a stack folder with `mapelix-stack.json`, or a list. */
+export type TextureStackSource = { readonly stack: string } | { readonly packs: readonly string[] };
+
 /** Packs in priority order, as Bedrock stacks them: what the first lacks comes from the next. */
 export interface ResourcePackStack {
   /** Highest priority first. */
@@ -225,22 +264,70 @@ export interface ResourcePackStack {
   terrainEntry(name: string): TerrainEntry | undefined;
   blockTextures(block: string): BlockTextureNames | undefined;
   flipbook(name: string): Flipbook | undefined;
+  /** The pack and file an image path (no extension) resolves to. */
+  locateImage(path: string): { readonly pack: ResourcePack; readonly file: string } | undefined;
+  /** Reads only the header of the image at `path`. */
+  readImageSize(
+    path: string,
+  ): Promise<{ readonly width: number; readonly height: number } | undefined>;
   /** Decodes the image at `path` (no extension) from the first pack holding it. */
   readImage(path: string): Promise<PackImage | undefined>;
 }
 
-/** The version of the texture pipeline; part of every stack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 1;
-
 export async function openResourcePackStack(
-  sources: readonly string[],
+  source: TextureStackSource | readonly string[],
   overrides: Partial<PackLimits> = {},
 ): Promise<ResourcePackStack> {
-  if (sources.length === 0) throw new RangeError("A resource pack stack needs at least one pack");
-  if (sources.length > 32) throw new RangeError("A resource pack stack holds at most 32 packs");
   const limits = packLimits(overrides);
+  const entries =
+    "stack" in source
+      ? await readStackFile(source.stack, limits)
+      : ("packs" in source ? source.packs : (source as readonly string[])).map((path) => ({
+          source: path,
+        }));
+  if (entries.length === 0) throw new RangeError("A resource pack stack needs at least one pack");
+  if (entries.length > limits.maxPacks) {
+    throw new RangeError(`A resource pack stack holds at most ${limits.maxPacks} packs`);
+  }
   const packs: ResourcePack[] = [];
-  for (const source of sources) packs.push(await openResourcePack(source, limits));
+  let files = 0;
+  let bytes = 0;
+  for (const entry of entries) {
+    const pack = await openResourcePack(entry.source, limits);
+    files += pack.files.sizes.size;
+    for (const size of pack.files.sizes.values()) bytes += size;
+    if (files > limits.maxStackEntries) {
+      throw new ResourcePackError(
+        pack.files.label,
+        `brings the stack over ${limits.maxStackEntries} files`,
+      );
+    }
+    if (bytes > limits.maxStackBytes) {
+      throw new ResourcePackError(
+        pack.files.label,
+        `brings the stack over ${limits.maxStackBytes} bytes`,
+      );
+    }
+    if ("uuid" in entry) {
+      const listed = entry as { uuid: string; version: string; fingerprint?: string; path: string };
+      if (pack.info.uuid !== listed.uuid || pack.info.version !== listed.version) {
+        throw new ResourcePackError(
+          pack.files.label,
+          `is ${pack.info.uuid} ${pack.info.version}, but mapelix-stack.json lists ${listed.uuid} ${listed.version}`,
+        );
+      }
+      if (listed.fingerprint !== undefined) {
+        const actual = await packFingerprint(pack);
+        if (actual !== listed.fingerprint) {
+          throw new ResourcePackError(
+            pack.files.label,
+            `has fingerprint ${actual}, but mapelix-stack.json pins ${listed.fingerprint}`,
+          );
+        }
+      }
+    }
+    packs.push(pack);
+  }
 
   const first = <T>(lookup: (pack: ResourcePack) => T | undefined): T | undefined => {
     for (const pack of packs) {
@@ -262,12 +349,8 @@ export async function openResourcePackStack(
   hash.update(`mapelix-texture-stack-v${TEXTURE_PIPELINE_VERSION}\n`);
   for (const pack of packs) {
     hash.update(`pack\0${pack.info.uuid}\0${pack.info.version}\0${pack.info.name}\n`);
-    for (const path of ["manifest.json", "blocks.json", "textures/terrain_texture.json"]) {
+    for (const path of PACK_JSON) {
       if (pack.files.sizes.has(path)) hash.update(`${path}\0${await pack.files.digest(path)}\n`);
-    }
-    if (pack.files.sizes.has("textures/flipbook_textures.json")) {
-      const path = "textures/flipbook_textures.json";
-      hash.update(`${path}\0${await pack.files.digest(path)}\n`);
     }
   }
   // Every image the merged stack can use: a terrain entry or flipbook comes from the first pack
@@ -290,20 +373,33 @@ export async function openResourcePackStack(
   }
   const fingerprint = hash.digest("hex").slice(0, 20);
 
+  const imageError = (found: { pack: ResourcePack; file: string }, error: unknown): never => {
+    if (error instanceof ResourcePackError) throw error;
+    throw new ResourcePackError(found.pack.files.label, (error as Error).message, found.file);
+  };
   return {
     packs,
     fingerprint,
     terrainEntry: (name) => first((pack) => pack.terrain.get(name)),
     blockTextures: (block) => first((pack) => pack.blocks.get(block.replace(/^minecraft:/, ""))),
     flipbook: (name) => first((pack) => pack.flipbooks.get(name)),
+    locateImage: locate,
+    readImageSize: async (path) => {
+      const found = locate(path);
+      if (found === undefined) return undefined;
+      try {
+        return packImageSize(await found.pack.files.read(found.file), found.file, limits);
+      } catch (error) {
+        return imageError(found, error);
+      }
+    },
     readImage: async (path) => {
       const found = locate(path);
       if (found === undefined) return undefined;
-      const bytes = await found.pack.files.read(found.file);
       try {
-        return decodePackImage(bytes, found.file, limits);
+        return decodePackImage(await found.pack.files.read(found.file), found.file, limits);
       } catch (error) {
-        throw new ResourcePackError(found.pack.files.label, (error as Error).message, found.file);
+        return imageError(found, error);
       }
     },
   };

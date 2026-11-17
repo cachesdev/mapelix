@@ -10,6 +10,7 @@ export {
   IMAGE_EXTENSIONS,
   decodePackImage,
   decodeTga,
+  packImageSize,
   parsePackJson,
   type PackImage,
 } from "./pack-image.js";
@@ -18,6 +19,8 @@ export {
   TEXTURE_PIPELINE_VERSION,
   openResourcePack,
   openResourcePackStack,
+  packFingerprint,
+  type TextureStackSource,
   type BlockFace,
   type BlockTextureNames,
   type Flipbook,
@@ -40,7 +43,17 @@ export {
   DEFAULT_ATLAS_OPTIONS,
   buildTextureAtlas,
   textureNames,
+  textureRevision,
   type BuiltTextureAtlas,
+  type TextureNotice,
   type TextureAtlasOptions,
   type TextureIndex,
 } from "./texture-atlas.js";
+export {
+  STACK_FILE,
+  STACK_FILE_FORMAT,
+  STACK_FILE_VERSION,
+  readStackFile,
+  type StackFileEntry,
+} from "./stack-file.js";
+export { bytesAccess, type RandomAccess } from "./pack-files.js";

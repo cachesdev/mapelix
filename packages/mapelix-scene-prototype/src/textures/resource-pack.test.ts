@@ -13,7 +13,7 @@ import {
 } from "../../test/synthetic-pack.js";
 import { decodeTga, parsePackJson } from "./pack-image.js";
 import { DEFAULT_PACK_LIMITS, ResourcePackError, packPath } from "./pack-limits.js";
-import { openResourcePackStack } from "./resource-pack.js";
+import { openResourcePackStack, packFingerprint } from "./resource-pack.js";
 
 let root: string;
 beforeEach(async () => {
@@ -265,7 +265,7 @@ describe("resource pack stack", () => {
     }
   });
 
-  it("ignores links that lead out of a folder pack", async () => {
+  it("refuses a folder pack holding a link, and a pack that is a link", async () => {
     const folder = join(root, "linked");
     await writePackFolder(folder, packFiles(base));
     const outside = join(root, "secret");
@@ -273,12 +273,91 @@ describe("resource pack stack", () => {
     await writeFile(join(outside, "stone_secret.png"), blue);
     try {
       await symlink(outside, join(folder, "textures", "outside"), "junction");
+      await symlink(outside, join(root, "alias"), "junction");
     } catch {
       return; // This system does not let tests create links.
     }
-    const stack = await openResourcePackStack([folder]);
-    expect(stack.packs[0]!.files.sizes.has("textures/outside/stone_secret.png")).toBe(false);
-    expect(await stack.readImage("textures/outside/stone_secret")).toBeUndefined();
+    await expect(openResourcePackStack([folder])).rejects.toThrow(
+      /linked \(textures\/outside\): holds a link/,
+    );
+    await expect(openResourcePackStack([join(root, "alias")])).rejects.toThrow(/is a link/);
+  });
+
+  it("opens a stack folder in the order of mapelix-stack.json and checks what it lists", async () => {
+    const stackFolder = join(root, "stack");
+    await mkdir(join(stackFolder, "packs"), { recursive: true });
+    const top = packFiles({
+      name: "Top",
+      uuid: "00000000-0000-4000-8000-0000000000a1",
+      version: [2, 0, 0],
+      terrain: { stone: { textures: "textures/blocks/stone_top" } },
+      images: { "textures/blocks/stone_top.png": blue },
+    });
+    await writePackFolder(join(stackFolder, "packs", "top"), top);
+    await writeFile(join(stackFolder, "base.mcpack"), makeZip(packFiles(base)));
+    const write = (packs: unknown[], extra: Record<string, unknown> = {}): Promise<void> =>
+      writeFile(
+        join(stackFolder, "mapelix-stack.json"),
+        JSON.stringify({ format: "mapelix-texture-stack", version: 1, packs, ...extra }),
+      );
+    const topEntry = {
+      path: "packs/top",
+      uuid: "00000000-0000-4000-8000-0000000000A1",
+      version: "2.0.0",
+    };
+    const baseEntry = { path: "base.mcpack", uuid: base.uuid, version: "1.0.0" };
+    await write([topEntry, baseEntry]);
+    const stack = await openResourcePackStack({ stack: stackFolder });
+    expect(stack.packs.map((pack) => pack.info.name)).toEqual(["Top", "Base"]);
+    expect(stack.terrainEntry("stone")?.textures[0]?.path).toBe("textures/blocks/stone_top");
+    expect(stack.fingerprint).toBe(
+      (
+        await openResourcePackStack([
+          join(stackFolder, "packs", "top"),
+          join(stackFolder, "base.mcpack"),
+        ])
+      ).fingerprint,
+    );
+
+    // A pinned fingerprint must match the pack.
+    const pinned = await packFingerprint(stack.packs[1]!);
+    expect(pinned).toMatch(/^[0-9a-f]{20}$/);
+    await write([topEntry, { ...baseEntry, fingerprint: pinned }]);
+    await expect(openResourcePackStack({ stack: stackFolder })).resolves.toBeDefined();
+
+    const cases: [unknown[], RegExp, Record<string, unknown>?][] = [
+      [[topEntry, { ...baseEntry, fingerprint: "0".repeat(20) }], /pins 0{20}/],
+      [[{ ...topEntry, version: "2.0.1" }], /lists 00000000-0000-4000-8000-0000000000a1 2\.0\.1/],
+      [[{ ...topEntry, path: "../outside" }], /path is unsafe/],
+      [[{ ...topEntry, path: "/etc" }], /path is unsafe/],
+      [[{ ...topEntry, path: "packs\\top" }], /path is unsafe/],
+      [[{ ...topEntry, path: "missing" }], /missing is missing/],
+      [[topEntry, topEntry], /same pack twice/],
+      [[{ ...topEntry, uuid: "nope" }], /uuid is not a UUID/],
+      [[], /lists no packs/],
+      [[topEntry], /reads 1/, { version: 2 }],
+      [[topEntry], /format/, { format: "other" }],
+    ];
+    for (const [packs, message, extra] of cases) {
+      await write(packs, extra);
+      await expect(openResourcePackStack({ stack: stackFolder }), String(message)).rejects.toThrow(
+        message,
+      );
+    }
+    await write(Array.from({ length: 3 }, () => topEntry));
+    await expect(openResourcePackStack({ stack: stackFolder }, { maxPacks: 2 })).rejects.toThrow(
+      /more than 2 packs/,
+    );
+    await writeFile(join(stackFolder, "mapelix-stack.json"), "{ nope");
+    await expect(openResourcePackStack({ stack: stackFolder })).rejects.toThrow(/not valid JSON/);
+    await expect(openResourcePackStack({ stack: join(root, "none") })).rejects.toThrow(
+      /is missing/,
+    );
+    // The whole stack is bounded too.
+    await write([topEntry, baseEntry]);
+    await expect(
+      openResourcePackStack({ stack: stackFolder }, { maxStackEntries: 6 }),
+    ).rejects.toThrow(/over 6 files/);
   });
 });
 

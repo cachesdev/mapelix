@@ -16,26 +16,56 @@ export interface PackFiles {
   digest(path: string): Promise<string>;
 }
 
-/** Opens a folder, or a zip or `.mcpack` file, as the files of one pack. */
+/** Bytes that can be read at any offset, so an archive is never held whole in memory. */
+export interface RandomAccess {
+  readonly size: number;
+  read(offset: number, length: number): Promise<Uint8Array>;
+}
+
+/** Random access to bytes already in memory. */
+export function bytesAccess(bytes: Uint8Array): RandomAccess {
+  return {
+    size: bytes.byteLength,
+    read: async (offset, length) =>
+      bytes.subarray(offset, Math.min(bytes.byteLength, offset + length)),
+  };
+}
+
+/** Random access to a file, opened for each read; a file that changes size is refused. */
+function fileAccess(path: string, size: number, label: string): RandomAccess {
+  return {
+    size,
+    read: async (offset, length) => {
+      const handle = await open(path, "r");
+      try {
+        if ((await handle.stat()).size !== size) {
+          throw new ResourcePackError(label, "changed while the pack was open");
+        }
+        const bytes = new Uint8Array(Math.max(0, Math.min(length, size - offset)));
+        const { bytesRead } = await handle.read(bytes, 0, bytes.byteLength, offset);
+        return bytes.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
+    },
+  };
+}
+
+/**
+ * Opens a folder, or a zip or `.mcpack` file, as the files of one pack. Links are refused, the
+ * pack itself included, so nothing outside the given path is ever read.
+ */
 export async function openPackFiles(source: string, limits: PackLimits): Promise<PackFiles> {
   const label = basename(source);
   const details = await lstat(source).catch(() => undefined);
   if (details === undefined) throw new ResourcePackError(label, "is missing");
+  if (details.isSymbolicLink()) throw new ResourcePackError(label, "is a link, which is refused");
   if (details.isDirectory()) return openFolder(source, label, limits);
   if (!details.isFile()) throw new ResourcePackError(label, "is neither a folder nor a file");
   if (details.size > limits.maxArchiveBytes) {
     throw new ResourcePackError(label, `is larger than ${limits.maxArchiveBytes} bytes`);
   }
-  const handle = await open(source, "r");
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(details.size);
-    const { bytesRead } = await handle.read(bytes, 0, details.size, 0);
-    if (bytesRead !== details.size) throw new ResourcePackError(label, "changed while read");
-  } finally {
-    await handle.close();
-  }
-  return openZip(bytes, label, limits);
+  return openZip(fileAccess(source, details.size, label), label, limits);
 }
 
 /** Restricts `files` to the folder `prefix` inside it (`a/b`), which becomes the root. */
@@ -65,9 +95,11 @@ async function openFolder(root: string, label: string, limits: PackLimits): Prom
       if (entries > limits.maxEntries) {
         throw new ResourcePackError(label, `has more than ${limits.maxEntries} entries`);
       }
-      // Links are never followed, so nothing outside the folder is reachable.
-      if (entry.isSymbolicLink()) continue;
       const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+      // A link could lead outside the folder: the whole pack is refused.
+      if (entry.isSymbolicLink()) {
+        throw new ResourcePackError(label, "holds a link, which is refused", relative);
+      }
       if (entry.isDirectory()) {
         await visit(join(directory, entry.name), relative);
       } else if (entry.isFile()) {
@@ -97,7 +129,7 @@ async function openFolder(root: string, label: string, limits: PackLimits): Prom
     }
     const file = join(root, ...path.split("/"));
     const details = await lstat(file);
-    if (!details.isFile() || details.size !== size) {
+    if (details.isSymbolicLink() || !details.isFile() || details.size !== size) {
       throw new ResourcePackError(label, "changed while the pack was open", path);
     }
     const handle = await open(file, "r");
@@ -133,59 +165,76 @@ const EOCD_SIGNATURE = 0x0605_4b50;
 const CENTRAL_SIGNATURE = 0x0201_4b50;
 const LOCAL_SIGNATURE = 0x0403_4b50;
 
-/** Reads a zip archive's directory. Only stored and deflated, unencrypted, non-ZIP64 entries. */
-export function openZip(bytes: Uint8Array, label: string, limits: PackLimits): PackFiles {
+/** Largest central directory read; 65,536 entries with long names fit well within it. */
+const MAX_DIRECTORY_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Reads a zip archive's directory, then each entry on demand: only the directory and the entry
+ * being read are in memory. Only stored and deflated, unencrypted, non-ZIP64 entries.
+ */
+export async function openZip(
+  source: Uint8Array | RandomAccess,
+  label: string,
+  limits: PackLimits,
+): Promise<PackFiles> {
+  const access = source instanceof Uint8Array ? bytesAccess(source) : source;
   const fail = (message: string, file?: string): never => {
     throw new ResourcePackError(label, message, file);
   };
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let eocd = -1;
-  for (let at = bytes.byteLength - 22; at >= Math.max(0, bytes.byteLength - 22 - 65_535); at--) {
+  const tailStart = Math.max(0, access.size - 22 - 65_535);
+  const tail = await access.read(tailStart, access.size - tailStart);
+  const view = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  let end = -1;
+  for (let at = tail.byteLength - 22; at >= 0; at--) {
     if (view.getUint32(at, true) === EOCD_SIGNATURE) {
-      eocd = at;
+      end = at;
       break;
     }
   }
-  if (eocd < 0) fail("is not a zip archive or a folder");
-  if (view.getUint16(eocd + 4, true) !== 0 || view.getUint16(eocd + 6, true) !== 0) {
+  if (end < 0) fail("is not a zip archive or a folder");
+  const eocd = tailStart + end;
+  if (view.getUint16(end + 4, true) !== 0 || view.getUint16(end + 6, true) !== 0) {
     fail("spans several disks");
   }
-  const count = view.getUint16(eocd + 10, true);
-  const directorySize = view.getUint32(eocd + 12, true);
-  const directoryOffset = view.getUint32(eocd + 16, true);
+  const count = view.getUint16(end + 10, true);
+  const directorySize = view.getUint32(end + 12, true);
+  const directoryOffset = view.getUint32(end + 16, true);
   if (count === 0xffff || directoryOffset === 0xffff_ffff || directorySize === 0xffff_ffff) {
     fail("uses ZIP64, which is not supported");
   }
   if (count > limits.maxEntries) fail(`has more than ${limits.maxEntries} entries`);
   if (directoryOffset + directorySize > eocd) fail("has a central directory outside the file");
+  if (directorySize > MAX_DIRECTORY_BYTES) fail("has a central directory too large to read");
+  const directory = await access.read(directoryOffset, directorySize);
+  const listing = new DataView(directory.buffer, directory.byteOffset, directory.byteLength);
 
   const entries = new Map<string, ZipEntry>();
   const sizes = new Map<string, number>();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let total = 0;
-  let at = directoryOffset;
+  let at = 0;
   for (let index = 0; index < count; index++) {
-    if (at + 46 > eocd || view.getUint32(at, true) !== CENTRAL_SIGNATURE) {
+    if (at + 46 > directory.byteLength || listing.getUint32(at, true) !== CENTRAL_SIGNATURE) {
       fail("has a damaged central directory");
     }
-    const flags = view.getUint16(at + 8, true);
-    const method = view.getUint16(at + 10, true);
-    const crc = view.getUint32(at + 16, true);
-    const compressedSize = view.getUint32(at + 20, true);
-    const size = view.getUint32(at + 24, true);
-    const nameLength = view.getUint16(at + 28, true);
-    const extraLength = view.getUint16(at + 30, true);
-    const commentLength = view.getUint16(at + 32, true);
-    const localOffset = view.getUint32(at + 42, true);
-    const end = at + 46 + nameLength + extraLength + commentLength;
-    if (end > eocd) fail("has a damaged central directory");
+    const flags = listing.getUint16(at + 8, true);
+    const method = listing.getUint16(at + 10, true);
+    const crc = listing.getUint32(at + 16, true);
+    const compressedSize = listing.getUint32(at + 20, true);
+    const size = listing.getUint32(at + 24, true);
+    const nameLength = listing.getUint16(at + 28, true);
+    const extraLength = listing.getUint16(at + 30, true);
+    const commentLength = listing.getUint16(at + 32, true);
+    const localOffset = listing.getUint32(at + 42, true);
+    const next = at + 46 + nameLength + extraLength + commentLength;
+    if (next > directory.byteLength) fail("has a damaged central directory");
     let raw: string;
     try {
-      raw = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
+      raw = decoder.decode(directory.subarray(at + 46, at + 46 + nameLength));
     } catch {
       raw = fail("has a file name that is not UTF-8");
     }
-    at = end;
+    at = next;
     let path: string | undefined;
     try {
       path = packPath(raw);
@@ -212,13 +261,15 @@ export function openZip(bytes: Uint8Array, label: string, limits: PackLimits): P
     if (entry.size > limits.maxFileBytes) {
       fail(`is larger than ${limits.maxFileBytes} bytes`, path);
     }
-    const local = entry.localOffset;
-    if (local + 30 > bytes.byteLength || view.getUint32(local, true) !== LOCAL_SIGNATURE) {
+    const header = await access.read(entry.localOffset, 30);
+    const fields = new DataView(header.buffer, header.byteOffset, header.byteLength);
+    if (header.byteLength < 30 || fields.getUint32(0, true) !== LOCAL_SIGNATURE) {
       fail("has a damaged local header", path);
     }
-    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
-    if (start + entry.compressedSize > bytes.byteLength) fail("is truncated", path);
-    const data = bytes.subarray(start, start + entry.compressedSize);
+    const start = entry.localOffset + 30 + fields.getUint16(26, true) + fields.getUint16(28, true);
+    if (start + entry.compressedSize > access.size) fail("is truncated", path);
+    const data = await access.read(start, entry.compressedSize);
+    if (data.byteLength !== entry.compressedSize) fail("is truncated", path);
     let content: Uint8Array;
     if (entry.method === 0) {
       if (entry.compressedSize !== entry.size) fail("has inconsistent sizes", path);

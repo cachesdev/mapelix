@@ -8,6 +8,7 @@ import { encodePng } from "@mapelix/prototype/png";
 import { makePng, makeZip, packFiles } from "../../test/synthetic-pack.js";
 import {
   ATLAS_HEADER_BYTES,
+  MAX_ATLAS_SIDE,
   decodeTextureAtlas,
   packQuadTexture,
   unpackQuadTexture,
@@ -117,11 +118,43 @@ describe("texture atlas", () => {
     expect(big.coverage).toBe(191);
     expect(atlas.tiles[index.tiles["textures/blocks/stone"]!]!.average).toBe(0x646e78);
 
-    // Each mip level halves the tiles; the last holds one pixel per tile.
-    expect(atlas.levels).toHaveLength(5);
-    const last = atlas.levels[4]!;
+    // Each mip level halves the cells, down to 4-pixel tiles with a 1-pixel gutter.
+    expect(atlas.levels).toHaveLength(3);
     const stone = index.tiles["textures/blocks/stone"]!;
-    expect(Array.from(last.subarray(stone * 4, stone * 4 + 4))).toEqual([100, 110, 120, 255]);
+    const last = atlas.levels[2]!;
+    const lastWidth = atlas.columns * 6;
+    const at =
+      (((stone / atlas.columns) | 0) * 6 + 3) * lastWidth + (stone % atlas.columns) * 6 + 3;
+    expect(Array.from(last.subarray(at * 4, at * 4 + 4))).toEqual([100, 110, 120, 255]);
+
+    // The gutter repeats the tile: left of the tile is its right edge, above it its bottom row.
+    const width = atlas.columns * 24;
+    const pixel = (tile: number, x: number, y: number): number[] => {
+      const offset =
+        ((((tile / atlas.columns) | 0) * 24 + 4 + y) * width +
+          (tile % atlas.columns) * 24 +
+          4 +
+          x) *
+        4;
+      return Array.from(atlas.levels[0]!.subarray(offset, offset + 4));
+    };
+    const bigTile = index.tiles["textures/blocks/big"]!;
+    expect(pixel(bigTile, -1, 0)).toEqual(pixel(bigTile, 15, 0));
+    expect(pixel(bigTile, -4, -4)).toEqual(pixel(bigTile, 12, 12));
+    expect(pixel(bigTile, 16, 19)).toEqual(pixel(bigTile, 0, 3));
+    expect(pixel(bigTile, 0, 0)).toEqual([255, 0, 0, 255]);
+    expect(pixel(bigTile, -1, 0)).toEqual([0, 0, 255, 255]);
+    expect(built.notices).toEqual([
+      {
+        pack: expect.objectContaining({ name: "Synthetic pack" }) as unknown,
+        files: [
+          "textures/blocks/big.png",
+          "textures/blocks/grass_top.png",
+          "textures/blocks/stone.png",
+          "textures/blocks/water.png",
+        ],
+      },
+    ]);
     expect(built.gpuBytes).toBe(atlas.levels.reduce((sum, level) => sum + level.byteLength, 0));
 
     // The index resolves blocks the way a region builder will.
@@ -163,11 +196,33 @@ describe("texture atlas", () => {
   it("shrinks tiles to the requested size and budget", async () => {
     const stack = await stackOf();
     const small = await buildTextureAtlas(stack, { maxTileSize: 8 });
+    expect(small.atlas.levels).toHaveLength(2);
     expect(small.atlas.tileSize).toBe(8);
     expect(small.fingerprint).not.toBe((await buildTextureAtlas(stack)).fingerprint);
-    const tight = await buildTextureAtlas(stack, { budgetBytes: 2000 });
-    expect(tight.gpuBytes).toBeLessThanOrEqual(2000);
+    const tight = await buildTextureAtlas(stack, { budgetBytes: 3000 });
+    expect(tight.gpuBytes).toBeLessThanOrEqual(3000);
     expect(tight.atlas.tileSize).toBeLessThan(16);
+    await expect(buildTextureAtlas(stack, { budgetBytes: 100 })).rejects.toThrow(/budget/);
+    await expect(buildTextureAtlas(stack, { maxTileSize: 2 })).rejects.toThrow(/from 4 to 256/);
+  });
+
+  it("shrinks high-resolution tiles until the atlas fits the side every device samples", async () => {
+    const images: Record<string, Uint8Array> = {};
+    const terrain: Record<string, { textures: string }> = {};
+    const blocks: Record<string, { textures: string }> = {};
+    for (let index = 0; index < 500; index++) {
+      images[`textures/blocks/hd_${index}.png`] = makePng(64, [index % 256, 0, 0, 255]);
+      terrain[`hd_${index}`] = { textures: `textures/blocks/hd_${index}` };
+      blocks[`hd_${index}`] = { textures: `hd_${index}` };
+    }
+    const path = join(root, "hd.zip");
+    await writeFile(path, makeZip(packFiles({ terrain, blocks, images })));
+    const built = await buildTextureAtlas(await openResourcePackStack([path]), {
+      maxTileSize: 64,
+    });
+    // 23 columns of 96-pixel cells would be 2208 pixels wide; 48-pixel cells fit in 2048.
+    expect(built.atlas.tileSize).toBe(32);
+    expect(built.atlas.columns * 48).toBeLessThanOrEqual(MAX_ATLAS_SIDE);
   });
 
   it("packs a quad texture word", () => {

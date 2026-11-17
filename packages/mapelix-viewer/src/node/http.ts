@@ -92,9 +92,12 @@ type Admit = (buildable: boolean) => Admission;
 
 /**
  * Serves the 3D viewer endpoints below `base`: `world.json`, `regions/<level>/<x>/<z>`,
- * `discoveries/<x>/<z>.bin` and, with resource packs, `textures/<fingerprint>.bin`, each with the scene context in the query string. A request outside
- * the stored world gets an empty payload (`x-mapelix-cache: empty`), too many waiting builds a
- * 503 with `retry-after`, and a missing world a 503.
+ * `discoveries/<x>/<z>.bin` and, with a texture stack, `textures/<revision>/atlas.bin` and
+ * `textures/<revision>/notices.json`; regions and discoveries take the scene context in the
+ * query string. A request outside the stored world gets an empty payload
+ * (`x-mapelix-cache: empty`), too many waiting builds a 503 with `retry-after`, and a missing
+ * world a 503.
+
  */
 export function createSceneHandler(
   server: SceneServer,
@@ -137,30 +140,63 @@ export function createSceneHandler(
         return refusal(request, cause);
       }
     }
-    const atlas = /^\/textures\/([0-9a-f]{20})\.bin$/.exec(path);
-    if (atlas !== null) {
-      let bytes: Uint8Array | undefined;
-      try {
-        bytes = await server.loadTextureAtlas(atlas[1]!);
-      } catch (cause) {
-        return refusal(request, cause);
-      }
-      if (bytes === undefined) return failure(404, "No such texture atlas");
-      const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      return new Response(body as ArrayBuffer, {
-        headers: {
-          "content-type": "application/octet-stream",
-          // The fingerprint names the content, so the atlas never changes in place.
-          "cache-control": "public, max-age=31536000, immutable",
-        },
-      });
-    }
+    const texture = /^\/textures\/([0-9a-f]{20})\/(atlas\.bin|notices\.json)$/.exec(path);
+    if (texture !== null) return textureResponse(server, request, texture, options);
     const region = /^\/regions\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
     if (region !== null) return regionResponse(server, request, url, region, admit);
     const discovery = /^\/discoveries\/([^/]+)\/([^/]+)\.bin$/.exec(path);
     if (discovery !== null) return discoveryResponse(server, request, url, discovery, admit);
     return undefined;
   };
+}
+
+const IMMUTABLE = "public, max-age=31536000, immutable";
+
+/**
+ * The atlas of a texture revision, Brotli- or gzip-encoded when the client accepts it, and the
+ * notices of the packs and files it was made of. The revision names the content, so neither
+ * ever changes in place. A cache-only handler never builds the atlas: 404 until it is stored.
+ */
+async function textureResponse(
+  server: SceneServer,
+  request: Request,
+  [, revision, file]: RegExpExecArray,
+  options: SceneHandlerOptions,
+): Promise<Response> {
+  let atlas;
+  try {
+    atlas = await server.loadTextureAtlas(revision!, { cacheOnly: options.cacheOnly === true });
+  } catch (cause) {
+    if (
+      cancelled(request, cause) ||
+      !(cause instanceof Error) ||
+      cause.name === "MissingWorldError"
+    )
+      return refusal(request, cause);
+    return failure(503, `Textures are unavailable: ${cause.message}`);
+  }
+  if (atlas === undefined) {
+    return Response.json(
+      { error: "not-cached", message: "No such texture atlas, or it is not built yet" },
+      { status: 404, headers: NO_STORE },
+    );
+  }
+  if (file === "notices.json") {
+    return Response.json(atlas.notices, { headers: { "cache-control": IMMUTABLE } });
+  }
+  const accepted = request.headers.get("accept-encoding") ?? "";
+  const encoding = /\bbr\b/.test(accepted) ? "br" : /\bgzip\b/.test(accepted) ? "gzip" : undefined;
+  const bytes = encoding === "br" ? atlas.brotli : encoding === "gzip" ? atlas.gzip : atlas.bytes;
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return new Response(request.method === "HEAD" ? null : (body as ArrayBuffer), {
+    headers: {
+      "content-type": "application/octet-stream",
+      "content-length": String(bytes.byteLength),
+      ...(encoding === undefined ? {} : { "content-encoding": encoding }),
+      vary: "accept-encoding",
+      "cache-control": IMMUTABLE,
+    },
+  });
 }
 
 /** Runs a load with an admission slot, and answers its refusals. */

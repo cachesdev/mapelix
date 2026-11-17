@@ -1,23 +1,33 @@
 /**
  * The texture atlas format shared by the Node atlas builder and the browser viewer.
  *
- * An atlas is one RGBA image of square tiles, `columns` wide and `rows` high, with a mipmap
- * chain down to one pixel per tile. Each tile is a texture, or one frame of an animated texture
- * whose frames follow it. Every level halves the tile size, so tiles never share a texel at any
- * level and a shader reads them with exact texel fetches, without bleeding.
+ * An atlas is one RGBA image of square cells, `columns` wide and `rows` high. Each cell holds a
+ * tile (a texture, or one frame of an animated texture whose frames follow it) surrounded by a
+ * gutter of a quarter tile on every side, copied from the opposite edge of the tile as if it
+ * repeated. A shader samples `gutter + fract(uv) * tileSize` inside the cell with explicit
+ * gradients: filtering and mipmaps near an edge read the gutter, which holds what a repeating
+ * texture shows there, never a neighbor.
+ *
+ * Mipmaps stop where the gutter is one texel wide, at 4-texel tiles; each level halves the
+ * cells, which stay aligned, so no level mixes two cells.
  *
  * Header (little-endian, 24 bytes): magic u32, version u16, tile size u16, columns u16,
- * rows u16, tiles u32, levels u16, reserved u16 and u32.
+ * rows u16, tiles u32, levels u16, gutter u16, reserved u32.
  * Then 8 bytes per tile: average color and coverage u32 (`0xCCRRGGBB`), frames u16, ticks per
  * frame u8, reserved u8. Then each level's pixels, largest first.
  */
 
 export const ATLAS_MAGIC = 0x3154_584d; // "MXT1" in little-endian byte order.
-export const ATLAS_FORMAT_VERSION = 1;
+export const ATLAS_FORMAT_VERSION = 2;
 export const ATLAS_HEADER_BYTES = 24;
 export const ATLAS_TILE_INFO_BYTES = 8;
-/** Largest atlas side; every WebGL 2 and WebGPU device of interest samples 4096 pixels. */
-export const MAX_ATLAS_SIDE = 4096;
+/**
+ * Largest atlas side: the texture size every WebGL 2 device must support (`MAX_TEXTURE_SIZE`
+ * is at least 2048; WebGPU guarantees 8192). Larger packs get smaller tiles.
+ */
+export const MAX_ATLAS_SIDE = 2048;
+/** Smallest tile side; the last mipmap level holds tiles this size. */
+export const MIN_ATLAS_TILE = 4;
 /** Tiles a quad texture word can address. */
 export const MAX_ATLAS_TILES = 1 << 14;
 
@@ -37,12 +47,23 @@ export interface TextureAtlas {
   readonly columns: number;
   readonly rows: number;
   readonly tiles: readonly AtlasTileInfo[];
-  /** RGBA pixels of each level, `columns * (tileSize >> level)` wide. */
+  /** RGBA pixels of each level, `columns * (atlasCellSize(tileSize) >> level)` wide. */
   readonly levels: readonly Uint8Array[];
 }
 
+/** Mipmap levels, down to 4-texel tiles with a 1-texel gutter. */
 export function atlasLevelCount(tileSize: number): number {
-  return Math.log2(tileSize) + 1;
+  return Math.log2(tileSize) - 1;
+}
+
+/** The gutter around each tile, a quarter tile. */
+export function atlasGutter(tileSize: number): number {
+  return tileSize / 4;
+}
+
+/** The side of a cell: the tile and its gutters. */
+export function atlasCellSize(tileSize: number): number {
+  return tileSize + 2 * atlasGutter(tileSize);
 }
 
 export function atlasLevelSize(
@@ -52,8 +73,8 @@ export function atlasLevelSize(
   width: number;
   height: number;
 } {
-  const tile = atlas.tileSize >> level;
-  return { width: atlas.columns * tile, height: atlas.rows * tile };
+  const cell = atlasCellSize(atlas.tileSize) >> level;
+  return { width: atlas.columns * cell, height: atlas.rows * cell };
 }
 
 /** GPU bytes of an atlas with its mipmaps. */
@@ -67,15 +88,11 @@ export function atlasBytes(atlas: Pick<TextureAtlas, "tileSize" | "columns" | "r
 }
 
 function checkShape(tileSize: number, columns: number, rows: number, tiles: number): void {
-  if (!Number.isInteger(Math.log2(tileSize)) || tileSize < 1 || tileSize > 256) {
-    throw new RangeError(`Atlas tile size ${tileSize} is not a power of two up to 256`);
+  if (!Number.isInteger(Math.log2(tileSize)) || tileSize < MIN_ATLAS_TILE || tileSize > 256) {
+    throw new RangeError(`Atlas tile size ${tileSize} is not a power of two from 4 to 256`);
   }
-  if (
-    columns < 1 ||
-    rows < 1 ||
-    columns * tileSize > MAX_ATLAS_SIDE ||
-    rows * tileSize > MAX_ATLAS_SIDE
-  ) {
+  const cell = atlasCellSize(tileSize);
+  if (columns < 1 || rows < 1 || columns * cell > MAX_ATLAS_SIDE || rows * cell > MAX_ATLAS_SIDE) {
     throw new RangeError(`Atlas of ${columns} by ${rows} tiles of ${tileSize} is too large`);
   }
   if (tiles < 1 || tiles > columns * rows || tiles > MAX_ATLAS_TILES) {
@@ -99,6 +116,7 @@ export function encodeTextureAtlas(atlas: TextureAtlas): Uint8Array {
   view.setUint16(10, rows, true);
   view.setUint32(12, tiles.length, true);
   view.setUint16(16, count, true);
+  view.setUint16(18, atlasGutter(tileSize), true);
   let offset = ATLAS_HEADER_BYTES;
   for (const tile of tiles) {
     view.setUint32(offset, ((tile.coverage << 24) | (tile.average & 0xff_ffff)) >>> 0, true);
@@ -129,8 +147,12 @@ export function decodeTextureAtlas(bytes: Uint8Array): TextureAtlas {
   const rows = view.getUint16(10, true);
   const count = view.getUint32(12, true);
   checkShape(tileSize, columns, rows, count);
-  if (view.getUint16(16, true) !== atlasLevelCount(tileSize))
-    throw new Error("Texture atlas has the wrong levels");
+  if (
+    view.getUint16(16, true) !== atlasLevelCount(tileSize) ||
+    view.getUint16(18, true) !== atlasGutter(tileSize)
+  ) {
+    throw new Error("Texture atlas has the wrong levels or gutter");
+  }
   const expected =
     ATLAS_HEADER_BYTES + count * ATLAS_TILE_INFO_BYTES + atlasBytes({ tileSize, columns, rows });
   if (bytes.byteLength !== expected) {

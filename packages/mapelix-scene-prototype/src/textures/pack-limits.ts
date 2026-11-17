@@ -18,8 +18,19 @@ export interface PackLimits {
   readonly maxImagePixels: number;
   /** Width or height of one decoded image. */
   readonly maxImageSide: number;
+  /** Packs in one stack. */
+  readonly maxPacks: number;
+  /** Files of every pack of a stack together. */
+  readonly maxStackEntries: number;
+  /** Uncompressed bytes of every pack of a stack together. */
+  readonly maxStackBytes: number;
 }
 
+/**
+ * Nothing a stack holds is kept in memory as a whole: archives are read entry by entry and
+ * images one at a time, so these bounds limit work and disk reads more than memory. Memory
+ * peaks at about one decoded image (`maxImagePixels` × 4 bytes) plus the atlas being built.
+ */
 export const DEFAULT_PACK_LIMITS: PackLimits = {
   maxArchiveBytes: 1024 * 1024 * 1024,
   maxEntries: 65_536,
@@ -28,6 +39,9 @@ export const DEFAULT_PACK_LIMITS: PackLimits = {
   maxCompressionRatio: 400,
   maxImagePixels: 4 * 1024 * 1024,
   maxImageSide: 8192,
+  maxPacks: 32,
+  maxStackEntries: 262_144,
+  maxStackBytes: 4096 * 1024 * 1024,
 };
 
 /** Entries smaller than this are too small for their ratio to matter. */
