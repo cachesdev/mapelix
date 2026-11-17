@@ -145,6 +145,10 @@ export class RegionService {
     if (textured && level !== 0) {
       throw new InvalidRegionError("Textured regions are level 0 only");
     }
+    const cutout = request.cutout === true;
+    if (cutout && !textured) {
+      throw new InvalidRegionError("Detailed cut-out regions need textures");
+    }
     const context = resolveContext(dimension, request);
     if (context.mode !== this.mode) {
       throw new InvalidRegionError(`This service builds ${this.mode} regions only`);
@@ -161,8 +165,9 @@ export class RegionService {
       };
     }
 
-    // Each vertical window cuts the geometry differently, so it is part of every key.
-    const key = regionCacheKey(context, { level, x, z });
+    // Each vertical window cuts the geometry differently, so it is part of every key; cut-out
+    // regions, which keep the faces between leaves, live under their own folder.
+    const key = `${cutout ? "cutout/" : ""}${regionCacheKey(context, { level, x, z })}`;
     const remembered = this.memory.get(key);
     if (remembered !== undefined) {
       return {
@@ -181,7 +186,7 @@ export class RegionService {
     // Surface builds keep their historical request shape; caves name the whole window.
     const build =
       context.mode === "surface"
-        ? { level, x, z, ceilingY: context.ceilingY }
+        ? { level, x, z, ceilingY: context.ceilingY, ...(cutout ? { cutout } : {}) }
         : {
             level,
             x,

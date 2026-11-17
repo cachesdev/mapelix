@@ -92,8 +92,9 @@ export function createSceneMaterials(atmosphere: Atmosphere, clip?: Node<"bool">
 }
 
 /**
- * Materials for textured regions. Terrain and plants draw the block textures near the camera;
- * lava, water and glass are the plain materials, shared.
+ * Materials for textured regions. Terrain and plants draw the block textures near the camera,
+ * terrain with its cut-out faces (see `TextureLook.cutoutMask`); lava, water and glass are the
+ * plain materials, shared.
  */
 export function createTexturedMaterials(
   atmosphere: Atmosphere,
@@ -102,9 +103,10 @@ export function createTexturedMaterials(
   clip?: Node<"bool">,
 ): SceneMaterials {
   const mask = look.plantMask(plantMask());
+  const terrainMask = clip ? look.cutoutMask().and(clip) : look.cutoutMask();
   return {
     ...plain,
-    terrain: withFading(createTerrainMaterial(atmosphere, look), clip),
+    terrain: withFading(createTerrainMaterial(atmosphere, look), terrainMask),
     plants: withFading(createPlantMaterial(atmosphere, look), clip ? mask.and(clip) : mask),
   };
 }

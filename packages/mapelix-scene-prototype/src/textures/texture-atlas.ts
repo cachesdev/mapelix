@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
+  isCutoutTile,
   ATLAS_FORMAT_VERSION,
   MAX_ATLAS_SIDE,
   MAX_ATLAS_TILES,
@@ -41,6 +42,8 @@ export interface TextureIndex {
   readonly tiles: Readonly<Record<string, number>>;
   readonly blocks: Readonly<Record<string, BlockTextureNames>>;
   readonly terrain: Readonly<Record<string, TerrainEntry>>;
+  /** Tiles with holes (`isCutoutTile`), ascending. */
+  readonly cutout: readonly number[];
 }
 
 /** Packs and files an atlas was made of, for attribution. */
@@ -263,7 +266,13 @@ export async function buildTextureAtlas(
     fingerprint,
     atlas,
     bytes: encodeTextureAtlas(atlas),
-    index: { fingerprint, tiles: tileOf, blocks, terrain },
+    index: {
+      fingerprint,
+      tiles: tileOf,
+      blocks,
+      terrain,
+      cutout: tiles.flatMap((tile, index) => (isCutoutTile(tile) ? [index] : [])),
+    },
     gpuBytes: atlasBytes(atlas),
     notices: stack.packs
       .filter((pack) => used.has(pack))

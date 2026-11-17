@@ -29,6 +29,7 @@ import type { SelectionTool } from "../three/selection-box.js";
 import type { AutoPerspective } from "../three/view-projection.js";
 import type { WeatherMode } from "../three/weather-layer.js";
 import type {
+  LeafMode,
   TextureMode,
   TextureState,
   WorldInfo,
@@ -72,6 +73,7 @@ export interface WorldSource {
     | "selection"
     | "onSelectionChange"
     | "textures"
+    | "leaves"
     | "textureBase"
     | "onTextureState"
   >;
@@ -93,6 +95,8 @@ export interface WorldSettings {
   readonly weather: WeatherMode;
   /** Block textures near the camera, when the server has them (default off). */
   readonly textures: TextureMode;
+  /** Textured leaves and other cut-out blocks: fast (default) or detailed. */
+  readonly leaves: LeafMode;
   /** Cave slices follow the camera depth. */
   readonly autoDepth: boolean;
   readonly discoveries: DiscoveryFilters;
@@ -110,6 +114,7 @@ export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
   clouds: true,
   weather: "clear",
   textures: "off",
+  leaves: "fast",
   autoDepth: true,
   discoveries: DEFAULT_DISCOVERY_FILTERS,
   selection: undefined,
@@ -522,9 +527,18 @@ export class MapelixViewer {
 
   /** Block textures near the camera; the status tells whether the server has them. */
   setTextures(mode: TextureMode): void {
-    if (mode !== "off" && mode !== "on") throw new RangeError(`Unknown texture mode ${String(mode)}`);
+    if (mode !== "off" && mode !== "on")
+      throw new RangeError(`Unknown texture mode ${String(mode)}`);
     this.updateSettings({ textures: mode });
     this.worldViewer?.setTextures(mode);
+  }
+
+  /** Textured leaves fast, filled with a dark shade, or detailed, cut out with inner faces. */
+  setLeaves(mode: LeafMode): void {
+    if (mode !== "fast" && mode !== "detailed")
+      throw new RangeError(`Unknown leaf mode ${String(mode)}`);
+    this.updateSettings({ leaves: mode });
+    this.worldViewer?.setLeaves(mode);
   }
 
   setWeather(weather: WeatherMode): void {
@@ -977,6 +991,7 @@ export class MapelixViewer {
           clouds: this.settingsNow.clouds,
           weather: this.settingsNow.weather,
           textures: this.settingsNow.textures,
+          leaves: this.settingsNow.leaves,
           textureBase: `${source.base}/textures`,
           onTextureState: () => this.publish(),
           autoDepth: this.settingsNow.autoDepth,

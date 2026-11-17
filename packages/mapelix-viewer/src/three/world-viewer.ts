@@ -79,6 +79,12 @@ export interface WorldInfo extends SceneContextInput {
 
 /** Block textures asked for by the host. */
 export type TextureMode = "off" | "on";
+/**
+ * How textured leaves and other cut-out blocks draw: `fast` fills their transparent texels
+ * with a dark shade of their color; `detailed` cuts them out and draws the faces between them,
+ * which costs more faces and fragment work.
+ */
+export type LeafMode = "fast" | "detailed";
 
 /**
  * What the block textures do now: `off` as asked, `unavailable` when the server has none,
@@ -129,6 +135,8 @@ export interface WorldViewerOptions {
   readonly autoPerspective?: AutoPerspective;
   /** Block textures near the camera when the server has them (default off). */
   readonly textures?: TextureMode;
+  /** Textured leaves and other cut-out blocks (default fast). */
+  readonly leaves?: LeafMode;
   /** URL prefix of `textures/<revision>/atlas.bin` (default `/textures`). */
   readonly textureBase?: string;
   /**
@@ -142,6 +150,7 @@ export interface WorldViewerOptions {
 
 export interface TextureSnapshot {
   readonly mode: TextureMode;
+  readonly leaves: LeafMode;
   readonly state: TextureState;
   /** GPU bytes of the atlas, 0 until it loads. */
   readonly gpuBytes: number;
@@ -246,6 +255,7 @@ export class WorldViewer {
   private projectionFrom = 0;
   private projectionProgress = 1;
   private textureMode: TextureMode = "off";
+  private leafMode: LeafMode = "fast";
   private textureState: TextureState = "off";
   private textureFade: TextureFade = DEFAULT_TEXTURE_FADE;
   /** The atlas of one texture revision, its look and materials, once loaded. */
@@ -314,6 +324,7 @@ export class WorldViewer {
     this.streamer = this.createStreamer(world);
     if (options.textureFade !== undefined) this.textureFade = textureFade(options.textureFade);
     this.textureMode = options.textures ?? "off";
+    if (options.leaves !== undefined) this.leafMode = leafMode(options.leaves);
     this.scene.add(this.streamer.root, this.sky, this.sun, this.sun.target, this.selectionBox.root);
     this.scene.add(this.clouds.root);
     this.scene.add(this.weather.root);
@@ -471,6 +482,7 @@ export class WorldViewer {
       },
       textures: {
         mode: this.textureMode,
+        leaves: this.leafMode,
         state: this.textureState,
         gpuBytes: this.textureSet?.atlas.gpuBytes ?? 0,
         regions: this.streamer.stats.textured,
@@ -608,9 +620,16 @@ export class WorldViewer {
    * texture stack; without it, or when the atlas fails, the state says so and colors stay.
    */
   setTextures(mode: TextureMode): void {
-    if (mode !== "off" && mode !== "on") throw new RangeError(`Unknown texture mode ${String(mode)}`);
+    if (mode !== "off" && mode !== "on")
+      throw new RangeError(`Unknown texture mode ${String(mode)}`);
     this.textureMode = mode;
     this.failedTextureRevision = undefined;
+    this.applyTextures();
+  }
+
+  /** Draws textured leaves and other cut-out blocks fast or detailed; see `LeafMode`. */
+  setLeaves(mode: LeafMode): void {
+    this.leafMode = leafMode(mode);
     this.applyTextures();
   }
 
@@ -639,10 +658,12 @@ export class WorldViewer {
     }
     const set = this.textureSet;
     if (set?.revision === revision) {
+      const cutout = this.leafMode === "detailed";
       this.streamer.setTextures({
         revision,
         materials: set.materials,
         minPixels: this.textureFade.none * this.renderer.getPixelRatio(),
+        cutout,
       });
       this.setTextureState("on");
       return;
@@ -1213,4 +1234,10 @@ function textureFade(fade: TextureFade): TextureFade {
   if (!Number.isFinite(none) || !Number.isFinite(full) || none <= 0 || full <= none)
     throw new RangeError("Texture fade needs 0 < none < full, in pixels per block");
   return { none, full };
+}
+
+function leafMode(mode: LeafMode): LeafMode {
+  if (mode !== "fast" && mode !== "detailed")
+    throw new RangeError(`Unknown leaf mode ${String(mode)}`);
+  return mode;
 }

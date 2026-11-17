@@ -222,6 +222,40 @@ describe("RegionService", () => {
     expect(builder.calls).toBe(2);
   });
 
+  it("keeps detailed cut-out regions apart, and only with textures", async () => {
+    const builder = controlledBuilder();
+    const store = memoryStore();
+    const textured = new RegionService({
+      dimensions: new Map<Dimension, typeof WORLD | undefined>([["overworld", WORLD]]),
+      build: builder.build,
+      store,
+      memoryBytes: 1024 * 1024,
+      maxPending: 4,
+      textures: async () => ({ fingerprint: "f", tiles: {}, blocks: {}, terrain: {} }),
+    });
+    const fast = textured.load("overworld", { level: 0, x: 0, z: 0 }, signal());
+    const detailed = textured.load("overworld", { level: 0, x: 0, z: 0, cutout: true }, signal());
+    await tick();
+    await tick();
+    expect(builder.pending.map((entry) => entry.request.cutout === true).sort()).toEqual([
+      false,
+      true,
+    ]);
+    for (const entry of builder.pending) entry.resolve();
+    await Promise.all([fast, detailed]);
+    expect([...store.files.keys()].sort()).toEqual([
+      "cutout/overworld/320/0/0/0",
+      "overworld/320/0/0/0",
+    ]);
+    await expect(
+      service(controlledBuilder().build).load(
+        "overworld",
+        { level: 0, x: 0, z: 0, cutout: true },
+        signal(),
+      ),
+    ).rejects.toThrow(InvalidRegionError);
+  });
+
   it("refuses ceilings the engine does not accept", async () => {
     const regions = service(controlledBuilder().build);
     for (const ceilingY of [100, -64, 336, 8]) {

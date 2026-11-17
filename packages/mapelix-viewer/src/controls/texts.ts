@@ -52,6 +52,7 @@ export interface ControlTexts {
   readonly clouds: string;
   readonly textures: string;
   readonly texturesUnavailable: string;
+  readonly detailedLeaves: string;
   readonly texturesFailed: string;
   readonly rain: string;
   readonly thunderstorm: string;
@@ -137,6 +138,7 @@ export const DEFAULT_CONTROL_TEXTS: ControlTexts = {
   clouds: "Clouds",
   textures: "Block textures",
   texturesUnavailable: "This world has no block textures.",
+  detailedLeaves: "Detailed leaves",
   texturesFailed: "Block textures could not load; blocks keep their colors.",
   rain: "Rain",
   thunderstorm: "Thunderstorm",

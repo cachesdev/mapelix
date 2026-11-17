@@ -674,9 +674,19 @@ export class ViewerControls {
     // Block textures near the camera, when the server has them (Surface only).
     const textures = this.check(t.textures, (on) => viewer.setTextures(on ? "on" : "off"));
     textures.dataset.part = "textures";
+    const leaves = this.check(t.detailedLeaves, (on) => viewer.setLeaves(on ? "detailed" : "fast"));
+    leaves.dataset.part = "leaves";
     const texturesNote = make("p", undefined);
     texturesNote.dataset.part = "textures-note";
-    view.append(seg, cavesNote, ceiling, caves, wrapperOf(textures), texturesNote);
+    view.append(
+      seg,
+      cavesNote,
+      ceiling,
+      caves,
+      wrapperOf(textures),
+      wrapperOf(leaves),
+      texturesNote,
+    );
 
     // Sky: clouds, rain, thunderstorm, time of day (Overworld surface).
     const sky = this.section("sky", t.atmosphere);
@@ -1034,6 +1044,12 @@ export class ViewerControls {
     if (textures) {
       textures.checked = settings.textures === "on";
       textures.disabled = !status.available || caves || status.textures === "unavailable";
+    }
+    const leaves = this.part<HTMLInputElement>("leaves");
+    if (leaves) {
+      leaves.checked = settings.leaves === "detailed";
+      // Only textured leaves have a detailed look.
+      show(wrapperOf(leaves), settings.textures === "on" && !caves);
     }
     const texturesNote = this.part("textures-note");
     if (texturesNote) {

@@ -22,6 +22,11 @@ export interface RegionRequest extends SceneContextOptions {
    * index travels once; later requests name it by its fingerprint.
    */
   readonly textures?: PaletteTextures | string;
+  /**
+   * With `textures`: draw the faces behind blocks with holes, such as leaves, which a textured
+   * view cuts out (detailed leaves). Plain and fast textured regions leave them out.
+   */
+  readonly cutout?: boolean;
 }
 
 export interface RegionBuilderOptions {
@@ -95,11 +100,14 @@ export class RegionBuilder {
     if (palette !== this.palette && level !== 0) {
       throw new RangeError("Only level 0 regions are textured");
     }
+    if (request.cutout === true && palette === this.palette) {
+      throw new RangeError("Detailed cut-out regions need textures");
+    }
     if (level === 0) {
       const volume = buildRegionVolume(this.chunks, palette, x, z, context.maxY, window);
       return volume === undefined
         ? emptyRegion(level, x, z, palette !== this.palette)
-        : meshRegionVolume(volume, palette, x, z, geometry);
+        : meshRegionVolume(volume, palette, x, z, geometry, request.cutout === true);
     }
     const voxels = buildVoxelRegion(this.voxels, level, x, z, context.maxY, window);
     return voxels === undefined ? emptyRegion(level, x, z) : meshVoxelRegion(voxels, geometry);

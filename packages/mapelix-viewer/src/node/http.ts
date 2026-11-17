@@ -242,6 +242,10 @@ async function regionResponse(
     return failure(400, `Caves support LOD 0 through ${CAVE_LIMITS.maxLevel}`);
   const revision = url.searchParams.get("revision");
   const textures = url.searchParams.get("textures");
+  const cutoutParam = url.searchParams.get("cutout");
+  if (cutoutParam !== null && (cutoutParam !== "1" || textures === null))
+    return failure(400, "cutout=1 needs a texture revision");
+  const cutout = cutoutParam === "1";
   if (textures !== null) {
     if (!/^[0-9a-f]{20}$/.test(textures)) return failure(400, "Invalid texture revision");
     if (level !== 0) return failure(400, "Textured regions are level 0 only");
@@ -267,6 +271,7 @@ async function regionResponse(
           await server.loadRegion({ level, x, z }, request.signal, context, {
             cacheOnly: true,
             textures,
+            ...(cutout ? { cutout } : {}),
           }),
           revision !== null,
           "region",
@@ -278,6 +283,7 @@ async function regionResponse(
       await server.loadRegion({ level, x, z }, request.signal, context, {
         cacheOnly,
         ...(textures === null ? {} : { textures }),
+        ...(cutout ? { cutout } : {}),
       }),
       revision !== null,
       "region",

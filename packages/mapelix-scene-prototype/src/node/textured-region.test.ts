@@ -28,6 +28,8 @@ const TEXTURES = [
   "still_lava",
   "log_side",
   "log_top",
+  "leaves_oak",
+  "leaf_litter",
 ];
 const index: PaletteTextures = {
   fingerprint: "0123456789abcdef0123",
@@ -40,6 +42,8 @@ const index: PaletteTextures = {
     flowing_water: all("still_water"),
     lava: all("still_lava"),
     oak_log: { ...all("log_side"), up: "log_top", down: "log_top" },
+    oak_leaves: all("leaves_oak"),
+    leaf_litter: all("leaf_litter"),
   },
   terrain: Object.fromEntries(
     TEXTURES.map((name) => [name, { textures: [{ path: `textures/blocks/${name}` }] }]),
@@ -54,13 +58,22 @@ describe("textured regions", () => {
     await writeFixtureWorld(directory, [
       sectionRecord(0, 0, 0, 4, (x, y, z) => {
         if (y < 70) return "minecraft:stone";
-        if (y === 70) return "minecraft:grass_block";
+        if (y === 70)
+          return x === 13 && z === 14 ? "minecraft:grass_path" : "minecraft:grass_block";
         if (y !== 71) return "minecraft:air";
         if (x === 2 && z === 2) return "minecraft:poppy";
         if (z === 8 && (x === 8 || x === 9)) return "minecraft:water";
         if (x === 12 && z === 12) return { name: "minecraft:lava", states: { liquid_depth: 0 } };
         if (x === 5 && z === 5) return { name: "minecraft:oak_log", states: { pillar_axis: "x" } };
         if (x === 6 && z === 6) return "minecraft:oak_stairs";
+        if (x === 14 && z === 14) return "minecraft:leaf_litter";
+        if (x === 13 && z === 14) return "minecraft:leaf_litter";
+        return "minecraft:air";
+      }),
+      // A 3 by 3 by 3 bush of leaves in the next section up.
+      sectionRecord(0, 0, 0, 5, (x, y, z) => {
+        if (x >= 10 && x <= 12 && z >= 2 && z <= 4 && y >= 81 && y <= 83)
+          return "minecraft:oak_leaves";
         return "minecraft:air";
       }),
     ]);
@@ -161,6 +174,87 @@ describe("textured regions", () => {
     };
     expect(area(region.opaque)).toBe(area(plain.opaque));
     expect(region.plants).toEqual(plain.plants);
+    builder.close();
+  });
+
+  it("draws the faces between cut-out leaves only when asked", () => {
+    const builder = new RegionBuilder({ directory, dimension: "overworld" });
+    // Another index, so another fingerprint: a builder keeps the index it was given under it.
+    const cutoutIndex = {
+      ...index,
+      fingerprint: "fedcba9876543210fedc",
+      cutout: [tile("leaves_oak"), tile("leaf_litter")],
+    };
+    const textureOf = (bytes: Uint8Array, name: string) => {
+      const region = decodeSceneRegion(bytes);
+      let area = 0;
+      const cutout = new Set<boolean>();
+      for (let i = 0; i < region.textures!.opaque.length; i++) {
+        const texture = unpackQuadTexture(region.textures!.opaque[i]!);
+        if (texture?.tile !== tile(name)) continue;
+        const quad = unpackQuad(region.opaque, i);
+        area += quad.width * quad.height;
+        cutout.add(texture.cutout === true);
+      }
+      return { area, cutout: [...cutout] };
+    };
+    const leafArea = (bytes: Uint8Array) => textureOf(bytes, "leaves_oak").area;
+    const fast = builder.build({ level: 0, x: 0, z: 0, textures: cutoutIndex });
+    const detailed = builder.build({ level: 0, x: 0, z: 0, textures: cutoutIndex, cutout: true });
+    // The bush's outside, 6 sides of 9 faces, then every face of its 27 leaves.
+    expect(leafArea(fast)).toBe(54);
+    expect(leafArea(detailed)).toBe(27 * 6);
+    // Fast leaves fill their holes; detailed ones and leaf litter always cut them out.
+    expect(textureOf(fast, "leaves_oak").cutout).toEqual([false]);
+    expect(textureOf(detailed, "leaves_oak").cutout).toEqual([true]);
+    expect(textureOf(fast, "leaf_litter").cutout).toEqual([true]);
+    expect(textureOf(detailed, "leaf_litter").cutout).toEqual([true]);
+    // Leaf litter's gray texture takes its brown color.
+    const litter = decodeSceneRegion(fast);
+    expect(
+      Array.from(litter.textures!.opaque, (word) => unpackQuadTexture(word))
+        .filter((texture) => texture?.tile === tile("leaf_litter"))
+        .every((texture) => texture!.tinted),
+    ).toBe(true);
+    // The grass under the litter shows through its holes, so it is drawn.
+    const grassUnder = (bytes: Uint8Array) => {
+      const region = decodeSceneRegion(bytes);
+      return Array.from({ length: region.opaque.length / 3 }, (_, i) =>
+        unpackQuad(region.opaque, i),
+      ).some(
+        (quad) =>
+          quad.face === Face.PositiveY &&
+          quad.y === 70 &&
+          quad.x <= 14 &&
+          quad.z <= 14 &&
+          quad.x + quad.width > 14 &&
+          quad.z + quad.height > 14,
+      );
+    };
+    expect(grassUnder(fast)).toBe(true);
+    expect(grassUnder(builder.build({ level: 0, x: 0, z: 0 }))).toBe(false);
+    // So does the lower top of a path, inside its own cell.
+    const pathUnder = (bytes: Uint8Array) => {
+      const region = decodeSceneRegion(bytes);
+      return Array.from({ length: region.opaque.length / 3 }, (_, i) =>
+        unpackQuad(region.opaque, i),
+      ).some(
+        (quad) =>
+          quad.face === Face.PositiveY &&
+          quad.y === 70 &&
+          quad.x <= 13 &&
+          quad.z <= 14 &&
+          quad.x + quad.width > 13 &&
+          quad.z + quad.height > 14 &&
+          quad.box.size === 15,
+      );
+    };
+    expect(pathUnder(fast)).toBe(true);
+    // Without a cut-out tile the option changes nothing.
+    expect(builder.build({ level: 0, x: 0, z: 0, textures: index, cutout: true })).toEqual(
+      builder.build({ level: 0, x: 0, z: 0, textures: index }),
+    );
+    expect(() => builder.build({ level: 0, x: 0, z: 0, cutout: true })).toThrow(/need textures/);
     builder.close();
   });
 

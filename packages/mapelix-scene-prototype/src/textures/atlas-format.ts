@@ -57,6 +57,14 @@ export interface TextureAtlas {
   readonly levels: readonly Uint8Array[];
 }
 
+/**
+ * A tile with transparent texels that are holes, like leaves: not an overlay mask, and less
+ * than fully covered. Terrain fills the holes (fast) or cuts them out (detailed).
+ */
+export function isCutoutTile(tile: AtlasTileInfo): boolean {
+  return tile.overlay !== true && tile.coverage < 250;
+}
+
 /** Mipmap levels, down to 4-texel tiles with a 1-texel gutter. */
 export function atlasLevelCount(tileSize: number): number {
   return Math.log2(tileSize) - 1;
@@ -190,9 +198,12 @@ export function decodeTextureAtlas(bytes: Uint8Array): TextureAtlas {
 /**
  * The fourth word of a textured quad: atlas tile (14 bits), quarter turns (2 bits) and whether
  * the texture takes the quad's biome color (bit 16). Bit 17 marks a quad with a texture; a quad
- * without one keeps its color.
+ * without one keeps its color. Bit 18 marks a cut-out face, whose transparent texels show what
+ * lies behind: thin and shaped blocks such as leaf litter, ladders or trapdoors always, leaves
+ * in regions built with their inner faces. Other faces fill those texels.
  */
 export const QUAD_TEXTURED = 1 << 17;
+export const QUAD_CUTOUT = 1 << 18;
 export const QUAD_TEXTURE_TINTED = 1 << 16;
 
 export function packQuadTexture(tile: number, rotation: number, tinted: boolean): number {
@@ -205,13 +216,19 @@ export function packQuadTexture(tile: number, rotation: number, tinted: boolean)
   );
 }
 
-export function unpackQuadTexture(
-  word: number,
-): { readonly tile: number; readonly rotation: number; readonly tinted: boolean } | undefined {
+export function unpackQuadTexture(word: number):
+  | {
+      readonly tile: number;
+      readonly rotation: number;
+      readonly tinted: boolean;
+      readonly cutout?: true;
+    }
+  | undefined {
   if ((word & QUAD_TEXTURED) === 0) return undefined;
   return {
     tile: word & 0x3fff,
     rotation: (word >>> 14) & 3,
     tinted: (word & QUAD_TEXTURE_TINTED) !== 0,
+    ...((word & QUAD_CUTOUT) !== 0 ? { cutout: true as const } : {}),
   };
 }

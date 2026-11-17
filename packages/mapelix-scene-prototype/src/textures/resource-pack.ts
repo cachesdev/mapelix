@@ -231,7 +231,7 @@ function blockFaces(value: unknown): BlockTextureNames | undefined {
 }
 
 /** The version of the texture pipeline; part of every stack and pack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 3;
+export const TEXTURE_PIPELINE_VERSION = 4;
 
 const PACK_JSON = [
   "manifest.json",

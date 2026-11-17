@@ -10,7 +10,7 @@ import {
 } from "../blocks/block-appearance.js";
 import { Face, PlantSprite, QuadMaterial } from "../format.js";
 import { MODEL_STATES, blockModelParts, type BlockModel } from "../blocks/block-models.js";
-import { packQuadTexture } from "../textures/atlas-format.js";
+import { QUAD_CUTOUT, packQuadTexture } from "../textures/atlas-format.js";
 import {
   TEXTURE_STATES,
   resolveBlockTextures,
@@ -25,6 +25,8 @@ export interface PaletteTextures {
   readonly tiles: Readonly<Record<string, number>>;
   readonly blocks: Readonly<Record<string, BlockTextureNames>>;
   readonly terrain: Readonly<Record<string, TerrainEntry>>;
+  /** Atlas tiles with holes, such as leaves. */
+  readonly cutout?: readonly number[];
 }
 
 /** Shape codes stored per palette id. */
@@ -63,6 +65,12 @@ export const TintCode = {
   Foliage: 3,
   Water: 4,
 } as const;
+
+/**
+ * Blocks whose gray texture the game colors with a tint this engine keeps as the block's own
+ * color, such as the dry foliage color of leaf litter: the texture takes that color.
+ */
+const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter"]);
 
 const TINT_CODES: Readonly<Record<BiomeTint, number>> = {
   none: TintCode.None,
@@ -123,6 +131,13 @@ export class BlockPalette {
   textureWords = new Uint32Array(0);
   /** Texture word of each id's crossed plant quads. */
   crossWords = new Uint32Array(0);
+  /**
+   * Blocks whose textures have holes: 1 for full cubes like leaves, which detailed meshes see
+   * through, 2 for thin and shaped blocks like leaf litter, which textured meshes always see
+   * through.
+   */
+  cutout = new Uint8Array(0);
+  private readonly cutoutTiles: ReadonlySet<number> = new Set();
   /** Texture word of water surfaces and waterlogged cells. */
   readonly waterWord: number = 0;
   private readonly names: TextureNames | undefined;
@@ -155,6 +170,8 @@ export class BlockPalette {
     };
     this.textureWords = new Uint32Array(256 * 6);
     this.crossWords = new Uint32Array(256);
+    this.cutout = new Uint8Array(256);
+    this.cutoutTiles = new Set(textures.cutout ?? []);
     const water = resolveBlockTextures(
       this.names,
       "minecraft:water",
@@ -193,16 +210,28 @@ export class BlockPalette {
   ): void {
     const textures = resolveBlockTextures(this.names!, name, states, appearance);
     if (textures === undefined) return;
+    const ownColor = SELF_TINTED.has(name.replace(/^minecraft:/, ""));
     for (let face = 0; face < 6; face += 1) {
       this.textureWords[id * 6 + face] = this.textureWord(
         textures.faces[face],
-        this.tints[id * 6 + face] !== TintCode.None,
+        ownColor || this.tints[id * 6 + face] !== TintCode.None,
       );
     }
     this.crossWords[id] = this.textureWord(
       textures.cross,
       this.tints[id * 6 + Face.PositiveY] !== TintCode.None,
     );
+    // Thin and shaped blocks always show what lies behind their holes; leaves and other cubes
+    // only in regions built with the faces between them (`VoxelMesher` marks those).
+    const shaped = this.shape[id] === Shape.Box || this.shape[id] === Shape.Model;
+    let cutout = false;
+    for (let face = 0; face < 6; face += 1) {
+      const word = this.textureWords[id * 6 + face]!;
+      if (word === 0 || !this.cutoutTiles.has(word & 0x3fff)) continue;
+      cutout = true;
+      if (shaped) this.textureWords[id * 6 + face] = (word | QUAD_CUTOUT) >>> 0;
+    }
+    this.cutout[id] = !cutout ? 0 : shaped ? 2 : this.shape[id] === Shape.Cube ? 1 : 0;
   }
 
   /** The texture word of a face, tinted as its color is; 0 when the atlas lacks the image. */
@@ -309,6 +338,7 @@ export class BlockPalette {
       const cross = new Uint32Array(capacity);
       cross.set(this.crossWords);
       this.crossWords = cross;
+      this.cutout = grow(this.cutout, capacity);
     }
   }
 }

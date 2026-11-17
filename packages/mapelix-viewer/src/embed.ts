@@ -14,6 +14,7 @@ export type {
   Pointed,
   TextureFade,
   TextureMode,
+  LeafMode,
   TextureSnapshot,
   TextureState,
   VerticalMovement,
@@ -46,8 +47,8 @@ export {
  * The version of this bundle's API, so a host can refuse a mismatch. Bumped whenever the
  * exported API changes incompatibly; later builds of one version only add optional members.
  * 4: the bundle is `@mapelix/viewer` itself (see the package README for the changes from 3).
- * 5: block textures (`textures`, `setTextures()`, `WorldStatus.textures`, the textures control
- * texts); a version 4 host keeps working unchanged, with textures off.
+ * 5: block textures (`textures`, `leaves`, `setTextures()`, `setLeaves()`,
+ * `WorldStatus.textures`, the textures control texts); a version 4 host keeps working unchanged, with textures off.
  */
 export const EMBED_API_VERSION = 5;
 

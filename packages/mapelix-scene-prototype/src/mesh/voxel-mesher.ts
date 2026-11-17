@@ -23,6 +23,7 @@ import { lavaFlowDirection } from "./lava-flow.js";
 import { blendColumnTints } from "./biome-tints.js";
 import type { GeometryMode } from "../dimensions.js";
 import { BlockPalette, PALETTE_ID_MASK, Shape, TintCode, WATERLOGGED } from "./block-palette.js";
+import { QUAD_CUTOUT } from "../textures/atlas-format.js";
 import {
   NO_BLOCK,
   VOLUME_LAYER,
@@ -59,7 +60,10 @@ const WATER_SURFACE_SIZE = 14;
 
 /**
  * Turns a level 0 volume into packed quads. Surface mode culls sealed interiors;
- * dimension modes keep internal faces for enclosed Nether caves and End islands.
+ * dimension modes keep internal faces for enclosed Nether caves and End islands. With a
+ * textured palette, thin blocks with holes (`BlockPalette.cutout`, like leaf litter) hide
+ * nothing; with `cutout`, cubes with holes like leaves hide nothing either: the faces behind
+ * and between them are drawn, as Minecraft's fancy leaves are.
  */
 export function meshRegionVolume(
   volume: RegionVolume,
@@ -67,8 +71,9 @@ export function meshRegionVolume(
   regionX: number,
   regionZ: number,
   geometry: GeometryMode = "surface",
+  cutout = false,
 ): SceneRegion {
-  return new VoxelMesher(volume, palette, geometry).mesh(regionX, regionZ);
+  return new VoxelMesher(volume, palette, geometry, cutout).mesh(regionX, regionZ);
 }
 
 class VoxelMesher {
@@ -98,9 +103,20 @@ class VoxelMesher {
   private minY = WORLD_MAX_Y;
   private maxY = WORLD_MIN_Y;
   private hasModels = false;
+  /** Blocks with holes, see `BlockPalette.cutout`; textured palettes only. */
+  private readonly cutout: Uint8Array | undefined;
+  /** Whether cubes with holes are seen through too, see `meshRegionVolume`. */
+  private readonly cutoutCubes: boolean;
 
-  constructor(volume: RegionVolume, palette: BlockPalette, geometry: GeometryMode) {
+  constructor(
+    volume: RegionVolume,
+    palette: BlockPalette,
+    geometry: GeometryMode,
+    cutout: boolean,
+  ) {
     this.geometry = geometry;
+    this.cutout = palette.textures !== undefined ? palette.cutout : undefined;
+    this.cutoutCubes = cutout;
     this.volume = volume;
     this.palette = palette;
     const textured = palette.textures !== undefined;
@@ -272,11 +288,15 @@ class VoxelMesher {
     const neighborColumn = column + STEPS.column[face]!;
     if (boundary) {
       if (neighborY < this.baseY) return false;
-      if (neighborY < this.limitY) {
+      if (neighborY < this.limitY && !this.seesThrough(this.cells[neighbor]!)) {
         if (this.hides(this.cells[neighbor]!, face, id)) return false;
         if (!this.isOpen(neighbor, neighborY, neighborColumn)) return false;
       }
-    } else if (!this.isOpen(index, y, column)) {
+    } else if (
+      !this.isOpen(index, y, column) &&
+      !(neighborY < this.limitY && this.seesThrough(this.cells[neighbor]!))
+    ) {
+      // A lower block such as a path under leaf litter shows through the litter's holes.
       return false;
     }
 
@@ -289,9 +309,20 @@ class VoxelMesher {
     const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
     keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
     colors[mask] = packQuadWord2(color, occlusion);
-    if (this.maskTextures !== undefined)
-      this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
+    if (this.maskTextures !== undefined) {
+      const word = this.textureWords![id * 6 + face]!;
+      this.maskTextures[mask] =
+        word !== 0 && this.cutoutCubes && this.cutout?.[id] === 1
+          ? (word | QUAD_CUTOUT) >>> 0
+          : word;
+    }
     return true;
+  }
+
+  /** Whether a neighbor's holes show this face, so it never hides it. */
+  private seesThrough(cell: number): boolean {
+    const kind = this.cutout?.[cell & PALETTE_ID_MASK];
+    return kind === 2 || (kind === 1 && this.cutoutCubes);
   }
 
   /** Water surfaces sit two sixteenths below the block top, like Minecraft's still water. */

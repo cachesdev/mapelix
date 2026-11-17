@@ -28,7 +28,7 @@ export {
   type ViewState,
 } from "./viewer/view-state.js";
 export { startFromSearch, viewerSearch, type SearchStart } from "./viewer/url-state.js";
-export type { TextureFade, TextureMode, TextureState } from "./three/world-viewer.js";
+export type { LeafMode, TextureFade, TextureMode, TextureState } from "./three/world-viewer.js";
 export {
   DEFAULT_MARKER_TEXTS,
   checkMarker,

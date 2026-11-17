@@ -169,6 +169,19 @@ describe("dimension streaming lifecycle", () => {
     ]);
     expect(streamer.stats.drawn).toBe(1);
 
+    // Detailed leaves are another variant: asked for with cutout=1, it replaces the first.
+    streamer.setTextures({
+      revision: "a".repeat(20),
+      materials: {} as SceneMaterials,
+      minPixels: 4,
+      cutout: true,
+    });
+    await vi.waitFor(() => {
+      frame();
+      expect(urls.filter((url) => url.searchParams.get("cutout") === "1")).toHaveLength(1);
+      expect(streamer.stats.textured).toBe(1);
+    });
+
     // Far away, a block is too small on screen: the plain region comes back.
     streamer.setTextures({
       revision: "a".repeat(20),
@@ -180,7 +193,7 @@ describe("dimension streaming lifecycle", () => {
     streamer.setTextures(undefined);
     frame();
     expect(streamer.stats.textured).toBe(0);
-    expect(textured).toHaveLength(1);
+    expect(urls.filter((url) => url.searchParams.has("textures"))).toHaveLength(2);
     streamer.dispose();
   });
 

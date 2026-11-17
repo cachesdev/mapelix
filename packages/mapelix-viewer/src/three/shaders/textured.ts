@@ -3,6 +3,7 @@ import {
   attribute,
   cameraProjectionMatrix,
   cameraViewMatrix,
+  cos,
   dFdx,
   dFdy,
   float,
@@ -14,6 +15,7 @@ import {
   normalWorld,
   positionWorld,
   select,
+  sin,
   smoothstep,
   step,
   texture,
@@ -39,7 +41,7 @@ import { quadColor, quadLavaFlow, quadPosition, quadUV } from "./quad";
  */
 
 /**
- * The quad's texture word, 18 bits, rides in the lava flow varying: plain terrain already uses
+ * The quad's texture word, 19 bits, rides in the lava flow varying: plain terrain already uses
  * all 16 varyings WebGPU allows, and the textured terrain and plants never read lava flow (lava
  * keeps its plain material). A float holds the word exactly; rounding removes interpolation
  * error.
@@ -53,7 +55,7 @@ const bit = (word: Node<"uint">, shift: number, mask: number) =>
 export const texturedQuadPosition = Fn(() => {
   // A variable, so `quadPosition` and its own lava flow assignment come first.
   const position = quadPosition().toVar();
-  textureWord.assign(bit(uint(attribute("texture", "uint")), 0, 0x3ffff));
+  textureWord.assign(bit(uint(attribute("texture", "uint")), 0, 0x7ffff));
   return position;
 });
 
@@ -62,12 +64,16 @@ const textureTile = bit(word, 0, 0x3fff);
 const textureTurn = bit(word, 14, 3);
 const textureTint = bit(word, 16, 1);
 const textured = bit(word, 17, 1);
+const cutoutQuad = bit(word, 18, 1);
 
 /** Screen sizes, in CSS pixels per block, where textures start to show and are complete. */
 export interface TextureFade {
   readonly none: number;
   readonly full: number;
 }
+
+/** Brightness of the fill behind the transparent texels of leaves and other cut-out tiles. */
+const LEAF_SHADE = 0.5;
 
 export const DEFAULT_TEXTURE_FADE: TextureFade = { none: 4, full: 8 };
 
@@ -167,32 +173,43 @@ export class TextureLook {
         ),
       ),
     );
-    // Quarter turns, for the sides of lying logs.
-    const turned = select(
-      textureTurn.lessThan(0.5),
-      coords,
-      select(
-        textureTurn.lessThan(1.5),
-        vec2(coords.y, coords.x.negate()),
-        select(textureTurn.lessThan(2.5), coords.negate(), vec2(coords.y.negate(), coords.x)),
-      ),
-    );
+    // Quarter turns, for the sides of lying logs: (x, y) becomes (y, -x) per turn.
+    const angle = textureTurn.mul(Math.PI / 2);
+    const c = cos(angle).round();
+    const s = sin(angle).round();
+    const turned = vec2(coords.x.mul(c).add(coords.y.mul(s)), coords.y.mul(c).sub(coords.x.mul(s)));
     return this.sample(turned);
   }
 
   /**
    * Blends a terrain color toward the face texture. Texels a pack leaves transparent, as in
-   * leaves, show a dark shade of the block's color: terrain stays opaque.
+   * leaves, show a dark shade of the quad's own color, the leaves' tint or their average
+   * color, so a canopy stays opaque. Cut-out faces (see `cutoutMask`) lose those texels where
+   * the texture shows, and blend from their plain color before.
    */
   terrain(plain: Node<"vec3">): Node<"vec3"> {
     const texel = this.faceTexel();
     const tint = this.tint();
-    const opaque = mix(tint.mul(0.3), texel.rgb.mul(tint), step(0.5, texel.a));
+    const fill = select(cutoutQuad.greaterThan(0.5), quadColor, quadColor.mul(LEAF_SHADE));
+    const opaque = mix(fill, texel.rgb.mul(tint), step(0.5, texel.a));
     // An overlay tile's alpha marks the pixels that take the quad color: the grass strip of a
     // grass block side, whose quad color is the grass color.
     const overlay = mix(texel.rgb, texel.rgb.mul(quadColor), texel.a);
     const color = select(this.tileInfo().w.greaterThan(127), overlay, opaque);
     return mix(plain, color, this.amount());
+  }
+
+  /**
+   * False at the transparent texels of cut-out faces where their texture shows: the ground
+   * under leaf litter, the faces and sky behind detailed leaves. Below the fade they stay
+   * filled, as the texture blends from a flat color.
+   */
+  cutoutMask(): Node<"bool"> {
+    return this.amount()
+      .greaterThan(0.5)
+      .and(cutoutQuad.greaterThan(0.5))
+      .and(this.faceTexel().a.lessThan(0.5))
+      .not();
   }
 
   /** Plant sprites: the crossed quad shows the whole tile, top up. */

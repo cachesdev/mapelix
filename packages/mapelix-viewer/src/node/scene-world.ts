@@ -485,13 +485,17 @@ export function createSceneServer(options: SceneServerOptions) {
    * A serialized region from memory, the disk cache, a shared build, or an empty one outside
    * the stored area. A build every caller abandoned stops before it starts. Rejects with
    * `InvalidRegionError`, `OverloadedError` or, with `cacheOnly`, `NotCachedError`. With
-   * `textures`, the texture revision served, it is the textured level 0 Surface region.
+   * `textures`, the texture revision served, it is the textured level 0 Surface region, and
+   * with `cutout` too, its variant that draws the faces between leaves and other cut-out blocks.
    */
   async function loadRegion(
     request: RegionRequest,
     signal: AbortSignal,
     input: SceneContextInput = sceneContext("overworld", request),
-    load: Pick<LoadOptions, "cacheOnly"> & { readonly textures?: string } = {},
+    load: Pick<LoadOptions, "cacheOnly"> & {
+      readonly textures?: string;
+      readonly cutout?: boolean;
+    } = {},
   ): Promise<LoadedRegion> {
     const context = sceneContext(input.dimension, input);
     const world = await ready();
@@ -504,7 +508,13 @@ export function createSceneServer(options: SceneServerOptions) {
       }
       return world.textured.service.load(
         context.dimension,
-        { level: request.level, x: request.x, z: request.z, ceilingY: context.ceilingY },
+        {
+          level: request.level,
+          x: request.x,
+          z: request.z,
+          ceilingY: context.ceilingY,
+          ...(load.cutout === true ? { cutout: true } : {}),
+        },
         signal,
         load.cacheOnly === true ? { cacheOnly: true } : {},
       );

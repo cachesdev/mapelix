@@ -127,7 +127,15 @@ describe("scene handler", () => {
       cacheOnly: false,
       textures: current,
     });
+    await handle(get(`/regions/0/1/2?textures=${current}&cutout=1`));
+    expect(server.loadRegion.mock.calls.at(-1)![3]).toEqual({
+      cacheOnly: false,
+      textures: current,
+      cutout: true,
+    });
     for (const [path, status] of [
+      ["/regions/0/0/0?cutout=1", 400],
+      [`/regions/0/0/0?textures=${current}&cutout=yes`, 400],
       ["/regions/0/0/0?textures=nope", 400],
       [`/regions/1/0/0?textures=${current}`, 400],
       [`/regions/0/0/0?mode=caves&minY=-64&maxY=-32&textures=${current}`, 400],

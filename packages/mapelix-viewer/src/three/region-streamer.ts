@@ -66,6 +66,16 @@ export interface StreamedTextures {
   readonly materials: SceneMaterials;
   /** Device pixels per block from which a region's nearest block asks for its textures. */
   readonly minPixels: number;
+  /**
+   * Detailed leaves: regions built with the faces between leaves and other cut-out blocks
+   * (`?cutout=1`), whose leaf faces are marked cut out.
+   */
+  readonly cutout?: boolean;
+}
+
+/** Cache key prefix of the textured twins of one variant; all start with `t/`. */
+function texturedPrefix(textures: StreamedTextures): string {
+  return textures.cutout === true ? "t/c/" : "t/";
 }
 
 /** Textured regions kept in memory beyond those drawn. */
@@ -232,7 +242,12 @@ export class RegionStreamer {
   setTextures(textures: StreamedTextures | undefined): void {
     const previous = this.textures;
     this.textures = this.context.mode === "surface" ? textures : undefined;
-    if (previous?.revision === this.textures?.revision && this.textures !== undefined) return;
+    if (
+      this.textures !== undefined &&
+      previous?.revision === this.textures.revision &&
+      previous.cutout === this.textures.cutout
+    )
+      return;
     this.texturedFailures.clear();
     for (const [key, controller] of this.requests) {
       if (!key.startsWith("t/")) continue;
@@ -451,7 +466,7 @@ export class RegionStreamer {
   ): CachedRegion {
     const textures = this.textures;
     if (textures === undefined || target.level !== 0 || cached.mesh === undefined) return cached;
-    const key = `t/${target.key}`;
+    const key = `${texturedPrefix(textures)}${target.key}`;
     const textured = this.cache.get(key);
     const pixels = projectedPixels(
       1,
@@ -537,7 +552,10 @@ export class RegionStreamer {
     const params = contextSearch(this.context);
     params.set("revision", this.options.revision);
     const textures = target.textured === true ? this.textures : undefined;
-    if (textures !== undefined) params.set("textures", textures.revision);
+    if (textures !== undefined) {
+      params.set("textures", textures.revision);
+      if (textures.cutout === true) params.set("cutout", "1");
+    }
     const base = this.options.regionBase ?? "/regions";
     const suffix = this.options.regionSuffix ?? "";
     const url = `${base}/${target.level}/${target.x}/${target.z}${suffix}?${params}`;
