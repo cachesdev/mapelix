@@ -88,10 +88,18 @@ async function drag(page: Page, from: Point, to: Point, touchscreen: boolean): P
   else await page.mouse.up();
 }
 
-test("shows the map without page scroll, zoom or controls that hide it", async ({ page }) => {
+test("shows the map without page scroll, zoom or controls that hide it", async ({ page }, info) => {
   await ready(page);
+  // A first tap dismisses the first-use hint; what stays on screen is measured.
+  if (info.project.name === "phone") await page.touchscreen.tap(180, 400);
+  else await page.mouse.click(640, 400);
+  await page.waitForTimeout(100);
   const layout = await page.evaluate(() => {
-    const boxes = [...document.querySelectorAll("button, .readout")].map((element) => {
+    // Visible controls only: those hidden in this mode keep their place but do not show.
+    const visible = [...document.querySelectorAll(".mx-btn, .mx-readout")].filter((element) =>
+      element.checkVisibility({ visibilityProperty: true }),
+    );
+    const boxes = visible.map((element) => {
       const box = element.getBoundingClientRect();
       return {
         tag: element.tagName,
@@ -299,7 +307,8 @@ test("first display time compared with Leaflet on the same export", async ({ bro
   const plain = `<!doctype html><html><head><meta charset="utf-8">
 <style>html,body,#map{margin:0;height:100%}</style></head><body><div id="map"></div>
 <script type="module">
-import { TileIndex, TileMap } from "/viewer/index.js";
+import { TileIndex } from "/viewer/map/tile-index.js";
+import { TileMap } from "/viewer/map/tile-map.js";
 const url = new URL("/tiles/manifest.json", location.href);
 const index = new TileIndex(await (await fetch(url)).json(), url);
 new TileMap(document.getElementById("map"), {

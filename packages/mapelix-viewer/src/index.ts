@@ -11,9 +11,13 @@ export {
   type TileAddress,
 } from "./map/tile-math.js";
 export {
+  DEFAULT_WORLD_SETTINGS,
   MapelixViewer,
   type MapelixViewerOptions,
+  type ViewerListener,
+  type WorldSettings,
   type WorldSource,
+  type WorldStatus,
 } from "./viewer/mapelix-viewer.js";
 export {
   DEFAULT_THRESHOLDS,
@@ -23,3 +27,4 @@ export {
   type ViewMode,
   type ViewState,
 } from "./viewer/view-state.js";
+export { startFromSearch, viewerSearch, type SearchStart } from "./viewer/url-state.js";

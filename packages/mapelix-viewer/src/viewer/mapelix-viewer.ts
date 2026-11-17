@@ -1,6 +1,33 @@
 import { TileMap, type TileMapOptions } from "../map/tile-map.js";
 import type { TileIndex } from "../map/tile-index.js";
-import type { MapView } from "../map/tile-math.js";
+import { blockAt, type MapView } from "../map/tile-math.js";
+import {
+  CAVE_LIMITS,
+  contextSearch,
+  DIMENSIONS,
+  parseDimension,
+  sceneContext,
+  type SceneContext,
+} from "@mapelix/scene-prototype/dimensions";
+import {
+  DEFAULT_DISCOVERY_FILTERS,
+  DISCOVERY_KINDS,
+  discoveryFilters,
+  type DiscoveryFilters,
+  type DiscoveryGroup,
+} from "@mapelix/scene-prototype/discoveries";
+import {
+  horizontalSelection,
+  selectionAround,
+  type HorizontalSelection,
+} from "@mapelix/scene-prototype/selection";
+import type { VerticalMovement } from "../three/camera-rig.js";
+import type { DepthNavigation } from "../three/depth-follow.js";
+import type { DiscoveryDetailText } from "../three/discovery-focus.js";
+import type { DiscoveryStats } from "../three/discovery-streamer.js";
+import type { SelectionTool } from "../three/selection-box.js";
+import type { AutoPerspective } from "../three/view-projection.js";
+import type { WeatherMode } from "../three/weather-layer.js";
 import type { WorldInfo, WorldViewer, WorldViewerOptions } from "../three/world-viewer.js";
 import {
   cameraOverMap,
@@ -20,9 +47,93 @@ import {
 export interface WorldSource {
   /** URL prefix of `world.json`, `regions/` and `discoveries/`. */
   readonly base: string;
-  /** Further 3D options; the region and discovery URLs come from `base`. */
-  readonly options?: Omit<WorldViewerOptions, "projection" | "regionBase" | "discoveryBase">;
+  /** Further 3D options; what the viewer manages itself is left out. */
+  readonly options?: Omit<
+    WorldViewerOptions,
+    | "projection"
+    | "regionBase"
+    | "discoveryBase"
+    | "clouds"
+    | "weather"
+    | "autoDepth"
+    | "loadDepth"
+    | "onDepthChange"
+    | "discoveryFilters"
+    | "onDiscoverySelect"
+    | "onDiscoveryFocusChange"
+    | "discoveryDetails"
+    | "selection"
+    | "onSelectionChange"
+  >;
 }
+
+/** What the 3D world shows. Kept while the map is on screen and applied when the world shows. */
+export interface WorldSettings {
+  /** Surface or a vertical cave slice; caves open the 3D world. */
+  readonly viewMode: "surface" | "caves";
+  /** Lowest Y of the cave slice, a multiple of 16. */
+  readonly caveMinY: number;
+  /** Cave slice thickness, 16 or 32 blocks. */
+  readonly caveThickness: number;
+  /** Height from which the Nether surface view hides terrain, a multiple of 16. */
+  readonly netherCeilingY: number;
+  /** Hour of the day from 0 to 24 (Overworld surface). */
+  readonly hour: number;
+  readonly clouds: boolean;
+  readonly weather: WeatherMode;
+  /** Cave slices follow the camera depth. */
+  readonly autoDepth: boolean;
+  readonly discoveries: DiscoveryFilters;
+  /** Cave exploration area. */
+  readonly selection: HorizontalSelection | undefined;
+  readonly selectionTool: SelectionTool;
+}
+
+export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
+  viewMode: "surface",
+  caveMinY: 0,
+  caveThickness: CAVE_LIMITS.defaultThickness,
+  netherCeilingY: DIMENSIONS.nether.defaultCeilingY,
+  hour: 15.5,
+  clouds: true,
+  weather: "clear",
+  autoDepth: true,
+  discoveries: DEFAULT_DISCOVERY_FILTERS,
+  selection: undefined,
+  selectionTool: "off",
+};
+
+/** Live state of the world for host controls. Texts are left to the host. */
+export interface WorldStatus {
+  /** A 3D world is configured and has not failed. */
+  readonly available: boolean;
+  /** The 3D world is on screen. */
+  readonly shown: boolean;
+  readonly name: string | undefined;
+  readonly spawn: { readonly x: number; readonly y: number; readonly z: number } | undefined;
+  /** Context of the 3D view, or the one the next 3D view opens with. */
+  readonly context: SceneContext | undefined;
+  /** A dimension, view or depth is loading. */
+  readonly changing: boolean;
+  /** 3D regions still to load. */
+  readonly loading: number;
+  readonly failure: string | undefined;
+  /** A cave slice has loaded with no cave surface here. */
+  readonly emptyCaves: boolean;
+  /** Weather, clouds and time of day apply: Overworld surface. */
+  readonly atmosphere: boolean;
+  readonly navigation: DepthNavigation | undefined;
+  readonly discoveries: DiscoveryStats | undefined;
+  readonly focusedDiscovery: DiscoveryGroup | undefined;
+  /** The block under the pointer; `y` only in 3D. */
+  readonly pointed: { readonly x: number; readonly y?: number; readonly z: number } | undefined;
+}
+
+export type ViewerListener = (
+  view: ViewState,
+  status: WorldStatus,
+  settings: WorldSettings,
+) => void;
 
 export interface MapelixViewerOptions {
   readonly tiles: TileIndex;
@@ -39,6 +150,8 @@ export interface MapelixViewerOptions {
    * Off by default: the world first shows straight down, like the map.
    */
   readonly autoTilt?: number;
+  /** Initial 3D settings. */
+  readonly settings?: Partial<WorldSettings>;
   /** Extra 2D map options. */
   readonly map?: Pick<
     TileMapOptions,
@@ -46,6 +159,8 @@ export interface MapelixViewerOptions {
   >;
   /** Accessible name of the view. */
   readonly label?: string;
+  /** Text of the discovery card (default English). */
+  readonly formatDiscoveryDetails?: (group: DiscoveryGroup) => DiscoveryDetailText;
   readonly onViewChange?: (view: ViewState) => void;
   readonly onModeChange?: (mode: ViewMode) => void;
   /** The 3D world could not be shown; the viewer stays a 2D map. */
@@ -62,15 +177,30 @@ const TILT_MS = 700;
 const POLL_MS = 100;
 /** Time without a wheel event after which the 3D view counts as at rest, in ms. */
 const WHEEL_REST_MS = 250;
+/** Scale the 3D view zooms to when caves open from the map. */
+const CAVE_SCALE = 10;
 
 type WorldModule = typeof import("../three/world-viewer.js");
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
+function isWorldDimension(dimension: string): boolean {
+  try {
+    parseDimension(dimension);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * One view of a world: a light 2D tile map that turns into the 3D world at the same center
  * and scale when zoomed in past `thresholds.toWorld`, and back into the map when zoomed out
  * below `thresholds.toMap`. The 3D engine loads only when first needed.
+ *
+ * Everything a host interface needs goes through this class: dimension, surface or caves,
+ * weather, time, discoveries, going places. `subscribe` reports every change, so a host can use
+ * the controls of `@mapelix/viewer/controls` or draw its own.
  */
 export class MapelixViewer {
   readonly map: TileMap;
@@ -94,6 +224,17 @@ export class MapelixViewer {
   private lastState: ViewState;
   private generation = 0;
   private disposed = false;
+  private settingsNow: WorldSettings;
+  private info: WorldInfo | undefined;
+  private contextGeneration = 0;
+  private contextRequest: AbortController | undefined;
+  private changing = false;
+  private failure: string | undefined;
+  private pointed: WorldStatus["pointed"];
+  private pickEvent: PointerEvent | undefined;
+  private focused: DiscoveryGroup | undefined;
+  private readonly listeners = new Set<ViewerListener>();
+  private publishQueued = false;
 
   constructor(element: HTMLElement, options: MapelixViewerOptions) {
     this.element = element;
@@ -102,6 +243,7 @@ export class MapelixViewer {
     this.projectionChoice = options.projection ?? "isometric";
     if (options.autoTilt !== undefined) tiltPitch(options.autoTilt);
     this.autoTiltDegrees = options.autoTilt;
+    this.settingsNow = { ...DEFAULT_WORLD_SETTINGS, ...options.settings };
     if (getComputedStyle(element).position === "static") element.style.position = "relative";
     this.mapLayer = this.layer();
     this.worldLayer = this.layer();
@@ -115,6 +257,8 @@ export class MapelixViewer {
       this.worldLayer.addEventListener(type, listener, { passive: true, capture: true });
     // Keys follow the pointer: a press on the view takes the focus back from any control.
     element.addEventListener("pointerdown", this.onPointerDown, { capture: true });
+    element.addEventListener("pointermove", this.onPointerMove, { passive: true });
+    element.addEventListener("pointerleave", this.onPointerLeave, { passive: true });
     this.worldLayer.addEventListener("keydown", this.onWorldKey);
     this.map = new TileMap(this.mapLayer, {
       ...options.map,
@@ -127,14 +271,17 @@ export class MapelixViewer {
       onViewChange: () => this.emit(),
     });
     this.lastState = this.mapState();
-    // A view that starts zoomed in past the switch scale opens in 3D.
-    queueMicrotask(() => this.mapRested());
+    // A view that starts zoomed in past the switch scale, or in caves, opens in 3D.
+    queueMicrotask(() => {
+      if (this.settingsNow.viewMode === "caves") void this.enterWorld();
+      else this.mapRested();
+    });
   }
 
   /** The shared view: center, scale and, in 3D, the camera direction. */
   get view(): ViewState {
     return this.modeNow === "3d" && this.worldViewer !== undefined
-      ? this.worldState(this.worldViewer)
+      ? this.cameraState(this.worldViewer)
       : this.mapState();
   }
 
@@ -146,6 +293,14 @@ export class MapelixViewer {
     return this.map.dimension;
   }
 
+  /** Dimensions the viewer can show: those of the map, and every world dimension in 3D. */
+  get dimensions(): string[] {
+    const names = [...this.map.dimensions];
+    if (this.hasWorld)
+      for (const name of Object.keys(DIMENSIONS)) if (!names.includes(name)) names.push(name);
+    return names;
+  }
+
   /** The 3D viewer while it is shown, for hosts that use more of its API. */
   get world(): WorldViewer | undefined {
     return this.modeNow === "3d" ? this.worldViewer : undefined;
@@ -154,6 +309,45 @@ export class MapelixViewer {
   /** True when a 3D world is configured and has not failed. */
   get hasWorld(): boolean {
     return this.options.world !== undefined && !this.worldBroken;
+  }
+
+  get settings(): WorldSettings {
+    return this.settingsNow;
+  }
+
+  get status(): WorldStatus {
+    const world = this.modeNow === "3d" ? this.worldViewer : undefined;
+    const snapshot = world?.snapshot();
+    const context = snapshot?.context ?? this.safeContext();
+    const streaming = snapshot?.streaming;
+    return {
+      available: this.hasWorld,
+      shown: world !== undefined,
+      name: this.info?.name,
+      spawn: this.info?.spawn,
+      context,
+      changing: this.changing || (this.switching && this.modeNow === "2d"),
+      loading: streaming?.remaining ?? 0,
+      failure: this.failure,
+      emptyCaves:
+        context?.mode === "caves" &&
+        streaming !== undefined &&
+        streaming.cached > 0 &&
+        streaming.remaining === 0 &&
+        streaming.quads === 0,
+      atmosphere: context?.dimension === "overworld" && context.mode === "surface",
+      navigation: snapshot?.navigation,
+      discoveries: snapshot?.discoveries,
+      focusedDiscovery: world === undefined ? undefined : this.focused,
+      pointed: this.pointed,
+    };
+  }
+
+  /** Calls `listener` now and after every change of the view, status or settings. */
+  subscribe(listener: ViewerListener): () => void {
+    this.listeners.add(listener);
+    listener(this.view, this.status, this.settingsNow);
+    return () => this.listeners.delete(listener);
   }
 
   get thresholds(): SwitchThresholds {
@@ -175,6 +369,11 @@ export class MapelixViewer {
     this.emit();
   }
 
+  /** Rules that show perspective inside an isometric 3D view; undefined turns them off. */
+  setAutoPerspective(rules: AutoPerspective | undefined): void {
+    this.worldViewer?.setAutoPerspective(rules);
+  }
+
   get autoTilt(): number | undefined {
     return this.autoTiltDegrees;
   }
@@ -185,23 +384,174 @@ export class MapelixViewer {
     this.autoTiltDegrees = degrees;
   }
 
+  /** Shows another dimension at the same place, on the map or in 3D. */
   setDimension(dimension: string): void {
     if (dimension === this.map.dimension) return;
-    if (this.modeNow === "3d") void this.showMap(false);
-    else {
+    this.map.setDimension(dimension);
+    this.settingsNow = { ...this.settingsNow, viewMode: "surface" };
+    this.focused = undefined;
+    if (this.modeNow === "3d") {
+      if (isWorldDimension(dimension)) void this.reloadWorld();
+      else void this.showMap(false);
+    } else if (this.switching) {
       // Drops a 3D world still loading for the previous dimension.
       this.generation++;
+      this.switching = false;
       this.hideWorldLayer();
     }
-    this.switching = false;
-    this.map.setDimension(dimension);
+    this.emit();
+    this.publish();
+  }
+
+  /** Surface or caves. Caves need the 3D world, which opens if the map is shown. */
+  setViewMode(mode: WorldSettings["viewMode"]): void {
+    if (mode === "caves" && !this.hasWorld) return;
+    this.updateSettings({ viewMode: mode });
+    if (this.modeNow === "3d") void this.reloadWorld();
+    else if (mode === "caves") void this.enterWorld(CAVE_SCALE);
+  }
+
+  /** Moves or resizes the cave slice; values snap to the dimension's 16-block grid. */
+  setCaveSlice(minY: number, thickness = this.settingsNow.caveThickness): void {
+    const config = DIMENSIONS[parseDimension(this.worldDimension())];
+    const size = CAVE_LIMITS.thicknesses.includes(thickness)
+      ? thickness
+      : CAVE_LIMITS.defaultThickness;
+    const lowest = Math.max(config.minY, Math.min(Math.round(minY / 16) * 16, config.maxY - size));
+    this.updateSettings({ caveMinY: lowest, caveThickness: size });
+    if (this.modeNow === "3d" && this.settingsNow.viewMode === "caves") void this.reloadWorld();
+  }
+
+  /** Hides Nether terrain from this height up, in the surface view. */
+  setNetherCeiling(y: number): void {
+    this.updateSettings({ netherCeilingY: Math.round(y / 16) * 16 });
+    if (
+      this.modeNow === "3d" &&
+      this.settingsNow.viewMode === "surface" &&
+      this.worldDimension() === "nether"
+    )
+      void this.reloadWorld();
+  }
+
+  setAutoDepth(enabled: boolean): void {
+    this.updateSettings({ autoDepth: enabled });
+    if (!this.changing) this.worldViewer?.setAutoDepth(enabled);
+  }
+
+  /** Held vertical movement in caves: 1 up, −1 down, 0 stop. */
+  setVerticalMovement(direction: VerticalMovement): void {
+    this.worldViewer?.setVerticalMovement(direction);
+  }
+
+  /** Brings a lost cave camera back above the slice. */
+  recoverCamera(): void {
+    this.updateSettings({ selectionTool: "off" });
+    this.worldViewer?.setSelectionTool("off");
+    this.worldViewer?.recoverCamera();
+  }
+
+  setTimeOfDay(hour: number): void {
+    const value = ((hour % 24) + 24) % 24;
+    this.updateSettings({ hour: value });
+    this.worldViewer?.setTimeOfDay(value);
+  }
+
+  setClouds(enabled: boolean): void {
+    this.updateSettings({ clouds: enabled });
+    this.worldViewer?.setClouds(enabled);
+  }
+
+  setWeather(weather: WeatherMode): void {
+    this.updateSettings({ weather });
+    this.worldViewer?.setWeather(weather);
+  }
+
+  /** Which discoveries show, in the 3D scene and the list; checked like the engine does. */
+  setDiscoveryFilters(filters: Partial<DiscoveryFilters>): void {
+    const next = discoveryFilters({ ...this.settingsNow.discoveries, ...filters });
+    this.updateSettings({ discoveries: next });
+    this.worldViewer?.setDiscoveryFilters(next);
+  }
+
+  /** Flies to a discovery, switching to its depth if needed. */
+  async focusDiscovery(group: DiscoveryGroup): Promise<boolean> {
+    const world = this.worldViewer;
+    if (world === undefined || this.modeNow !== "3d") return false;
+    const done = await world.focusDiscovery(group);
+    if (done) this.syncFromWorld(world);
+    this.publish();
+    return done;
+  }
+
+  clearDiscoveryFocus(): void {
+    this.worldViewer?.clearDiscoveryFocus();
+    this.focused = undefined;
+    this.publish();
+  }
+
+  /** The text of a discovery card, from the host formatter or the English default. */
+  describeDiscovery(group: DiscoveryGroup): DiscoveryDetailText {
+    if (this.options.formatDiscoveryDetails) return this.options.formatDiscoveryDetails(group);
+    return {
+      title: `${DISCOVERY_KINDS[group.kind]?.label ?? "Discovery"} × ${group.count}`,
+      lines: [
+        `X ${group.x} · Y ${group.y} · Z ${group.z}`,
+        `${group.exposed} exposed · ${group.buried} buried · ${group.unknown} uncertain`,
+      ],
+      closeLabel: "Close discovery details",
+    };
+  }
+
+  /** Limits cave exploration to an area; undefined clears it. */
+  setSelection(selection: HorizontalSelection | undefined): void {
+    const value = selection === undefined ? undefined : horizontalSelection(selection);
+    this.updateSettings({ selection: value });
+    this.worldViewer?.setSelection(value);
+  }
+
+  /** Selects the default area around the view center. */
+  selectAroundView(): void {
+    const view = this.view;
+    this.setSelection(selectionAround(view.x, view.z));
+  }
+
+  setSelectionTool(tool: SelectionTool): void {
+    this.updateSettings({ selectionTool: tool });
+    this.worldViewer?.setSelectionTool(tool);
+  }
+
+  /** Moves the view to block `x`, `z`, keeping the mode and scale. */
+  goTo(x: number, z: number): void {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (this.modeNow === "3d" && this.worldViewer !== undefined) this.worldViewer.flyTo(x, z);
+    else this.map.setView({ x, z });
+  }
+
+  /** Goes to the world spawn, or to the start view without a world. */
+  async goHome(): Promise<void> {
+    const source = this.options.world;
+    if (source !== undefined && this.hasWorld && isWorldDimension(this.worldDimension())) {
+      try {
+        const info = this.info ?? (await this.loadWorldInfo(source.base, this.surfaceContext()));
+        this.goTo(info.spawn.x, info.spawn.z);
+        return;
+      } catch {
+        /* Falls back to the start view. */
+      }
+    }
+    this.goTo(this.options.view?.x ?? 0, this.options.view?.z ?? 0);
+  }
+
+  /** Turns the 3D camera to face north. */
+  faceNorth(): void {
+    this.worldViewer?.faceNorth();
     this.emit();
   }
 
   /**
    * Gives the keyboard focus to the view shown: arrows and +/− on the map; WASD, arrows, Q/E,
-   * R/F (and Space/C in caves) in 3D. Hosts call it after a pointer press on their own controls,
-   * so a focused button never takes those keys.
+   * R/F, +/− (and Space/C in caves) in 3D. Hosts call it after a pointer press on their own
+   * controls, so a focused button never takes those keys.
    */
   focus(): void {
     this.focusTarget()?.focus({ preventScroll: true });
@@ -228,14 +578,132 @@ export class MapelixViewer {
   dispose(): void {
     this.disposed = true;
     this.generation++;
+    this.contextRequest?.abort();
     cancelAnimationFrame(this.tween);
     clearInterval(this.poll);
     this.worldViewer?.dispose();
     this.worldViewer = undefined;
+    this.listeners.clear();
     this.element.removeEventListener("pointerdown", this.onPointerDown, { capture: true });
+    this.element.removeEventListener("pointermove", this.onPointerMove);
+    this.element.removeEventListener("pointerleave", this.onPointerLeave);
     this.map.dispose();
     this.mapLayer.remove();
     this.worldLayer.remove();
+  }
+
+  private updateSettings(change: Partial<WorldSettings>): void {
+    this.settingsNow = { ...this.settingsNow, ...change };
+    this.publish();
+  }
+
+  /** The 3D dimension for the map's dimension (the map may hold others). */
+  private worldDimension(): string {
+    return this.map.dimension;
+  }
+
+  private surfaceContext(): SceneContext {
+    const dimension = parseDimension(this.worldDimension());
+    return dimension === "nether"
+      ? sceneContext(dimension, this.settingsNow.netherCeilingY)
+      : sceneContext(dimension);
+  }
+
+  /** The context the settings ask for in the map's dimension. */
+  private requestedContext(): SceneContext {
+    const { viewMode, caveMinY, caveThickness } = this.settingsNow;
+    if (viewMode === "surface") return this.surfaceContext();
+    const dimension = parseDimension(this.worldDimension());
+    const config = DIMENSIONS[dimension];
+    const minY = Math.max(config.minY, Math.min(caveMinY, config.maxY - caveThickness));
+    return sceneContext(dimension, { mode: "caves", minY, maxY: minY + caveThickness });
+  }
+
+  private safeContext(): SceneContext | undefined {
+    if (!this.hasWorld || !isWorldDimension(this.worldDimension())) return undefined;
+    try {
+      return this.requestedContext();
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Loads the context the settings ask for into the 3D viewer, keeping the view. */
+  private async reloadWorld(): Promise<void> {
+    const world = this.worldViewer;
+    const source = this.options.world;
+    if (world === undefined || source === undefined) return;
+    const id = ++this.contextGeneration;
+    this.contextRequest?.abort();
+    const request = (this.contextRequest = new AbortController());
+    this.changing = true;
+    this.failure = undefined;
+    world.setAutoDepth(false);
+    this.publish();
+    try {
+      const context = this.requestedContext();
+      const info = await this.loadWorldInfo(source.base, context, request.signal);
+      if (id !== this.contextGeneration || this.worldViewer !== world) return;
+      const sameDimension = this.info?.dimension === info.dimension;
+      world.setWorld(info, true);
+      if (!sameDimension) world.setSelection(this.settingsNow.selection);
+      this.info = info;
+      this.focused = undefined;
+      this.syncFromWorld(world);
+    } catch (cause) {
+      if (id !== this.contextGeneration || request.signal.aborted) return;
+      this.failure = cause instanceof Error ? cause.message : String(cause);
+      // The settings follow what is still shown.
+      this.syncFromWorld(world);
+    } finally {
+      if (id === this.contextGeneration) {
+        this.changing = false;
+        world.setAutoDepth(this.settingsNow.autoDepth);
+        this.publish();
+      }
+    }
+  }
+
+  /** Follows context changes the engine made itself: depth following, discovery focus. */
+  private syncFromWorld(world: WorldViewer): void {
+    if (this.changing) return;
+    const snapshot = world.snapshot();
+    this.syncContext(snapshot.context);
+    if (snapshot.selection !== this.settingsNow.selection)
+      this.settingsNow = { ...this.settingsNow, selection: snapshot.selection };
+  }
+
+  private syncContext(context: SceneContext): void {
+    const change: Partial<{ -readonly [K in keyof WorldSettings]: WorldSettings[K] }> = {
+      viewMode: context.mode,
+    };
+    if (context.mode === "caves") {
+      change.caveMinY = context.minY;
+      change.caveThickness = context.maxY - context.minY;
+    } else if (context.dimension === "nether") change.netherCeilingY = context.maxY;
+    const next = { ...this.settingsNow, ...change };
+    if (
+      next.viewMode !== this.settingsNow.viewMode ||
+      next.caveMinY !== this.settingsNow.caveMinY ||
+      next.caveThickness !== this.settingsNow.caveThickness ||
+      next.netherCeilingY !== this.settingsNow.netherCeilingY
+    ) {
+      this.settingsNow = next;
+      this.publish();
+    }
+  }
+
+  /** Reports to subscribers once per task, however many changes it made. */
+  private publish(): void {
+    if (this.publishQueued || this.listeners.size === 0) return;
+    this.publishQueued = true;
+    queueMicrotask(() => {
+      this.publishQueued = false;
+      if (this.disposed) return;
+      const view = this.view,
+        status = this.status;
+      for (const listener of this.listeners) listener(view, status, this.settingsNow);
+    });
   }
 
   private focusTarget(): HTMLElement | undefined {
@@ -253,6 +721,39 @@ export class MapelixViewer {
     const target = this.focusTarget();
     if (target !== undefined && event.target instanceof Node && target.contains(event.target))
       if (document.activeElement !== target) target.focus({ preventScroll: true });
+  };
+
+  /** The block under a mouse pointer, at most once per frame (3D picking marches a ray). */
+  private readonly onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType !== "mouse") return;
+    if (this.pickEvent === undefined)
+      requestAnimationFrame(() => {
+        const pending = this.pickEvent;
+        this.pickEvent = undefined;
+        if (pending === undefined || this.disposed) return;
+        const bounds = this.element.getBoundingClientRect();
+        if (this.modeNow === "3d" && this.worldViewer !== undefined)
+          this.pointed = this.worldViewer.pick(pending.clientX, pending.clientY);
+        else {
+          const block = blockAt(
+            this.map.view,
+            bounds.width,
+            bounds.height,
+            pending.clientX - bounds.left,
+            pending.clientY - bounds.top,
+          );
+          this.pointed = { x: Math.floor(block.x), z: Math.floor(block.z) };
+        }
+        this.publish();
+      });
+    this.pickEvent = event;
+  };
+
+  private readonly onPointerLeave = (): void => {
+    this.pickEvent = undefined;
+    if (this.pointed === undefined) return;
+    this.pointed = undefined;
+    this.publish();
   };
 
   /** `+` and `−` zoom the 3D view as they zoom the map. */
@@ -286,7 +787,7 @@ export class MapelixViewer {
     };
   }
 
-  private worldState(world: WorldViewer): ViewState {
+  private cameraState(world: WorldViewer): ViewState {
     const snapshot = world.snapshot();
     return {
       mode: this.modeNow,
@@ -313,46 +814,57 @@ export class MapelixViewer {
       state.heading !== last.heading ||
       state.pitch !== last.pitch ||
       state.projection !== last.projection
-    )
+    ) {
       this.options.onViewChange?.(state);
+      this.publish();
+    }
   }
 
   private mapRested(): void {
     if (this.modeNow !== "2d" || this.switching || !this.hasWorld) return;
+    if (!isWorldDimension(this.worldDimension())) return;
     if (restingMode("2d", this.map.view.pixelsPerBlock, this.thresholdValues) === "3d")
       void this.enterWorld();
   }
 
-  private loadWorldInfo(base: string, dimension: string): Promise<WorldInfo> {
-    let info = this.worlds.get(dimension);
+  private loadWorldInfo(
+    base: string,
+    context: SceneContext,
+    signal?: AbortSignal,
+  ): Promise<WorldInfo> {
+    const search = contextSearch(context).toString();
+    let info = this.worlds.get(search);
     if (info === undefined) {
-      const url = new URL(`${base}/world.json`, location.href);
-      url.searchParams.set("dimension", dimension);
-      info = fetch(url).then(async (response) => {
+      const url = new URL(`${base}/world.json?${search}`, location.href);
+      info = fetch(url, { signal }).then(async (response) => {
         if (!response.ok) throw new Error(`The 3D world could not be loaded (${response.status})`);
         return (await response.json()) as WorldInfo;
       });
-      info.catch(() => this.worlds.delete(dimension));
-      this.worlds.set(dimension, info);
+      // Only surfaces are kept: cave metadata follows each slice.
+      if (context.mode === "surface") {
+        this.worlds.set(search, info);
+        info.catch(() => this.worlds.delete(search));
+      }
     }
     return info;
   }
 
-  private async enterWorld(): Promise<boolean> {
+  private async enterWorld(minimumScale = 0): Promise<boolean> {
     const source = this.options.world;
     if (source === undefined || this.worldBroken || this.switching || this.disposed) return false;
+    if (!isWorldDimension(this.worldDimension())) return false;
     this.switching = true;
+    this.publish();
     const generation = ++this.generation;
-    const dimension = this.map.dimension;
     let world: WorldViewer | undefined;
     try {
       this.worldModule ??= import("../three/world-viewer.js");
       const [module, info] = await Promise.all([
         this.worldModule,
-        this.loadWorldInfo(source.base, dimension),
+        this.loadWorldInfo(source.base, this.requestedContext()),
       ]);
       if (generation !== this.generation) return false;
-      const start = this.mapTarget();
+      const start = this.mapTarget(minimumScale);
       this.worldLayer.style.visibility = "visible";
       world = await module.WorldViewer.create(
         this.worldLayer,
@@ -363,14 +875,37 @@ export class MapelixViewer {
           projection: this.projectionChoice,
           regionBase: `${source.base}/regions`,
           discoveryBase: `${source.base}/discoveries`,
+          clouds: this.settingsNow.clouds,
+          weather: this.settingsNow.weather,
+          autoDepth: this.settingsNow.autoDepth,
+          discoveryFilters: this.settingsNow.discoveries,
+          ...(this.settingsNow.selection ? { selection: this.settingsNow.selection } : {}),
+          // The host draws the discovery card where its controls leave room.
+          discoveryDetails: false,
+          loadDepth: (context, signal) => this.loadWorldInfo(source.base, context, signal),
+          onDepthChange: (context) => this.syncContext(context),
+          onDiscoverySelect: (group) => void this.focusDiscovery(group),
+          onDiscoveryFocusChange: (group) => {
+            this.focused = group;
+            this.publish();
+          },
+          onSelectionChange: (change) => {
+            this.settingsNow = { ...this.settingsNow, selection: change.selection };
+            if (change.minY !== this.settingsNow.caveMinY) this.setCaveSlice(change.minY);
+            this.publish();
+          },
         },
       );
       if (generation !== this.generation) return false;
       world.setPixelsPerBlock(start.pixelsPerBlock);
+      world.setTimeOfDay(this.settingsNow.hour);
+      world.setSelectionTool(this.settingsNow.selectionTool);
+      this.info = info;
+      this.failure = undefined;
       await this.waitForTerrain(world, generation);
       if (generation !== this.generation) return false;
       // The map may have moved while the world loaded: start from where it is now.
-      const now = this.mapTarget();
+      const now = this.mapTarget(minimumScale);
       world.setCameraView({ x: now.x, z: now.z, heading: 0, pitch: TOP_DOWN_PITCH });
       world.setPixelsPerBlock(now.pixelsPerBlock);
       this.worldViewer = world;
@@ -386,6 +921,7 @@ export class MapelixViewer {
       this.moveFocus();
       this.options.onModeChange?.("3d");
       this.emit();
+      this.publish();
       if (this.autoTiltDegrees !== undefined)
         await this.turn(
           this.worldViewer,
@@ -397,6 +933,7 @@ export class MapelixViewer {
     } catch (error) {
       if (generation === this.generation) {
         this.worldBroken = true;
+        this.failure = error instanceof Error ? error.message : String(error);
         this.hideWorldLayer();
         this.options.onWorldError?.(error);
       }
@@ -406,13 +943,18 @@ export class MapelixViewer {
       if (this.modeNow === "2d" && this.worldViewer === undefined && generation === this.generation)
         this.hideWorldLayer();
       if (generation === this.generation) this.switching = false;
+      this.publish();
     }
   }
 
   /** The map view to hand to the 3D world: at least the switch scale. */
-  private mapTarget(): MapView {
+  private mapTarget(minimumScale: number): MapView {
     const view = this.map.view;
-    const pixelsPerBlock = Math.max(view.pixelsPerBlock, this.thresholdValues.toWorld);
+    const pixelsPerBlock = Math.max(
+      view.pixelsPerBlock,
+      this.thresholdValues.toWorld,
+      minimumScale,
+    );
     return { x: view.x, z: view.z, pixelsPerBlock };
   }
 
@@ -437,6 +979,9 @@ export class MapelixViewer {
     const world = this.worldViewer!;
     const generation = ++this.generation;
     this.switching = true;
+    this.contextGeneration++;
+    this.contextRequest?.abort();
+    this.changing = false;
     clearInterval(this.poll);
     if (animate) {
       const view = world.snapshot().view;
@@ -448,7 +993,11 @@ export class MapelixViewer {
       );
       if (generation !== this.generation) return;
     }
-    const state = this.worldState(world);
+    const state = this.cameraState(world);
+    // The map shows the surface: the next 3D view opens there too.
+    this.settingsNow = { ...this.settingsNow, viewMode: "surface" };
+    this.focused = undefined;
+    this.pointed = undefined;
     this.map.setView({ x: state.x, z: state.z, pixelsPerBlock: state.pixelsPerBlock }, false);
     this.modeNow = "2d";
     this.mapLayer.inert = false;
@@ -459,6 +1008,7 @@ export class MapelixViewer {
     this.moveFocus();
     this.options.onModeChange?.("2d");
     this.emit();
+    this.publish();
     if (animate) await new Promise((resolve) => setTimeout(resolve, FADE_MS));
     world.dispose();
     if (this.worldViewer === world) this.worldViewer = undefined;
@@ -512,9 +1062,11 @@ export class MapelixViewer {
     });
   }
 
-  /** Reports 3D view changes and returns to the map once the world rests below the map scale. */
+  /** Reports 3D changes and returns to the map once the world rests below the map scale. */
   private watchWorld(): void {
     if (this.worldViewer === undefined || this.modeNow !== "3d") return;
+    this.syncFromWorld(this.worldViewer);
+    this.publish();
     const before = this.lastState;
     this.emit();
     const state = this.lastState;
@@ -526,6 +1078,7 @@ export class MapelixViewer {
       before.pitch === state.pitch;
     if (
       !this.switching &&
+      !this.changing &&
       still &&
       this.pointers.size === 0 &&
       performance.now() - this.lastWheel > WHEEL_REST_MS &&

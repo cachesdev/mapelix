@@ -12,6 +12,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./controls": {
+      "types": "./dist/controls/index.d.ts",
+      "import": "./dist/controls/index.js"
+    },
     "./three": {
       "types": "./dist/three/world-viewer.d.ts",
       "import": "./dist/three/world-viewer.js"

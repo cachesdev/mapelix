@@ -19,8 +19,23 @@ publication on the next page load. `HOST` and `PORT` choose the address (adapter
 With `MAPELIX_WORLD_DIRECTORY` set to a Bedrock world folder (only read, never written), the
 server also serves the 3D world below `/world`. Zooming in past 5 CSS pixels per block then turns
 the map into the 3D world, isometric and looking straight down, at the same center and scale;
-zooming out below 4 turns the camera back north and down and shows the map again. The 3D button
-switches at once, and the cube button picks isometric or perspective. `MAPELIX_CACHE_DIRECTORY`
+zooming out below 4 turns the camera back north and down and shows the map again. The controls come from
+`@mapelix/viewer/controls` and only call the `MapelixViewer` API, with texts from the demo
+(`src/lib/texts.ts`):
+
+- bottom right: isometric or perspective (3D), 3D/2D, zoom; bottom left: settings, home (world
+  spawn), dimension; bottom center in caves: descend, ascend, recover the camera;
+- top: coordinates (the block under the mouse, else the view center), scale and status; compass in
+  3D (tap to face north);
+- settings panel: Surface or Caves (slice thickness and depth, automatic depth, exploration area),
+  Nether ceiling, clouds, rain, thunderstorm and time of day (Overworld surface), discoveries
+  (filters, list; a tap flies there and opens its card), go to coordinates.
+
+On phones the panel and the discovery card take the free space between the top row and the
+buttons; they close with ×, Escape, a swipe down on the panel header or a tap on the map. Keys go to
+the map or the 3D view after any tap on a button: arrows and +/− on the map; WASD, arrows, Q/E,
+R/F, +/− in 3D, and Space/C up and down in caves. Clouds, weather and automatic depth are kept on the
+device; the address keeps the view and the other settings. `MAPELIX_CACHE_DIRECTORY`
 chooses where 3D regions are cached (default: the system temporary folder).
 
 For development, `pnpm --filter @mapelix/demo dev` serves on `127.0.0.1`, and `dev:lan` on every
@@ -37,3 +52,8 @@ desktop profile. They render the shared fixture world once into `.local/demo-exp
 `MAPELIX_E2E_TILES_DIRECTORY` to use another export. They cover drag and glide, pinch, double-tap,
 wheel and keys, sharp enlarged tiles, the switch to 3D and back at the same center and scale, center-first loading and cancelled requests, the layout of
 the controls, and the first display time against Leaflet on the same export.
+
+`tests/layout.e2e.ts` checks that no control overlaps another, the coordinates, an open panel or
+the discovery card, in 2D and 3D, panels open and closed, on phones (portrait and landscape),
+tablets and desktops, in light and dark. Set `MAPELIX_CAPTURES` to a folder to keep a screenshot of
+each layout.

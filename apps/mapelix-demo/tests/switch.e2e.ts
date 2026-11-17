@@ -208,3 +208,29 @@ test("after a tap on a button, Space and the movement keys go to the 3D view", a
     "Isometric view",
   );
 });
+
+test("in caves, after a tap on the cube, Space raises the camera and keeps the projection", async ({
+  page,
+}, info) => {
+  test.setTimeout(90_000);
+  await open(page, WORLD_URL + START);
+  await page.evaluate(() => window.__mapelixViewer!.setViewMode("caves"));
+  await waitForMode(page, "3d");
+  await expect
+    .poll(() => page.evaluate(() => window.__mapelixViewer!.status.context?.mode))
+    .toBe("caves");
+  await expect.poll(() => page.evaluate(() => window.__mapelixViewer!.status.changing)).toBe(false);
+  const cube = page.getByRole("button", { name: "Isometric view" });
+  if (info.project.name === "phone") await cube.tap();
+  else await cube.click();
+  await expect
+    .poll(() => page.evaluate(() => window.__mapelixViewer!.projection))
+    .toBe("perspective");
+  const y = () => page.evaluate(() => window.__mapelixViewer!.world!.snapshot().view.y);
+  const before = await y();
+  await page.keyboard.down("Space");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("Space");
+  await expect.poll(y).toBeGreaterThan(before + 1);
+  expect(await page.evaluate(() => window.__mapelixViewer!.projection)).toBe("perspective");
+});
