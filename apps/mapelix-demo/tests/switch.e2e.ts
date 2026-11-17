@@ -121,14 +121,14 @@ test("zooming in turns the map into the 3D world at the same center and scale, a
   if (phone) await pinch(page, center, 240, 60);
   else {
     await page.mouse.move(center.x, center.y);
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 8; i += 1) {
       await page.mouse.wheel(0, 300);
       await page.waitForTimeout(40);
     }
   }
   await waitForMode(page, "2d");
   const back = await mapView(page);
-  expect(back.pixelsPerBlock).toBeLessThan(4);
+  expect(back.pixelsPerBlock).toBeLessThan(2);
   // The map picks up exactly where the world was.
   const last = await page.evaluate(() => (Reflect.get(window, "__trace") as ViewState[]).at(-1)!);
   expect(Math.hypot(back.x - last.x, back.z - last.z)).toBeLessThan(0.5);

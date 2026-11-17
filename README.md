@@ -36,7 +36,7 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
 
 3. **View** it. The demo is a full-screen map for phones and desktops. With
    `MAPELIX_WORLD_DIRECTORY`, zooming in past 5 CSS pixels per block turns the map into the 3D
-   world at the same place and scale, and zooming out below 4 turns it back into the map:
+   world at the same place and scale, and zooming out below 2 turns it back into the map:
 
    ```sh
    MAPELIX_TILES_DIRECTORY=/path/to/map \

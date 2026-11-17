@@ -142,7 +142,7 @@ export interface MapelixViewerOptions {
   readonly world?: WorldSource;
   readonly dimension?: string;
   readonly view?: Partial<MapView>;
-  /** Scales at which the view changes mode (default: 3D above 5, map below 4 px/block). */
+  /** Scales at which the view changes mode (default: 3D above 5, map below 2 px/block). */
   readonly thresholds?: SwitchThresholds;
   /** 3D projection (default isometric). */
   readonly projection?: Projection;

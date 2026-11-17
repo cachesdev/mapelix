@@ -11,15 +11,16 @@ import {
 } from "./view-state.js";
 
 describe("view switch thresholds", () => {
-  it("switches to 3D above 5 and back to the map below 4 by default", () => {
+  it("switches to 3D above 5 and back to the map below 2 by default", () => {
     expect(restingMode("2d", 5, DEFAULT_THRESHOLDS)).toBe("2d");
     expect(restingMode("2d", 5.01, DEFAULT_THRESHOLDS)).toBe("3d");
     expect(restingMode("3d", 4, DEFAULT_THRESHOLDS)).toBe("3d");
-    expect(restingMode("3d", 3.99, DEFAULT_THRESHOLDS)).toBe("2d");
+    expect(restingMode("3d", 2, DEFAULT_THRESHOLDS)).toBe("3d");
+    expect(restingMode("3d", 1.99, DEFAULT_THRESHOLDS)).toBe("2d");
   });
 
   it("keeps the current mode anywhere in the margin between the thresholds", () => {
-    for (let scale = 4; scale <= 5; scale += 0.05) {
+    for (let scale = 2; scale <= 5; scale += 0.05) {
       expect(restingMode("2d", scale, DEFAULT_THRESHOLDS)).toBe("2d");
       expect(restingMode("3d", scale, DEFAULT_THRESHOLDS)).toBe("3d");
     }

@@ -19,7 +19,7 @@ publication on the next page load. `HOST` and `PORT` choose the address (adapter
 With `MAPELIX_WORLD_DIRECTORY` set to a Bedrock world folder (only read, never written), the
 server also serves the 3D world below `/world`. Zooming in past 5 CSS pixels per block then turns
 the map into the 3D world, isometric and looking straight down, at the same center and scale;
-zooming out below 4 turns the camera back north and down and shows the map again. The controls come from
+zooming out below 2 turns the camera back north and down and shows the map again. The controls come from
 `@mapelix/viewer/controls` and only call the `MapelixViewer` API, with texts from the demo
 (`src/lib/texts.ts`):
 

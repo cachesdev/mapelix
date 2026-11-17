@@ -29,7 +29,11 @@ export interface SwitchThresholds {
   readonly toMap: number;
 }
 
-export const DEFAULT_THRESHOLDS: SwitchThresholds = { toWorld: 5, toMap: 4 };
+/**
+ * 3D above 5 CSS pixels per block, the map again below 2: the 3D view, isometric above all, can
+ * zoom out to more than twice the scale it opened at before the map takes over.
+ */
+export const DEFAULT_THRESHOLDS: SwitchThresholds = { toWorld: 5, toMap: 2 };
 
 /** The most top-down pitch the 3D camera allows, in radians above the horizon. */
 export const TOP_DOWN_PITCH = Math.PI / 2 - 0.04;
