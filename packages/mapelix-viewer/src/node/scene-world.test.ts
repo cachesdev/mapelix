@@ -10,6 +10,12 @@ import {
   encodeSceneRegion,
   regionGridSize,
 } from "@mapelix/scene-prototype/format";
+import { decodeTextureAtlas } from "@mapelix/scene-prototype/texture-format";
+import {
+  makePng,
+  makeZip,
+  packFiles,
+} from "../../../mapelix-scene-prototype/test/synthetic-pack.js";
 import { NotCachedError, InvalidRegionError } from "./region-service";
 import { MissingWorldError, createSceneServer, type SceneServerOptions } from "./scene-world";
 
@@ -224,6 +230,66 @@ describe("scene server", () => {
     const revision = await server.getRevision();
     expect(revision).toMatch(/^[0-9a-f]{20}$/);
     expect(await readdir(options.cacheDirectory)).not.toContain("0123456789abcdef0123");
+    await server.close();
+  });
+
+  it("serves the atlas of its resource packs, keeps it on disk and lists the packs", async () => {
+    const pack = join(root, "pack.mcpack");
+    await writeFile(
+      pack,
+      makeZip(
+        packFiles({
+          name: "Synthetic",
+          uuid: "00000000-0000-4000-8000-0000000000c1",
+          version: [1, 2, 3],
+          terrain: { stone: { textures: "textures/blocks/stone" } },
+          blocks: { stone: { textures: "stone" } },
+          images: { "textures/blocks/stone.png": makePng(16, [9, 8, 7, 255]) },
+        }),
+      ),
+    );
+    const events: string[] = [];
+    const textured = {
+      ...options,
+      resourcePacks: [pack],
+      onEvent: (name: string) => void events.push(name),
+    };
+    const server = createSceneServer(textured);
+    const metadata = await server.getWorldMetadata();
+    expect(metadata.textures).toMatchObject({
+      tileSize: 16,
+      tiles: 1,
+      packs: [
+        { name: "Synthetic", version: "1.2.3", uuid: "00000000-0000-4000-8000-0000000000c1" },
+      ],
+    });
+    const fingerprint = metadata.textures!.fingerprint;
+    const atlas = decodeTextureAtlas((await server.loadTextureAtlas(fingerprint))!);
+    expect(Array.from(atlas.levels[0]!.subarray(0, 4))).toEqual([9, 8, 7, 255]);
+    expect(await server.loadTextureAtlas("0".repeat(20))).toBeUndefined();
+    expect((await server.stats()).textures).toMatchObject({ fingerprint });
+    await server.close();
+    expect(events).toContain("textures.built");
+
+    const restarted = createSceneServer(textured);
+    expect((await restarted.getWorldMetadata()).textures?.fingerprint).toBe(fingerprint);
+    await restarted.close();
+    expect(events).toContain("textures.cache-hit");
+
+    // Without packs the metadata does not change at all.
+    const plain = createSceneServer(options);
+    expect(await plain.getWorldMetadata()).not.toHaveProperty("textures");
+    await plain.close();
+  });
+
+  it("serves the world untextured when a pack cannot be read, and says why", async () => {
+    const broken = join(root, "broken.zip");
+    await writeFile(broken, "not a zip");
+    const server = createSceneServer({ ...options, resourcePacks: [broken] });
+    expect(await server.getWorldMetadata()).not.toHaveProperty("textures");
+    expect((await server.stats()).textures).toEqual({
+      error: expect.stringMatching(/broken\.zip: is not a zip archive/) as unknown,
+    });
     await server.close();
   });
 });

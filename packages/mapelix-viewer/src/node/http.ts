@@ -91,8 +91,8 @@ type Admission = { readonly cacheOnly: boolean; readonly release: () => void } |
 type Admit = (buildable: boolean) => Admission;
 
 /**
- * Serves the 3D viewer endpoints below `base`: `world.json`, `regions/<level>/<x>/<z>` and
- * `discoveries/<x>/<z>.bin`, each with the scene context in the query string. A request outside
+ * Serves the 3D viewer endpoints below `base`: `world.json`, `regions/<level>/<x>/<z>`,
+ * `discoveries/<x>/<z>.bin` and, with resource packs, `textures/<fingerprint>.bin`, each with the scene context in the query string. A request outside
  * the stored world gets an empty payload (`x-mapelix-cache: empty`), too many waiting builds a
  * 503 with `retry-after`, and a missing world a 503.
  */
@@ -136,6 +136,24 @@ export function createSceneHandler(
       } catch (cause) {
         return refusal(request, cause);
       }
+    }
+    const atlas = /^\/textures\/([0-9a-f]{20})\.bin$/.exec(path);
+    if (atlas !== null) {
+      let bytes: Uint8Array | undefined;
+      try {
+        bytes = await server.loadTextureAtlas(atlas[1]!);
+      } catch (cause) {
+        return refusal(request, cause);
+      }
+      if (bytes === undefined) return failure(404, "No such texture atlas");
+      const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      return new Response(body as ArrayBuffer, {
+        headers: {
+          "content-type": "application/octet-stream",
+          // The fingerprint names the content, so the atlas never changes in place.
+          "cache-control": "public, max-age=31536000, immutable",
+        },
+      });
     }
     const region = /^\/regions\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
     if (region !== null) return regionResponse(server, request, url, region, admit);

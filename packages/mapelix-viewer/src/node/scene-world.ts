@@ -34,6 +34,8 @@ import {
   type RegionServiceStats,
 } from "./region-service.js";
 import { engineFingerprint, worldRevision } from "./revision.js";
+import { loadSceneTextures, type SceneTextures } from "./textures.js";
+import type { ResourcePackInfo } from "@mapelix/scene-prototype/textures";
 
 export type { CacheStatus } from "./region-service.js";
 
@@ -66,6 +68,16 @@ export interface SceneServerOptions {
   readonly discoveryMaxPending?: number;
   /** Cache, pool and build events, for the host's log. */
   readonly onEvent?: SceneEvent;
+  /**
+   * Bedrock resource packs (folders, zip or .mcpack files), highest priority first, whose block
+   * textures the viewer may draw near the camera. A texture missing from one pack comes from
+   * the next. Without packs nothing changes.
+   */
+  readonly resourcePacks?: readonly string[];
+  /** Largest texture tile side, a power of two (default 32). */
+  readonly textureMaxTileSize?: number;
+  /** GPU memory the texture atlas may take with its mipmaps (default 32). */
+  readonly textureBudgetMiB?: number;
 }
 
 /** A served region or discovery index and where it came from. */
@@ -82,6 +94,19 @@ export interface WorldMetadata extends SceneContext {
   readonly caves: typeof CAVE_LIMITS;
   readonly snapshotRevision: string;
   readonly discoveries: typeof DISCOVERY_LIMITS;
+  /** Present when resource packs were given and their textures could be read. */
+  readonly textures?: WorldTextures;
+}
+
+/** The texture atlas a client may load from `textures/<fingerprint>.bin`. */
+export interface WorldTextures {
+  readonly fingerprint: string;
+  readonly tileSize: number;
+  readonly tiles: number;
+  /** GPU bytes of the atlas with its mipmaps. */
+  readonly gpuBytes: number;
+  /** The packs in use, highest priority first. */
+  readonly packs: readonly ResourcePackInfo[];
 }
 
 export interface PrewarmOptions {
@@ -109,6 +134,8 @@ export interface SceneServerStats {
     readonly cache: DiskCacheStats;
   };
   readonly prewarm: PrewarmResult;
+  /** The textures in use, the reason they are not, or nothing without packs. */
+  readonly textures?: WorldTextures | { readonly error: string };
 }
 
 /** The world folder holds no Bedrock world: a configuration error that a retry cannot fix. */
@@ -137,6 +164,8 @@ interface Opened {
   readonly surface: RegionService;
   readonly caves: RegionService;
   readonly discoveries: DiscoveryService;
+  readonly textures: SceneTextures | undefined;
+  readonly textureError: string | undefined;
 }
 
 /**
@@ -170,6 +199,11 @@ export function createSceneServer(options: SceneServerOptions) {
       positiveInteger(options.discoveryDiskCacheMiB ?? 64, "discoveryDiskCacheMiB") * MIB,
     discoveryPending: positiveInteger(options.discoveryMaxPending ?? 8, "discoveryMaxPending"),
   };
+  const resourcePacks = [...(options.resourcePacks ?? [])].map((pack) => resolve(pack));
+  const textureMaxTileSize = options.textureMaxTileSize ?? 32;
+  if (!Number.isInteger(Math.log2(textureMaxTileSize)) || textureMaxTileSize > 256)
+    throw new RangeError("textureMaxTileSize must be a power of two up to 256");
+  const textureBudget = positiveInteger(options.textureBudgetMiB ?? 32, "textureBudgetMiB") * MIB;
   const onEvent = options.onEvent;
   const event = (name: string, detail: Record<string, unknown>) => onEvent?.(name, detail);
   let opening: Promise<Opened> | undefined;
@@ -212,6 +246,22 @@ export function createSceneServer(options: SceneServerOptions) {
       sizes.discoveryDisk,
       events,
     );
+    // Packs are optional: one that cannot be read leaves the world untextured, not unavailable.
+    let textures: SceneTextures | undefined;
+    let textureError: string | undefined;
+    if (resourcePacks.length > 0) {
+      try {
+        textures = await loadSceneTextures(
+          resourcePacks,
+          cacheDirectory,
+          { maxTileSize: textureMaxTileSize, budgetBytes: textureBudget },
+          event,
+        );
+      } catch (cause) {
+        textureError = cause instanceof Error ? cause.message : String(cause);
+        event("textures.failed", { message: textureError });
+      }
+    }
     const extent = bounds === undefined ? await loadExtent(revision) : undefined;
     const servedBounds = new Map<Dimension, BlockBounds | undefined>(
       served.map((dimension) => [dimension, bounds ?? extent?.[dimension]]),
@@ -232,6 +282,8 @@ export function createSceneServer(options: SceneServerOptions) {
     ) => pools.build(dimension, request, signal, background);
     return {
       revision,
+      textures,
+      textureError,
       info: { name: first.info.name, spawn: first.info.spawn },
       bounds: servedBounds,
       pools,
@@ -310,7 +362,14 @@ export function createSceneServer(options: SceneServerOptions) {
       caves: CAVE_LIMITS,
       snapshotRevision: world.revision,
       discoveries: DISCOVERY_LIMITS,
+      ...(world.textures === undefined ? {} : { textures: worldTextures(world.textures) }),
     };
+  }
+
+  /** The encoded atlas named `fingerprint`, or undefined when no such atlas is served. */
+  async function loadTextureAtlas(fingerprint: string): Promise<Uint8Array | undefined> {
+    const world = await ready();
+    return world.textures?.fingerprint === fingerprint ? world.textures.bytes : undefined;
   }
 
   /**
@@ -426,6 +485,11 @@ export function createSceneServer(options: SceneServerOptions) {
         regions: regionPrewarm?.progress ?? IDLE,
         discoveries: discoveryPrewarm?.progress ?? IDLE,
       },
+      ...(world.textures !== undefined
+        ? { textures: worldTextures(world.textures) }
+        : world.textureError !== undefined
+          ? { textures: { error: world.textureError } }
+          : {}),
     };
   }
 
@@ -444,11 +508,22 @@ export function createSceneServer(options: SceneServerOptions) {
     getWorldMetadata,
     loadRegion,
     loadDiscoveries,
+    loadTextureAtlas,
     getRevision,
     getSnapshotRevision: getRevision,
     prewarm,
     stats,
     close,
+  };
+}
+
+function worldTextures(textures: SceneTextures): WorldTextures {
+  return {
+    fingerprint: textures.fingerprint,
+    tileSize: textures.tileSize,
+    tiles: textures.tiles,
+    gpuBytes: textures.gpuBytes,
+    packs: textures.packs,
   };
 }
 

@@ -35,3 +35,12 @@ export {
   type FaceTexture,
   type TextureNames,
 } from "./block-textures.js";
+export * from "./atlas-format.js";
+export {
+  DEFAULT_ATLAS_OPTIONS,
+  buildTextureAtlas,
+  textureNames,
+  type BuiltTextureAtlas,
+  type TextureAtlasOptions,
+  type TextureIndex,
+} from "./texture-atlas.js";

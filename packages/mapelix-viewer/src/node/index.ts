@@ -10,6 +10,7 @@ export {
   type SceneServerOptions,
   type SceneServerStats,
   type WorldMetadata,
+  type WorldTextures,
 } from "./scene-world.js";
 export {
   createSceneHandler,
@@ -24,3 +25,5 @@ export type { DiskCacheStats } from "./disk-cache.js";
 export type { PrewarmProgress } from "./prewarm.js";
 export type { RegionServiceStats } from "./region-service.js";
 export type { DiscoveryServiceStats } from "./discovery-service.js";
+export type { SceneTextures } from "./textures.js";
+export type { ResourcePackInfo } from "@mapelix/scene-prototype/textures";

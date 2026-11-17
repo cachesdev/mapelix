@@ -31,6 +31,10 @@
     "./textures": {
       "types": "./dist/textures/index.d.ts",
       "import": "./dist/textures/index.js"
+    },
+    "./texture-format": {
+      "types": "./dist/textures/atlas-format.d.ts",
+      "import": "./dist/textures/atlas-format.js"
     }
   },
   "scripts": {

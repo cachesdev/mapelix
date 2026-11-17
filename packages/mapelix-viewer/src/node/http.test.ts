@@ -14,6 +14,9 @@ function fakeServer() {
   return {
     getWorldMetadata: vi.fn(async () => ({ revision: "r1", name: "Fixture" })),
     getRevision: vi.fn(async () => "r1"),
+    loadTextureAtlas: vi.fn(async (fingerprint: string) =>
+      fingerprint === "a".repeat(20) ? new Uint8Array([1, 2, 3]) : undefined,
+    ),
     getSnapshotRevision: vi.fn(async () => "s1"),
     loadRegion: vi.fn(async (_request: unknown) => ({
       bytes: new Uint8Array([1, 2, 3]),
@@ -49,6 +52,19 @@ describe("scene handler", () => {
     expect(await handle(get("/regions/1/0/0"))).toBeUndefined();
     expect(await handle(get("/world/other"))).toBeUndefined();
     expect(await handle(get("/world/world.json", { method: "POST" }))).toBeUndefined();
+  });
+
+  it("serves a texture atlas by fingerprint as immutable", async () => {
+    const handle = createSceneHandler(fakeServer() as unknown as SceneServer, "/world");
+    const atlas = await handle(new Request(`http://local/world/textures/${"a".repeat(20)}.bin`));
+    expect(atlas?.status).toBe(200);
+    expect(atlas?.headers.get("cache-control")).toContain("immutable");
+    expect(new Uint8Array(await atlas!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    const other = await handle(new Request(`http://local/world/textures/${"b".repeat(20)}.bin`));
+    expect(other?.status).toBe(404);
+    expect((await handle(new Request("http://local/world/textures/../x.bin")))?.status).not.toBe(
+      200,
+    );
   });
 
   it("refuses invalid requests and stale revisions with JSON errors", async () => {

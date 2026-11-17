@@ -1,0 +1,183 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { encodePng } from "@mapelix/prototype/png";
+
+import { makePng, makeZip, packFiles } from "../../test/synthetic-pack.js";
+import {
+  ATLAS_HEADER_BYTES,
+  decodeTextureAtlas,
+  packQuadTexture,
+  unpackQuadTexture,
+} from "./atlas-format.js";
+import { resolveBlockTextures } from "./block-textures.js";
+import { resolveBlockAppearance } from "../blocks/block-appearance.js";
+import { openResourcePackStack } from "./resource-pack.js";
+import { buildTextureAtlas, textureNames } from "./texture-atlas.js";
+
+let root: string;
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), "mapelix-atlas-"));
+});
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true });
+});
+
+/** A 32-pixel texture of four 16-pixel quadrants, to check averaging and placement. */
+function quadrants(): Uint8Array {
+  const pixels = new Uint8Array(32 * 32 * 4);
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < 32; x++) {
+      const at = (y * 32 + x) * 4;
+      pixels.set(
+        x < 16 ? (y < 16 ? [255, 0, 0, 255] : [0, 255, 0, 255]) : [0, 0, 255, y < 16 ? 255 : 0],
+        at,
+      );
+    }
+  }
+  return encodePng(pixels, 32, 32);
+}
+
+/** Four 16-pixel frames stacked vertically, each a gray level. */
+function strip(): Uint8Array {
+  const pixels = new Uint8Array(16 * 64 * 4);
+  for (let y = 0; y < 64; y++) {
+    const level = [10, 20, 30, 40][Math.floor(y / 16)]!;
+    for (let x = 0; x < 16; x++) pixels.set([level, level, level, 255], (y * 16 + x) * 4);
+  }
+  return encodePng(pixels, 16, 64);
+}
+
+async function stackOf(): Promise<Awaited<ReturnType<typeof openResourcePackStack>>> {
+  const path = join(root, "pack.zip");
+  await writeFile(
+    path,
+    makeZip(
+      packFiles({
+        terrain: {
+          stone: { textures: "textures/blocks/stone" },
+          big: { textures: "textures/blocks/big" },
+          water: { textures: "textures/blocks/water" },
+          grass_top: { textures: "textures/blocks/grass_top" },
+          gone: { textures: "textures/blocks/gone" },
+        },
+        blocks: {
+          stone: { textures: "stone" },
+          big: { textures: "big" },
+          water: { textures: "water" },
+          grass: { textures: { up: "grass_top", down: "stone", side: "stone" } },
+          gone: { textures: "gone" },
+        },
+        flipbooks: [
+          {
+            flipbook_texture: "textures/blocks/water",
+            atlas_tile: "water",
+            ticks_per_frame: 3,
+            frames: [3, 2, 1, 0],
+          },
+        ],
+        images: {
+          "textures/blocks/stone.png": makePng(16, [100, 110, 120, 255]),
+          "textures/blocks/big.png": quadrants(),
+          "textures/blocks/water.png": strip(),
+          "textures/blocks/grass_top.png": makePng(16, [150, 150, 150, 255]),
+        },
+      }),
+    ),
+  );
+  return openResourcePackStack([path]);
+}
+
+describe("texture atlas", () => {
+  it("places every texture and animation frame in tiles of the common size", async () => {
+    const built = await buildTextureAtlas(await stackOf());
+    const { atlas, index } = built;
+    expect(atlas.tileSize).toBe(16);
+    // big, grass_top, stone, and four water frames; the missing image has no tile.
+    expect(atlas.tiles).toHaveLength(7);
+    expect(Object.keys(index.tiles).sort()).toEqual([
+      "textures/blocks/big",
+      "textures/blocks/grass_top",
+      "textures/blocks/stone",
+      "textures/blocks/water",
+    ]);
+    const water = index.tiles["textures/blocks/water"]!;
+    expect(atlas.tiles[water]).toMatchObject({ frames: 4, ticksPerFrame: 3, average: 0x282828 });
+    expect(
+      atlas.tiles.slice(water + 1, water + 4).map((tile) => [tile.frames, tile.average]),
+    ).toEqual([
+      [0, 0x1e1e1e],
+      [0, 0x141414],
+      [0, 0x0a0a0a],
+    ]);
+    // A 32-pixel texture is averaged down; its transparent quadrant lowers the coverage.
+    const big = atlas.tiles[index.tiles["textures/blocks/big"]!]!;
+    expect(big.coverage).toBe(191);
+    expect(atlas.tiles[index.tiles["textures/blocks/stone"]!]!.average).toBe(0x646e78);
+
+    // Each mip level halves the tiles; the last holds one pixel per tile.
+    expect(atlas.levels).toHaveLength(5);
+    const last = atlas.levels[4]!;
+    const stone = index.tiles["textures/blocks/stone"]!;
+    expect(Array.from(last.subarray(stone * 4, stone * 4 + 4))).toEqual([100, 110, 120, 255]);
+    expect(built.gpuBytes).toBe(atlas.levels.reduce((sum, level) => sum + level.byteLength, 0));
+
+    // The index resolves blocks the way a region builder will.
+    const grass = resolveBlockTextures(
+      textureNames(index),
+      "minecraft:grass_block",
+      {},
+      resolveBlockAppearance("minecraft:grass_block", {}),
+    );
+    expect(grass?.faces[2]).toEqual({
+      path: "textures/blocks/grass_top",
+      rotation: 0,
+      tinted: true,
+    });
+  });
+
+  it("encodes and decodes the same atlas, and builds the same bytes again", async () => {
+    const stack = await stackOf();
+    const first = await buildTextureAtlas(stack);
+    const second = await buildTextureAtlas(stack);
+    expect(second.bytes).toEqual(first.bytes);
+    expect(second.fingerprint).toBe(first.fingerprint);
+    const decoded = decodeTextureAtlas(first.bytes);
+    expect(decoded.tiles).toEqual(first.atlas.tiles);
+    expect(decoded.levels.map((level) => level.byteLength)).toEqual(
+      first.atlas.levels.map((level) => level.byteLength),
+    );
+    expect(() => decodeTextureAtlas(first.bytes.subarray(0, first.bytes.byteLength - 1))).toThrow(
+      /bytes/,
+    );
+    const wrong = first.bytes.slice();
+    wrong[0] = 0;
+    expect(() => decodeTextureAtlas(wrong)).toThrow(/Not a Mapelix/);
+    expect(() => decodeTextureAtlas(first.bytes.subarray(0, ATLAS_HEADER_BYTES - 1))).toThrow(
+      /truncated/,
+    );
+  });
+
+  it("shrinks tiles to the requested size and budget", async () => {
+    const stack = await stackOf();
+    const small = await buildTextureAtlas(stack, { maxTileSize: 8 });
+    expect(small.atlas.tileSize).toBe(8);
+    expect(small.fingerprint).not.toBe((await buildTextureAtlas(stack)).fingerprint);
+    const tight = await buildTextureAtlas(stack, { budgetBytes: 2000 });
+    expect(tight.gpuBytes).toBeLessThanOrEqual(2000);
+    expect(tight.atlas.tileSize).toBeLessThan(16);
+  });
+
+  it("packs a quad texture word", () => {
+    const word = packQuadTexture(1234, 3, true);
+    expect(unpackQuadTexture(word)).toEqual({ tile: 1234, rotation: 3, tinted: true });
+    expect(unpackQuadTexture(packQuadTexture(0, 0, false))).toEqual({
+      tile: 0,
+      rotation: 0,
+      tinted: false,
+    });
+    expect(unpackQuadTexture(0)).toBeUndefined();
+  });
+});
