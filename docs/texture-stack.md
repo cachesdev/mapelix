@@ -116,6 +116,32 @@ revisions. A `createSceneHandler` with `cacheOnly` never builds an atlas: it ans
 `not-cached` until a prewarm stored it, and never builds a textured region either. Changing
 the stack takes a server restart.
 
+## In the viewer
+
+Textures are off by default; the host turns them on with the `textures` option or
+`setTextures("on")`, and the settings panel has a "Block textures" switch. The viewer only learns
+from `world.json` whether the server has textures (`textures.revision`); without them, or when
+the atlas fails to load, `WorldStatus.textures` says `unavailable` or `failed` and the world keeps
+its block colors.
+
+- The atlas loads once from `textures/<revision>/atlas.bin` (about 630 KiB with Brotli for the
+  vanilla pack) and takes its GPU size in `snapshot().textures.gpuBytes`.
+- Level 0 Surface regions whose nearest block draws at least `textureFade.none` CSS pixels are
+  asked for again with `?textures=`. The plain region stays until its textured twin arrives,
+  then they dissolve into each other; at most 160 textured regions stay cached beyond those on
+  screen.
+- Each pixel blends from the block color to the texture between `textureFade.none` and
+  `textureFade.full` pixels per block (4 and 8 by default), measured from the projection itself,
+  so perspective, isometric and the transition between them fade at the same block size. The map
+  turns 2D below 2 pixels per block, under the fade.
+- Textures are sampled at the fraction of the block coordinate with gradients from the
+  continuous coordinate, inside the tile's gutter, so neither filtering nor mipmaps reach a
+  neighbor tile at any distance. Animated tiles (water, lava, fire) step through their frames.
+- Terrain and plants are textured; lava, water and glass keep their own materials. Tinted
+  textures take the biome color. An `overlay_color` texture, like the grass block side, uses its
+  alpha as the mask of the pixels that take the block color; terrain stays opaque elsewhere, and
+  plant sprites cut out along the texture's alpha once it shows.
+
 ## Checking a stack
 
 `validateTextureStack(source, options)` from `@mapelix/viewer/node`, or the release's

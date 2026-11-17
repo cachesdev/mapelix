@@ -24,7 +24,7 @@ const number = (params: URLSearchParams, name: string): number | undefined => {
 /**
  * The view and settings as address parameters: `dimension`, `x`, `z`, `scale` (CSS pixels per
  * block), `projection`, `view=caves` with `minY` and `thickness`, `ceilingY` (Nether), `hour`,
- * `weather`, `clouds=0`, `autoDepth=0`, the discovery filters and the cave area.
+ * `weather`, `clouds=0`, `textures=1`, `autoDepth=0`, the discovery filters and the cave area.
  */
 export function viewerSearch(viewer: MapelixViewer): URLSearchParams {
   const view = viewer.view;
@@ -45,6 +45,7 @@ export function viewerSearch(viewer: MapelixViewer): URLSearchParams {
   params.set("hour", String(settings.hour));
   if (settings.weather !== "clear") params.set("weather", settings.weather);
   if (!settings.clouds) params.set("clouds", "0");
+  if (settings.textures === "on") params.set("textures", "1");
   if (!settings.autoDepth) params.set("autoDepth", "0");
   for (const [name, value] of discoveryFilterSearch(settings.discoveries)) params.set(name, value);
   if (settings.selection)
@@ -75,6 +76,7 @@ export function startFromSearch(params: URLSearchParams): SearchStart {
   const weather = params.get("weather");
   if (weather === "rain" || weather === "thunderstorm") settings.weather = weather;
   if (params.get("clouds") === "0") settings.clouds = false;
+  if (params.get("textures") === "1") settings.textures = "on";
   if (params.get("autoDepth") === "0") settings.autoDepth = false;
   try {
     const filters = discoveryFiltersFromSearch(params);

@@ -671,7 +671,12 @@ export class ViewerControls {
       viewer.setNetherCeiling(Number(ceilingInput.value)),
     );
     ceiling.append(ceilingLabel, ceilingInput);
-    view.append(seg, cavesNote, ceiling, caves);
+    // Block textures near the camera, when the server has them (Surface only).
+    const textures = this.check(t.textures, (on) => viewer.setTextures(on ? "on" : "off"));
+    textures.dataset.part = "textures";
+    const texturesNote = make("p", undefined);
+    texturesNote.dataset.part = "textures-note";
+    view.append(seg, cavesNote, ceiling, caves, wrapperOf(textures), texturesNote);
 
     // Sky: clouds, rain, thunderstorm, time of day (Overworld surface).
     const sky = this.section("sky", t.atmosphere);
@@ -1023,6 +1028,24 @@ export class ViewerControls {
         );
     const tool = this.part<HTMLSelectElement>("tool");
     if (tool) tool.value = settings.selectionTool;
+
+    // Block textures.
+    const textures = this.part<HTMLInputElement>("textures");
+    if (textures) {
+      textures.checked = settings.textures === "on";
+      textures.disabled = !status.available || caves || status.textures === "unavailable";
+    }
+    const texturesNote = this.part("textures-note");
+    if (texturesNote) {
+      const note =
+        status.textures === "unavailable"
+          ? this.t.texturesUnavailable
+          : status.textures === "failed"
+            ? this.t.texturesFailed
+            : "";
+      texturesNote.textContent = note;
+      show(texturesNote, note !== "");
+    }
 
     // Sky.
     const sky =

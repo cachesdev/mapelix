@@ -41,7 +41,7 @@ everything the browser entries above export, plus `EMBED_API_VERSION` and `isVie
 
 ```js
 const mapelix = await import("/assets/mapelix-viewer.js");
-if (mapelix.EMBED_API_VERSION !== 4 || !mapelix.isViewerSupported()) showFallback();
+if (mapelix.EMBED_API_VERSION !== 5 || !mapelix.isViewerSupported()) showFallback();
 const viewer = new mapelix.MapelixViewer(element, {
   tiles: await mapelix.TileIndex.load("/tiles/manifest.json"),
   world: { base: "/world/" },
@@ -54,6 +54,21 @@ stylesheet first; the viewer then adds none:
 ```html
 <link rel="stylesheet" href="/assets/mapelix-viewer.css" data-mapelix-styles />
 ```
+
+### API version 5 (changes from 4)
+
+Version 5 adds block textures (see `docs/texture-stack.md`); a host written for version 4 keeps
+working unchanged, with textures off, and with a server that has no texture stack.
+
+- `WorldSettings.textures` (`"off"` by default or `"on"`), `MapelixViewer.setTextures()`, and
+  `WorldStatus.textures`: `off`, `unavailable` (the server has no stack), `loading`, `on` or
+  `failed` (the atlas did not load; blocks keep their colors).
+- `WorldViewer` options `textures`, `textureBase`, `textureFade` (`{ none, full }` in CSS pixels
+  per block, 4 and 8 by default) and `onTextureState`; `setTextures()`, `setTextureFade()`, and
+  `snapshot().textures` with the atlas GPU bytes. `world.options.textureFade` sets the fade
+  through `MapelixViewer`.
+- Control texts `textures`, `texturesUnavailable` and `texturesFailed`; the address keeps
+  `textures=1`.
 
 ### API version 4 (changes from 3)
 

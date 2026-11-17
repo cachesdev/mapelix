@@ -23,6 +23,11 @@ export interface TextureRef {
   readonly path: string;
   /** `overlay_color` or `tint_color`, packed `0xRRGGBB`. */
   readonly color?: number;
+  /**
+   * From `overlay_color`: the image's alpha is not transparency but a mask of the pixels that
+   * take the block's color, like the grass strip of a grass block side.
+   */
+  readonly overlay?: true;
 }
 
 /** A `terrain_texture.json` entry: one texture, or several indexed by a legacy data value. */
@@ -191,7 +196,9 @@ function textureRefs(value: unknown): TextureRef[] {
     if (Array.isArray(variations)) return one(variations[0]);
     const path = entry["path"];
     if (typeof path !== "string") return undefined;
-    const tint = color(entry["overlay_color"]) ?? color(entry["tint_color"]);
+    const overlay = color(entry["overlay_color"]);
+    if (overlay !== undefined) return { path, color: overlay, overlay: true };
+    const tint = color(entry["tint_color"]);
     return tint === undefined ? { path } : { path, color: tint };
   };
   const items = Array.isArray(value) ? value : [value];
@@ -224,7 +231,7 @@ function blockFaces(value: unknown): BlockTextureNames | undefined {
 }
 
 /** The version of the texture pipeline; part of every stack and pack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 2;
+export const TEXTURE_PIPELINE_VERSION = 3;
 
 const PACK_JSON = [
   "manifest.json",

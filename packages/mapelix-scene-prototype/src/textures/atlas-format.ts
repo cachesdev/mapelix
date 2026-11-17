@@ -14,7 +14,8 @@
  * Header (little-endian, 24 bytes): magic u32, version u16, tile size u16, columns u16,
  * rows u16, tiles u32, levels u16, gutter u16, reserved u32.
  * Then 8 bytes per tile: average color and coverage u32 (`0xCCRRGGBB`), frames u16, ticks per
- * frame u8, reserved u8. Then each level's pixels, largest first.
+ * frame u8, flags u8 (bit 0: overlay, see `AtlasTileInfo.overlay`). Then each level's pixels,
+ * largest first.
  */
 
 export const ATLAS_MAGIC = 0x3154_584d; // "MXT1" in little-endian byte order.
@@ -40,6 +41,11 @@ export interface AtlasTileInfo {
   readonly frames: number;
   /** Game ticks (1/20 s) per frame. */
   readonly ticksPerFrame: number;
+  /**
+   * The alpha channel masks the pixels that take the block's color (`overlay_color`); the tile
+   * is opaque. Its mipmaps average colors without alpha weights.
+   */
+  readonly overlay?: boolean;
 }
 
 export interface TextureAtlas {
@@ -122,6 +128,7 @@ export function encodeTextureAtlas(atlas: TextureAtlas): Uint8Array {
     view.setUint32(offset, ((tile.coverage << 24) | (tile.average & 0xff_ffff)) >>> 0, true);
     view.setUint16(offset + 4, tile.frames, true);
     view.setUint8(offset + 6, tile.ticksPerFrame);
+    view.setUint8(offset + 7, tile.overlay === true ? 1 : 0);
     offset += ATLAS_TILE_INFO_BYTES;
   }
   for (const [level, pixels] of levels.entries()) {
@@ -167,6 +174,7 @@ export function decodeTextureAtlas(bytes: Uint8Array): TextureAtlas {
       coverage: packed >>> 24,
       frames: view.getUint16(offset + 4, true),
       ticksPerFrame: view.getUint8(offset + 6),
+      ...((view.getUint8(offset + 7) & 1) !== 0 ? { overlay: true } : {}),
     });
     offset += ATLAS_TILE_INFO_BYTES;
   }

@@ -80,6 +80,8 @@ interface Source {
   /** Frame indexes into the image's square frames, in play order. */
   readonly frames: readonly number[];
   readonly ticksPerFrame: number;
+  /** The image's alpha is an overlay mask, see `AtlasTileInfo.overlay`. */
+  readonly overlay: boolean;
 }
 
 function atlasOptions(options: TextureAtlasOptions): Required<TextureAtlasOptions> {
@@ -147,6 +149,11 @@ export async function buildTextureAtlas(
   const paths = [
     ...new Set(Object.values(terrain).flatMap((entry) => entry.textures.map((ref) => ref.path))),
   ].sort();
+  const overlays = new Set(
+    Object.values(terrain).flatMap((entry) =>
+      entry.textures.flatMap((ref) => (ref.overlay === true ? [ref.path] : [])),
+    ),
+  );
 
   const sources: Source[] = [];
   for (const path of paths) {
@@ -166,6 +173,7 @@ export async function buildTextureAtlas(
       side,
       frames: frames.length === 0 ? [0] : frames,
       ticksPerFrame: flipbook?.ticksPerFrame ?? 1,
+      overlay: overlays.has(path),
     });
   }
   const count = sources.reduce((sum, source) => sum + source.frames.length, 0);
@@ -214,19 +222,40 @@ export async function buildTextureAtlas(
       const tile = tiles.length;
       const x0 = (tile % columns) * cell + gutter;
       const y0 = Math.floor(tile / columns) * cell + gutter;
-      const average = resample(image, source.side, frame, tileSize, base, width, x0, y0);
+      const average = resample(
+        image,
+        source.side,
+        frame,
+        tileSize,
+        base,
+        width,
+        x0,
+        y0,
+        !source.overlay,
+      );
       wrapGutter(base, width, x0, y0, tileSize, gutter);
       tiles.push({
         ...average,
         frames: order === 0 ? source.frames.length : 0,
         ticksPerFrame: Math.min(255, source.ticksPerFrame),
+        ...(source.overlay ? { overlay: true } : {}),
       });
     }
   }
 
   const levels: Uint8Array[] = [base];
+  // Overlay tiles average their colors without alpha weights, as their alpha is a mask.
+  const weighted = (cellX: number, cellY: number): boolean =>
+    tiles[cellY * columns + cellX]?.overlay !== true;
   for (let level = 1; level < atlasLevelCount(tileSize); level++) {
-    levels.push(halve(levels[level - 1]!, atlasLevelSize({ tileSize, columns, rows }, level - 1)));
+    levels.push(
+      halve(
+        levels[level - 1]!,
+        atlasLevelSize({ tileSize, columns, rows }, level - 1),
+        cell >> (level - 1),
+        weighted,
+      ),
+    );
   }
   const atlas: TextureAtlas = { tileSize, columns, rows, tiles, levels };
   const fingerprint = textureRevision(stack.fingerprint, { maxTileSize, budgetBytes });
@@ -264,7 +293,8 @@ function wrapGutter(
 /**
  * Writes one square frame of `image`, scaled to `tileSize`, into the atlas at `(x0, y0)`.
  * Larger frames are averaged by alpha-weighted boxes, smaller ones repeat their pixels.
- * Returns the frame's average color and coverage.
+ * `weighted` false averages colors alone, for overlay masks. Returns the frame's average color
+ * and coverage.
  */
 function resample(
   image: PackImage,
@@ -275,6 +305,7 @@ function resample(
   outWidth: number,
   x0: number,
   y0: number,
+  weighted = true,
 ): { average: number; coverage: number } {
   let sumR = 0;
   let sumG = 0;
@@ -309,14 +340,16 @@ function resample(
       }
       const samples = (toY - fromY) * (toX - fromX);
       const at = ((y0 + y) * outWidth + x0 + x) * 4;
-      out[at] = Math.round(a > 0 ? r / a : plainR / samples);
-      out[at + 1] = Math.round(a > 0 ? g / a : plainG / samples);
-      out[at + 2] = Math.round(a > 0 ? b / a : plainB / samples);
+      const byAlpha = weighted && a > 0;
+      out[at] = Math.round(byAlpha ? r / a : plainR / samples);
+      out[at + 1] = Math.round(byAlpha ? g / a : plainG / samples);
+      out[at + 2] = Math.round(byAlpha ? b / a : plainB / samples);
       out[at + 3] = Math.round(a / samples);
-      sumR += out[at]! * out[at + 3]!;
-      sumG += out[at + 1]! * out[at + 3]!;
-      sumB += out[at + 2]! * out[at + 3]!;
-      sumA += out[at + 3]!;
+      const weight = weighted ? out[at + 3]! : 255;
+      sumR += out[at]! * weight;
+      sumG += out[at + 1]! * weight;
+      sumB += out[at + 2]! * weight;
+      sumA += weight;
     }
   }
   const pixels = tileSize * tileSize;
@@ -327,13 +360,22 @@ function resample(
   };
 }
 
-/** The next mipmap level: alpha-weighted 2×2 averages, which never cross a tile border. */
-function halve(pixels: Uint8Array, size: { width: number; height: number }): Uint8Array {
+/**
+ * The next mipmap level: alpha-weighted 2×2 averages, which never cross a tile border; plain
+ * averages in cells where `weighted` is false. `cell` is the cell side at the source level.
+ */
+function halve(
+  pixels: Uint8Array,
+  size: { width: number; height: number },
+  cell: number,
+  weighted: (cellX: number, cellY: number) => boolean,
+): Uint8Array {
   const width = size.width / 2;
   const height = size.height / 2;
   const out = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
+      const byAlpha = weighted(Math.floor((2 * x) / cell), Math.floor((2 * y) / cell));
       let r = 0;
       let g = 0;
       let b = 0;
@@ -354,9 +396,9 @@ function halve(pixels: Uint8Array, size: { width: number; height: number }): Uin
         plain = [plain[0]! + pixels[at]!, plain[1]! + pixels[at + 1]!, plain[2]! + pixels[at + 2]!];
       }
       const at = (y * width + x) * 4;
-      out[at] = Math.round(a > 0 ? r / a : plain[0]! / 4);
-      out[at + 1] = Math.round(a > 0 ? g / a : plain[1]! / 4);
-      out[at + 2] = Math.round(a > 0 ? b / a : plain[2]! / 4);
+      out[at] = Math.round(byAlpha && a > 0 ? r / a : plain[0]! / 4);
+      out[at + 1] = Math.round(byAlpha && a > 0 ? g / a : plain[1]! / 4);
+      out[at + 2] = Math.round(byAlpha && a > 0 ? b / a : plain[2]! / 4);
       out[at + 3] = Math.round(a / 4);
     }
   }

@@ -79,7 +79,7 @@ describe("resource pack stack", () => {
       });
       expect(stack.blockTextures("stone")?.west).toBe("stone");
       expect(stack.terrainEntry("grass_side")).toEqual({
-        textures: [{ path: "textures/blocks/grass_side", color: 0x79c05a }],
+        textures: [{ path: "textures/blocks/grass_side", color: 0x79c05a, overlay: true }],
       });
       expect(stack.terrainEntry("wool")?.textures).toHaveLength(2);
       expect(stack.flipbook("water")).toEqual({

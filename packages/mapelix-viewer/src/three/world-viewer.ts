@@ -51,7 +51,13 @@ import {
   type AutoPerspective,
   type ViewProjection,
 } from "./view-projection";
-import { createSceneMaterials, type SceneMaterials } from "./shaders/materials";
+import {
+  createSceneMaterials,
+  createTexturedMaterials,
+  type SceneMaterials,
+} from "./shaders/materials";
+import { DEFAULT_TEXTURE_FADE, TextureLook, type TextureFade } from "./shaders/textured";
+import { BlockAtlas } from "./block-atlas";
 import {
   CAVE_LIMITS,
   DIMENSIONS,
@@ -67,7 +73,21 @@ export interface WorldInfo extends SceneContextInput {
   readonly revision: string;
   readonly snapshotRevision?: string;
   readonly discoveries?: { readonly schemaVersion: number; readonly tileSpan: number };
+  /** Present when the server has block textures; the revision names its atlas and regions. */
+  readonly textures?: { readonly revision: string };
 }
+
+/** Block textures asked for by the host. */
+export type TextureMode = "off" | "on";
+
+/**
+ * What the block textures do now: `off` as asked, `unavailable` when the server has none,
+ * `loading`, `on`, or `failed` when the atlas could not load. Without textures the world
+ * keeps its block colors.
+ */
+export type TextureState = "off" | "unavailable" | "loading" | "on" | "failed";
+
+export type { TextureFade } from "./shaders/textured";
 
 export type { CameraView, VerticalMovement } from "./camera-rig";
 export type { DiscoveryDetailText } from "./discovery-focus";
@@ -107,6 +127,26 @@ export interface WorldViewerOptions {
   readonly projection?: ViewProjection;
   /** Rules that show perspective inside an isometric view (default none). */
   readonly autoPerspective?: AutoPerspective;
+  /** Block textures near the camera when the server has them (default off). */
+  readonly textures?: TextureMode;
+  /** URL prefix of `textures/<revision>/atlas.bin` (default `/textures`). */
+  readonly textureBase?: string;
+  /**
+   * Block sizes on screen, in CSS pixels, where textures start to show and are complete
+   * (default 4 and 8). The map turns 2D below 2 pixels per block.
+   */
+  readonly textureFade?: TextureFade;
+  /** Called when `TextureState` changes, a failure included. */
+  readonly onTextureState?: (state: TextureState) => void;
+}
+
+export interface TextureSnapshot {
+  readonly mode: TextureMode;
+  readonly state: TextureState;
+  /** GPU bytes of the atlas, 0 until it loads. */
+  readonly gpuBytes: number;
+  /** Drawn regions with textures. */
+  readonly regions: number;
 }
 
 export interface ProjectionState {
@@ -131,6 +171,7 @@ export interface ViewerSnapshot {
   readonly navigation: DepthNavigation;
   readonly selectedDiscovery: DiscoveryGroup | undefined;
   readonly projection: ProjectionState;
+  readonly textures: TextureSnapshot;
 }
 
 export interface Pointed {
@@ -204,6 +245,19 @@ export class WorldViewer {
   /** Blend at the start of the running transition, and how far it has run, from 0 to 1. */
   private projectionFrom = 0;
   private projectionProgress = 1;
+  private textureMode: TextureMode = "off";
+  private textureState: TextureState = "off";
+  private textureFade: TextureFade = DEFAULT_TEXTURE_FADE;
+  /** The atlas of one texture revision, its look and materials, once loaded. */
+  private textureSet:
+    | {
+        readonly revision: string;
+        readonly atlas: BlockAtlas;
+        readonly look: TextureLook;
+        readonly materials: SceneMaterials;
+      }
+    | undefined;
+  private textureLoad: { readonly revision: string; readonly abort: AbortController } | undefined;
 
   private constructor(
     container: HTMLElement,
@@ -258,6 +312,8 @@ export class WorldViewer {
     );
     this.materials = createSceneMaterials(this.atmosphere, this.selectionBox.mask);
     this.streamer = this.createStreamer(world);
+    if (options.textureFade !== undefined) this.textureFade = textureFade(options.textureFade);
+    this.textureMode = options.textures ?? "off";
     this.scene.add(this.streamer.root, this.sky, this.sun, this.sun.target, this.selectionBox.root);
     this.scene.add(this.clouds.root);
     this.scene.add(this.weather.root);
@@ -341,6 +397,7 @@ export class WorldViewer {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
+    this.applyTextures();
     this.timer.connect(document);
     renderer.setAnimationLoop(() => this.frame());
   }
@@ -352,6 +409,9 @@ export class WorldViewer {
     options: WorldViewerOptions = {},
   ): Promise<WorldViewer> {
     if (options.weather !== undefined) weatherMode(options.weather);
+    if (options.textures !== undefined && options.textures !== "off" && options.textures !== "on")
+      throw new RangeError(`Unknown texture mode ${String(options.textures)}`);
+    if (options.textureFade !== undefined) textureFade(options.textureFade);
     if (options.selection) horizontalSelection(options.selection);
     if (
       options.autoDepthIntervalMs !== undefined &&
@@ -408,6 +468,12 @@ export class WorldViewer {
         shown: this.projectionShown,
         blend: this.camera.projectionBlend,
         pixelsPerBlock: this.focusPixelsPerBlock(),
+      },
+      textures: {
+        mode: this.textureMode,
+        state: this.textureState,
+        gpuBytes: this.textureSet?.atlas.gpuBytes ?? 0,
+        regions: this.streamer.stats.textured,
       },
     };
   }
@@ -477,6 +543,7 @@ export class WorldViewer {
     this.discoveries.setWorld(world);
     this.streamer = this.createStreamer(world);
     this.scene.add(this.streamer.root);
+    this.applyTextures();
     this.atmosphere.setDimension(world.dimension);
     this.atmosphere.setCaves(this.context.mode === "caves");
     this.clouds.setContext(this.context);
@@ -534,6 +601,110 @@ export class WorldViewer {
   /** Fades terrain into the sky before the edge of the loaded area, or lets the edge show. */
   setEdgeFade(enabled: boolean): void {
     this.atmosphere.edgeFade.value = enabled ? 1 : 0;
+  }
+
+  /**
+   * Draws block textures near the camera, or block colors only. Textures need the server's
+   * texture stack; without it, or when the atlas fails, the state says so and colors stay.
+   */
+  setTextures(mode: TextureMode): void {
+    if (mode !== "off" && mode !== "on") throw new RangeError(`Unknown texture mode ${String(mode)}`);
+    this.textureMode = mode;
+    this.failedTextureRevision = undefined;
+    this.applyTextures();
+  }
+
+  /** Changes where textures start and finish fading in, in CSS pixels per block. */
+  setTextureFade(fade: TextureFade): void {
+    this.textureFade = textureFade(fade);
+    this.textureSet?.look.setFade(this.textureFade);
+    this.applyTextures();
+  }
+
+  private setTextureState(state: TextureState): void {
+    if (state === this.textureState) return;
+    this.textureState = state;
+    this.options.onTextureState?.(state);
+  }
+
+  /** Brings the streamer, the atlas and the state in line with the mode and the world. */
+  private applyTextures(): void {
+    const revision = this.world.textures?.revision;
+    if (this.textureMode === "off" || revision === undefined) {
+      this.textureLoad?.abort.abort();
+      this.textureLoad = undefined;
+      this.streamer.setTextures(undefined);
+      this.setTextureState(this.textureMode === "off" ? "off" : "unavailable");
+      return;
+    }
+    const set = this.textureSet;
+    if (set?.revision === revision) {
+      this.streamer.setTextures({
+        revision,
+        materials: set.materials,
+        minPixels: this.textureFade.none * this.renderer.getPixelRatio(),
+      });
+      this.setTextureState("on");
+      return;
+    }
+    this.streamer.setTextures(undefined);
+    if (this.textureLoad?.revision === revision) return;
+    // A failed atlas is fetched again only when the host asks for textures again.
+    if (this.failedTextureRevision === revision) {
+      this.setTextureState("failed");
+      return;
+    }
+    this.textureLoad?.abort.abort();
+    const abort = new AbortController();
+    this.textureLoad = { revision, abort };
+    this.setTextureState("loading");
+    const base = this.options.textureBase ?? "/textures";
+    BlockAtlas.load(`${base}/${revision}/atlas.bin`, abort.signal).then(
+      (atlas) => {
+        if (abort.signal.aborted || this.textureLoad?.abort !== abort) {
+          atlas.dispose();
+          return;
+        }
+        this.textureLoad = undefined;
+        this.disposeTextureSet();
+        const look = new TextureLook(atlas);
+        look.setFade(this.textureFade);
+        look.viewHeight.value = this.screenHeight;
+        this.textureSet = {
+          revision,
+          atlas,
+          look,
+          materials: createTexturedMaterials(
+            this.atmosphere,
+            this.materials,
+            look,
+            this.selectionBox.mask,
+          ),
+        };
+        this.applyTextures();
+      },
+      (cause: unknown) => {
+        if (abort.signal.aborted || this.textureLoad?.abort !== abort) return;
+        this.textureLoad = undefined;
+        this.failedTextureRevision = revision;
+        console.warn(cause);
+        this.setTextureState("failed");
+      },
+    );
+  }
+
+  private failedTextureRevision: string | undefined;
+
+  private disposeTextureSet(): void {
+    const set = this.textureSet;
+    if (set === undefined) return;
+    this.textureSet = undefined;
+    this.streamer.setTextures(undefined);
+    set.atlas.dispose();
+    for (const pair of [set.materials.terrain, set.materials.plants]) {
+      pair.steady.dispose();
+      pair.fading.dispose();
+    }
   }
 
   /** Retains the preference through dimension/depth switches; no terrain requests. */
@@ -830,7 +1001,10 @@ export class WorldViewer {
     this.discoveryDetails.dispose();
     this.clouds.dispose();
     this.weather.dispose();
+    this.textureLoad?.abort.abort();
+    this.textureLoad = undefined;
     this.streamer.dispose();
+    this.disposeTextureSet();
     this.explorationRequests.dispose();
     this.meshPool.dispose();
     this.pipeline.dispose();
@@ -1016,6 +1190,10 @@ export class WorldViewer {
     this.camera.aspect = width / height;
     this.camera.focusDistance = this.rig.distance;
     this.camera.updateProjectionMatrix();
+    if (this.textureSet !== undefined) {
+      this.textureSet.look.viewHeight.value = height;
+      this.applyTextures();
+    }
   }
 
   private countFrame(): void {
@@ -1027,4 +1205,12 @@ export class WorldViewer {
       this.frameWindowStart = now;
     }
   }
+}
+
+/** Checks a texture fade: finite, positive sizes with `none` below `full`. */
+function textureFade(fade: TextureFade): TextureFade {
+  const { none, full } = fade;
+  if (!Number.isFinite(none) || !Number.isFinite(full) || none <= 0 || full <= none)
+    throw new RangeError("Texture fade needs 0 < none < full, in pixels per block");
+  return { none, full };
 }

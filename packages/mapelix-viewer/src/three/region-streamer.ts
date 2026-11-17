@@ -59,8 +59,22 @@ export interface StreamingOptions {
   readonly onRegion: () => void;
 }
 
+/** The textured variant of nearby level 0 regions; see `RegionStreamer.setTextures`. */
+export interface StreamedTextures {
+  /** Texture revision from the world metadata, sent as `?textures=`. */
+  readonly revision: string;
+  readonly materials: SceneMaterials;
+  /** Device pixels per block from which a region's nearest block asks for its textures. */
+  readonly minPixels: number;
+}
+
+/** Textured regions kept in memory beyond those drawn. */
+const TEXTURED_CACHE = 160;
+
 export interface StreamingStats {
   readonly drawn: number;
+  /** Drawn regions with block textures. */
+  readonly textured: number;
   readonly cached: number;
   readonly loading: number;
   /** Regions the view still needs, including those loading now. */
@@ -74,6 +88,8 @@ interface RegionNode {
   readonly x: number;
   readonly z: number;
   readonly key: string;
+  /** The textured variant of a level 0 region, cached under its own key. */
+  readonly textured?: boolean;
 }
 
 interface CachedRegion {
@@ -138,6 +154,9 @@ export class RegionStreamer {
   private readonly maxLevel: number;
   private selection: HorizontalSelection | undefined;
   private detailRevision = 0;
+  private textures: StreamedTextures | undefined;
+  /** Textured regions the server could not give; not asked again for this revision. */
+  private readonly texturedFailures = new Set<string>();
 
   get surfaceRevision(): number {
     return this.detailRevision;
@@ -205,11 +224,41 @@ export class RegionStreamer {
     this.selection = selection;
   }
 
+  /**
+   * Draws nearby level 0 Surface regions with block textures, or stops. Textured regions are
+   * a second variant: the plain region stays on screen until its textured twin arrives, then
+   * they dissolve into each other, and back when textures stop or the camera moves away.
+   */
+  setTextures(textures: StreamedTextures | undefined): void {
+    const previous = this.textures;
+    this.textures = this.context.mode === "surface" ? textures : undefined;
+    if (previous?.revision === this.textures?.revision && this.textures !== undefined) return;
+    this.texturedFailures.clear();
+    for (const [key, controller] of this.requests) {
+      if (!key.startsWith("t/")) continue;
+      controller.abort();
+      this.requests.delete(key);
+    }
+    const shown = new Set(this.drawn.values());
+    for (const [key, cached] of this.cache) {
+      if (!key.startsWith("t/")) continue;
+      if (cached.mesh && (shown.has(cached.mesh) || this.fades.has(cached.mesh))) continue;
+      this.cache.delete(key);
+      this.bytes -= cached.mesh?.byteLength ?? 0;
+      cached.mesh?.dispose();
+    }
+  }
+
   get stats(): StreamingStats {
     let quadBytes = 0;
-    for (const mesh of this.drawn.values()) quadBytes += mesh.byteLength;
+    let textured = 0;
+    for (const mesh of this.drawn.values()) {
+      quadBytes += mesh.byteLength;
+      if (mesh.region.textures !== undefined) textured += 1;
+    }
     return {
       drawn: this.drawn.size,
+      textured,
       cached: this.cache.size,
       loading: this.requests.size,
       remaining: this.wanted.length,
@@ -354,7 +403,7 @@ export class RegionStreamer {
     if (!refine) {
       if (cached !== undefined) {
         if (this.projectionBlend <= 0) cached.blended = false;
-        return this.use(cached, draw);
+        return this.use(this.withTextures(target, distance, cached, wanted), draw);
       }
       wanted.push({ node: target, priority: this.priority(target, distance) });
       // While zooming out, finer regions that are still cached fill in until this one arrives.
@@ -393,6 +442,41 @@ export class RegionStreamer {
     return covered;
   }
 
+  /** The textured twin of a near level 0 region when it is ready, asking for it otherwise. */
+  private withTextures(
+    target: RegionNode,
+    distance: number,
+    cached: CachedRegion,
+    wanted: Wanted[],
+  ): CachedRegion {
+    const textures = this.textures;
+    if (textures === undefined || target.level !== 0 || cached.mesh === undefined) return cached;
+    const key = `t/${target.key}`;
+    const textured = this.cache.get(key);
+    const pixels = projectedPixels(
+      1,
+      distance,
+      this.pixelsPerBlock,
+      this.projectionBlend,
+      this.focusDistance,
+    );
+    // A textured region stays a little past the size that asked for it, so it does not flicker.
+    if (pixels < textures.minPixels * (textured === undefined ? 1 : 0.7)) return cached;
+    if (textured !== undefined) {
+      if (textured.mesh === undefined) return cached;
+      cached.lastDrawn = this.frame;
+      return textured;
+    }
+    if (!this.texturedFailures.has(key)) {
+      wanted.push({
+        node: { ...target, key, textured: true },
+        // After the plain regions at the same distance, which fill holes.
+        priority: this.priority(target, distance) * 1.5 + 16,
+      });
+    }
+    return cached;
+  }
+
   private use(cached: CachedRegion, draw: RegionMesh[]): boolean {
     cached.lastDrawn = this.frame;
     if (cached.mesh !== undefined) draw.push(cached.mesh);
@@ -404,11 +488,12 @@ export class RegionStreamer {
       draw.map((mesh) => [regionKey(mesh.region.level, mesh.region.x, mesh.region.z), mesh]),
     );
     const now = performance.now();
+    // A region and its textured twin share a key; swapping them dissolves one into the other.
     for (const [key, mesh] of this.drawn) {
-      if (!next.has(key)) this.startFade(mesh, false, now);
+      if (next.get(key) !== mesh) this.startFade(mesh, false, now);
     }
     for (const [key, mesh] of next) {
-      if (this.drawn.has(key)) continue;
+      if (this.drawn.get(key) === mesh) continue;
       if (!this.fades.has(mesh)) this.root.add(mesh.group);
       this.startFade(mesh, true, now);
     }
@@ -451,6 +536,8 @@ export class RegionStreamer {
     this.requests.set(target.key, controller);
     const params = contextSearch(this.context);
     params.set("revision", this.options.revision);
+    const textures = target.textured === true ? this.textures : undefined;
+    if (textures !== undefined) params.set("textures", textures.revision);
     const base = this.options.regionBase ?? "/regions";
     const suffix = this.options.regionSuffix ?? "";
     const url = `${base}/${target.level}/${target.x}/${target.z}${suffix}?${params}`;
@@ -459,7 +546,11 @@ export class RegionStreamer {
       .then((bytes) => {
         if (this.disposed || controller.signal.aborted) return;
         const region = decodeSceneRegion(new Uint8Array(bytes));
-        const mesh = new RegionMesh(region, this.options.materials, this.options.meshPool);
+        const materials =
+          textures !== undefined && region.textures !== undefined
+            ? textures.materials
+            : this.options.materials;
+        const mesh = new RegionMesh(region, materials, this.options.meshPool);
         if (mesh.isEmpty) {
           mesh.dispose();
           this.store(target, undefined);
@@ -467,6 +558,7 @@ export class RegionStreamer {
       })
       .catch((cause: unknown) => {
         if (this.disposed || controller.signal.aborted) return;
+        if (target.textured === true) this.texturedFailures.add(target.key);
         if (!(cause instanceof DOMException && cause.name === "AbortError")) {
           console.warn(cause);
         }
@@ -479,19 +571,40 @@ export class RegionStreamer {
   private store(target: RegionNode, mesh: RegionMesh | undefined): void {
     this.cache.set(target.key, { mesh, lastDrawn: this.frame, blended: this.projectionBlend > 0 });
     this.bytes += mesh?.byteLength ?? 0;
-    if (target.level === 0) this.detailRevision++;
+    if (target.level === 0 && target.textured !== true) this.detailRevision++;
     this.options.onRegion();
   }
 
   private evict(): void {
     // Empty regions cost no quad bytes but still need a bounded metadata cache.
     const maxEntries = this.context.mode === "caves" ? 256 : 8192;
-    if (this.bytes <= this.options.memoryBudget && this.cache.size <= maxEntries) return;
+    let textured = 0;
+    for (const key of this.cache.keys()) if (key.startsWith("t/")) textured += 1;
+    const texturedLimit = TEXTURED_CACHE + this.drawn.size;
+    const withinBudget = () =>
+      this.bytes <= this.options.memoryBudget * 0.85 && this.cache.size <= maxEntries;
+    if (
+      this.bytes <= this.options.memoryBudget &&
+      this.cache.size <= maxEntries &&
+      textured <= texturedLimit
+    )
+      return;
+    const shown = new Set(this.drawn.values());
     const stale = [...this.cache.entries()]
-      .filter(([key, { mesh }]) => !this.drawn.has(key) && !(mesh && this.fades.has(mesh)))
+      .filter(
+        ([key, { mesh }]) =>
+          !this.drawn.has(key) && !(mesh && (shown.has(mesh) || this.fades.has(mesh))),
+      )
       .sort(([, left], [, right]) => left.lastDrawn - right.lastDrawn);
     for (const [key, cached] of stale) {
-      if (this.bytes <= this.options.memoryBudget * 0.85 && this.cache.size <= maxEntries) break;
+      const isTextured = key.startsWith("t/");
+      if (withinBudget()) {
+        // Only textured regions above their own limit are left to evict.
+        if (textured <= texturedLimit) break;
+        if (!isTextured) continue;
+      }
+      if (isTextured) textured -= 1;
+
       this.cache.delete(key);
       if (key.startsWith("0/")) this.detailRevision++;
       this.bytes -= cached.mesh?.byteLength ?? 0;

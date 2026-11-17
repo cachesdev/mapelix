@@ -9,7 +9,10 @@ import { makePng, makeZip, packFiles } from "../../test/synthetic-pack.js";
 import {
   ATLAS_HEADER_BYTES,
   MAX_ATLAS_SIDE,
+  atlasCellSize,
+  atlasLevelSize,
   decodeTextureAtlas,
+  encodeTextureAtlas,
   packQuadTexture,
   unpackQuadTexture,
 } from "./atlas-format.js";
@@ -223,6 +226,49 @@ describe("texture atlas", () => {
     // 23 columns of 96-pixel cells would be 2208 pixels wide; 48-pixel cells fit in 2048.
     expect(built.atlas.tileSize).toBe(32);
     expect(built.atlas.columns * 48).toBeLessThanOrEqual(MAX_ATLAS_SIDE);
+  });
+
+  it("keeps the colors under an overlay mask, whose alpha is not transparency", async () => {
+    // Like a grass block side: a gray strip that takes the biome color (alpha 255) above soil
+    // (alpha 0), whose color must survive in the tile and its mipmaps.
+    const pixels = new Uint8Array(16 * 16 * 4);
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++)
+        pixels.set(y < 4 ? [150, 150, 150, 255] : [120, 80, 40, 0], (y * 16 + x) * 4);
+    }
+    const path = join(root, "overlay.zip");
+    await writeFile(
+      path,
+      makeZip(
+        packFiles({
+          terrain: {
+            grass_side: {
+              textures: [{ path: "textures/blocks/grass_side", overlay_color: "#79c05a" }],
+            },
+            dirt: { textures: "textures/blocks/dirt" },
+          },
+          blocks: { grass: { textures: "grass_side" }, dirt: { textures: "dirt" } },
+          images: {
+            "textures/blocks/grass_side.png": encodePng(pixels, 16, 16),
+            "textures/blocks/dirt.png": makePng(16, [120, 80, 40, 255]),
+          },
+        }),
+      ),
+    );
+    const built = await buildTextureAtlas(await openResourcePackStack([path]));
+    const decoded = decodeTextureAtlas(encodeTextureAtlas(built.atlas));
+    const tile = built.index.tiles["textures/blocks/grass_side"]!;
+    expect(decoded.tiles[tile]).toMatchObject({ overlay: true, coverage: 255 });
+    expect(decoded.tiles[built.index.tiles["textures/blocks/dirt"]!]).not.toHaveProperty("overlay");
+    // The last level holds 4-pixel tiles: soil rows stay soil although their alpha is 0.
+    const level = decoded.levels.length - 1;
+    const cell = atlasCellSize(decoded.tileSize) >> level;
+    const { width } = atlasLevelSize(decoded, level);
+    const x = (tile % decoded.columns) * cell + cell / 2;
+    const y = Math.floor(tile / decoded.columns) * cell + cell - 2;
+    expect([
+      ...decoded.levels[level]!.subarray((y * width + x) * 4, (y * width + x) * 4 + 4),
+    ]).toEqual([120, 80, 40, 0]);
   });
 
   it("packs a quad texture word", () => {

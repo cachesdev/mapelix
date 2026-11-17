@@ -28,7 +28,13 @@ import type { DiscoveryStats } from "../three/discovery-streamer.js";
 import type { SelectionTool } from "../three/selection-box.js";
 import type { AutoPerspective } from "../three/view-projection.js";
 import type { WeatherMode } from "../three/weather-layer.js";
-import type { WorldInfo, WorldViewer, WorldViewerOptions } from "../three/world-viewer.js";
+import type {
+  TextureMode,
+  TextureState,
+  WorldInfo,
+  WorldViewer,
+  WorldViewerOptions,
+} from "../three/world-viewer.js";
 import { MarkerLayer, type MarkerTexts, type Markers } from "../markers/marker-layer.js";
 import {
   cameraOverMap,
@@ -65,6 +71,9 @@ export interface WorldSource {
     | "discoveryDetails"
     | "selection"
     | "onSelectionChange"
+    | "textures"
+    | "textureBase"
+    | "onTextureState"
   >;
 }
 
@@ -82,6 +91,8 @@ export interface WorldSettings {
   readonly hour: number;
   readonly clouds: boolean;
   readonly weather: WeatherMode;
+  /** Block textures near the camera, when the server has them (default off). */
+  readonly textures: TextureMode;
   /** Cave slices follow the camera depth. */
   readonly autoDepth: boolean;
   readonly discoveries: DiscoveryFilters;
@@ -98,6 +109,7 @@ export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
   hour: 15.5,
   clouds: true,
   weather: "clear",
+  textures: "off",
   autoDepth: true,
   discoveries: DEFAULT_DISCOVERY_FILTERS,
   selection: undefined,
@@ -123,6 +135,11 @@ export interface WorldStatus {
   readonly emptyCaves: boolean;
   /** Weather, clouds and time of day apply: Overworld surface. */
   readonly atmosphere: boolean;
+  /**
+   * Block textures: `off` as set, `unavailable` without a server texture stack, `loading`,
+   * `on`, or `failed`, in which case the world keeps its block colors.
+   */
+  readonly textures: TextureState;
   readonly navigation: DepthNavigation | undefined;
   readonly discoveries: DiscoveryStats | undefined;
   readonly focusedDiscovery: DiscoveryGroup | undefined;
@@ -370,6 +387,13 @@ export class MapelixViewer {
         streaming.remaining === 0 &&
         streaming.quads === 0,
       atmosphere: context?.dimension === "overworld" && context.mode === "surface",
+      textures:
+        (snapshot ?? this.worldViewer?.snapshot())?.textures.state ??
+        (this.settingsNow.textures === "off"
+          ? "off"
+          : this.info !== undefined && this.info.textures === undefined
+            ? "unavailable"
+            : "loading"),
       navigation: snapshot?.navigation,
       discoveries: snapshot?.discoveries,
       focusedDiscovery: world === undefined ? undefined : this.focused,
@@ -494,6 +518,13 @@ export class MapelixViewer {
   setClouds(enabled: boolean): void {
     this.updateSettings({ clouds: enabled });
     this.worldViewer?.setClouds(enabled);
+  }
+
+  /** Block textures near the camera; the status tells whether the server has them. */
+  setTextures(mode: TextureMode): void {
+    if (mode !== "off" && mode !== "on") throw new RangeError(`Unknown texture mode ${String(mode)}`);
+    this.updateSettings({ textures: mode });
+    this.worldViewer?.setTextures(mode);
   }
 
   setWeather(weather: WeatherMode): void {
@@ -945,6 +976,9 @@ export class MapelixViewer {
           discoveryBase: `${source.base}/discoveries`,
           clouds: this.settingsNow.clouds,
           weather: this.settingsNow.weather,
+          textures: this.settingsNow.textures,
+          textureBase: `${source.base}/textures`,
+          onTextureState: () => this.publish(),
           autoDepth: this.settingsNow.autoDepth,
           discoveryFilters: this.settingsNow.discoveries,
           ...(this.settingsNow.selection ? { selection: this.settingsNow.selection } : {}),

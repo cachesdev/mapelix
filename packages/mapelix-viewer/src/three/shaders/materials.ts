@@ -52,6 +52,7 @@ import {
 
 import type { Atmosphere } from "../atmosphere";
 import { createLavaMaterial } from "./lava";
+import { texturedQuadPosition, type TextureLook } from "./textured";
 import {
   quadColor,
   quadCovered,
@@ -87,6 +88,24 @@ export function createSceneMaterials(atmosphere: Atmosphere, clip?: Node<"bool">
     plants: withFading(createPlantMaterial(atmosphere), clip ? plantMask().and(clip) : plantMask()),
     water: withFading(createWaterMaterial(atmosphere), clip),
     glass: withFading(createGlassMaterial(atmosphere), clip),
+  };
+}
+
+/**
+ * Materials for textured regions. Terrain and plants draw the block textures near the camera;
+ * lava, water and glass are the plain materials, shared.
+ */
+export function createTexturedMaterials(
+  atmosphere: Atmosphere,
+  plain: SceneMaterials,
+  look: TextureLook,
+  clip?: Node<"bool">,
+): SceneMaterials {
+  const mask = look.plantMask(plantMask());
+  return {
+    ...plain,
+    terrain: withFading(createTerrainMaterial(atmosphere, look), clip),
+    plants: withFading(createPlantMaterial(atmosphere, look), clip ? mask.and(clip) : mask),
   };
 }
 
@@ -156,9 +175,12 @@ const coveredSoil = Fn(() => {
   return select(inSoil, soil, quadColor);
 });
 
-function createTerrainMaterial(atmosphere: Atmosphere): MeshStandardNodeMaterial {
+function createTerrainMaterial(
+  atmosphere: Atmosphere,
+  look?: TextureLook,
+): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0 });
-  material.positionNode = quadPosition();
+  material.positionNode = look === undefined ? quadPosition() : texturedQuadPosition();
   const foliage = quadMaterial.equal(QuadMaterial.Foliage);
   const variation = blockNoise()
     .sub(0.5)
@@ -169,9 +191,8 @@ function createTerrainMaterial(atmosphere: Atmosphere): MeshStandardNodeMaterial
   const glowing = quadMaterial.equal(QuadMaterial.Emissive);
   const bevel = select(glowing, float(1), blockBevel());
   const wet = atmosphere.rain.mul(normalWorld.y.max(0)).mul(select(foliage.or(glowing), 0, 1));
-  material.colorNode = coveredSoil()
-    .mul(variation)
-    .mul(bevel)
+  const surface = coveredSoil().mul(variation).mul(bevel);
+  material.colorNode = (look === undefined ? surface : look.terrain(surface))
     .mul(contact)
     .mul(float(1).sub(wet.mul(0.12)));
   material.roughnessNode = mix(1, 0.24, wet);
@@ -180,7 +201,7 @@ function createTerrainMaterial(atmosphere: Atmosphere): MeshStandardNodeMaterial
   const glow = mix(float(4.2), float(1.4), atmosphere.daylight);
   material.emissiveNode = select(
     glowing,
-    quadColor.mul(glow),
+    (look === undefined ? quadColor : look.terrain(quadColor)).mul(glow),
     material.colorNode.mul(atmosphere.caveLight),
   );
   return material;
@@ -223,11 +244,11 @@ const plantMask = Fn(() => {
   );
 });
 
-function createPlantMaterial(atmosphere: Atmosphere): MeshLambertNodeMaterial {
+function createPlantMaterial(atmosphere: Atmosphere, look?: TextureLook): MeshLambertNodeMaterial {
   const material = new MeshLambertNodeMaterial({ side: DoubleSide });
   // A gentle sway that grows toward the tips, phased per block so fields ripple.
   const sway = sin(time.mul(1.7).add(positionWorld.x.mul(0.37)).add(positionWorld.z.mul(0.23)));
-  material.positionNode = quadPosition().add(
+  material.positionNode = (look === undefined ? quadPosition() : texturedQuadPosition()).add(
     vec3(sway.mul(0.045), 0, sway.mul(0.03)).mul(quadUV.y),
   );
   const isFlower = quadSprite.greaterThan(0.5).and(quadSprite.lessThan(1.5));
@@ -236,7 +257,8 @@ function createPlantMaterial(atmosphere: Atmosphere): MeshLambertNodeMaterial {
   const base = select(isFlower.and(petals.not()), stemColor, quadColor);
   // Plants darken slightly toward the ground, where neighbors shade them.
   const shade = mix(float(0.78), float(1.12), quadUV.y);
-  material.colorNode = base.mul(shade).mul(blockNoise().mul(0.2).add(0.9));
+  const plain = base.mul(shade).mul(blockNoise().mul(0.2).add(0.9));
+  material.colorNode = look === undefined ? plain : look.plant(plain, shade);
   // A fixed view-space up normal, so the back sides of the planes are lit like the front.
   material.normalNode = transformNormalToView(vec3(0, 1, 0));
   // Three 0.186 NodeMaterial supports this for Lambert too; its Lambert typings omit it.

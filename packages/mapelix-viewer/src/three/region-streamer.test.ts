@@ -103,6 +103,87 @@ describe("dimension streaming lifecycle", () => {
     expect(streamer.isSurfaceBlock(16, 80, 16)).toBe(false);
     streamer.dispose();
   });
+  it("swaps near level 0 regions for their textured twins, and back when textures stop", async () => {
+    const urls: URL[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input), "http://localhost");
+      urls.push(url);
+      const [level, x, z] = url.pathname.split("/").slice(-3).map(Number);
+      const empty = new Uint32Array(0);
+      const quad = new Uint32Array([1, 0, 0]);
+      return new Response(
+        new Uint8Array(
+          encodeSceneRegion({
+            level: level!,
+            x: x!,
+            z: z!,
+            minY: 0,
+            maxY: 81,
+            heights: new Int16Array(regionGridSize(level!) ** 2).fill(81),
+            opaque: quad,
+            plants: empty,
+            translucent: empty,
+            ...(url.searchParams.has("textures")
+              ? {
+                  textures: {
+                    opaque: new Uint32Array([1 << 17]),
+                    plants: empty,
+                    translucent: empty,
+                  },
+                }
+              : {}),
+          }),
+        ).buffer,
+      );
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const streamer = stream("overworld", {
+      viewDistance: 8,
+      voxelPixels: 0.01,
+      blockPixels: 0.01,
+      maxRequests: 4,
+    });
+    const camera = new PerspectiveCamera(50, 1, 1, 1000);
+    camera.position.set(32, 86, 32);
+    camera.lookAt(32, 81, 33);
+    const frame = () => streamer.update(camera, 600);
+    frame();
+    await vi.waitFor(() => {
+      frame();
+      expect(streamer.stats.drawn).toBe(1);
+    });
+    expect(urls.every((url) => !url.searchParams.has("textures"))).toBe(true);
+
+    streamer.setTextures({
+      revision: "a".repeat(20),
+      materials: {} as SceneMaterials,
+      minPixels: 4,
+    });
+    await vi.waitFor(() => {
+      frame();
+      expect(streamer.stats.textured).toBe(1);
+    });
+    const textured = urls.filter((url) => url.searchParams.has("textures"));
+    expect(textured.map((url) => [url.pathname, url.searchParams.get("textures")])).toEqual([
+      ["/regions/0/0/0", "a".repeat(20)],
+    ]);
+    expect(streamer.stats.drawn).toBe(1);
+
+    // Far away, a block is too small on screen: the plain region comes back.
+    streamer.setTextures({
+      revision: "a".repeat(20),
+      materials: {} as SceneMaterials,
+      minPixels: 1e6,
+    });
+    frame();
+    expect(streamer.stats.textured).toBe(0);
+    streamer.setTextures(undefined);
+    frame();
+    expect(streamer.stats.textured).toBe(0);
+    expect(textured).toHaveLength(1);
+    streamer.dispose();
+  });
+
   it("pauses scheduling after a 429 instead of retrying every frame", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(null, {

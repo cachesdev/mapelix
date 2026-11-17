@@ -46,8 +46,11 @@ export class RegionMeshPool {
   release(mesh: Mesh, materials: MaterialPair): void {
     mesh.geometry.dispose();
     // A disposed geometry can still retain its typed array through a cached render object.
-    const quads = mesh.geometry.getAttribute("quad") as InstancedBufferAttribute;
-    quads.array = new Uint32Array(0);
+    for (const name of ["quad", "texture"]) {
+      const attribute = mesh.geometry.getAttribute(name) as InstancedBufferAttribute | undefined;
+      if (attribute !== undefined) attribute.array = new Uint32Array(0);
+    }
+
     let pool = this.pools.get(materials);
     if (pool === undefined) {
       pool = [];
@@ -85,7 +88,12 @@ export class RegionMesh {
     this.region = region;
     this.pool = pool;
     this.byteLength =
-      region.opaque.byteLength + region.plants.byteLength + region.translucent.byteLength;
+      region.opaque.byteLength +
+      region.plants.byteLength +
+      region.translucent.byteLength +
+      (region.textures === undefined
+        ? 0
+        : region.textures.opaque.byteLength + region.textures.plants.byteLength);
     // Quads count in cells, and cells are cubes, so one scale places every axis.
     this.group.position.set(region.originX, 0, region.originZ);
     this.group.scale.setScalar(region.cellSize);
@@ -99,9 +107,12 @@ export class RegionMesh {
       new Vector3(region.gridSize, high, region.gridSize),
     );
     const lavaStart = firstLavaQuad(region.opaque);
+    // Textured regions add one texture word per quad, read by the textured terrain and plants.
+    const textures = region.textures;
     this.add(region.opaque.subarray(0, lavaStart), materials.terrain, bounds, {
       castShadow: true,
       renderOrder: RENDER_ORDER.terrain,
+      textures: textures?.opaque.subarray(0, lavaStart / 3),
     });
     this.add(region.opaque.subarray(lavaStart), materials.lava, bounds, {
       castShadow: true,
@@ -111,6 +122,7 @@ export class RegionMesh {
     this.add(region.plants, materials.plants, bounds, {
       castShadow: false,
       renderOrder: RENDER_ORDER.plants,
+      textures: textures?.plants,
     });
     const { water, glass } = splitGlass(region.translucent);
     this.add(water, materials.water, bounds, {
@@ -159,7 +171,11 @@ export class RegionMesh {
     quads: Uint32Array,
     materials: MaterialPair,
     bounds: Box3,
-    options: { readonly castShadow: boolean; readonly renderOrder: number },
+    options: {
+      readonly castShadow: boolean;
+      readonly renderOrder: number;
+      readonly textures?: Uint32Array | undefined;
+    },
   ): void {
     if (quads.length === 0) return;
     const geometry = new InstancedBufferGeometry();
@@ -167,6 +183,9 @@ export class RegionMesh {
     geometry.setAttribute("position", corners);
     geometry.setAttribute("normal", normals);
     geometry.setAttribute("quad", new InstancedBufferAttribute(quads, 3));
+    if (options.textures !== undefined) {
+      geometry.setAttribute("texture", new InstancedBufferAttribute(options.textures, 1));
+    }
     geometry.instanceCount = quads.length / 3;
     geometry.boundingBox = bounds;
     geometry.boundingSphere = bounds.getBoundingSphere(new Sphere());

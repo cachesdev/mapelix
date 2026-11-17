@@ -50,6 +50,9 @@ export interface ControlTexts {
   readonly atmosphere: string;
   readonly atmosphereOnly: string;
   readonly clouds: string;
+  readonly textures: string;
+  readonly texturesUnavailable: string;
+  readonly texturesFailed: string;
   readonly rain: string;
   readonly thunderstorm: string;
   readonly timeOfDay: string;
@@ -132,6 +135,9 @@ export const DEFAULT_CONTROL_TEXTS: ControlTexts = {
   atmosphere: "Sky",
   atmosphereOnly: "Weather and time apply to the Overworld surface in 3D.",
   clouds: "Clouds",
+  textures: "Block textures",
+  texturesUnavailable: "This world has no block textures.",
+  texturesFailed: "Block textures could not load; blocks keep their colors.",
   rain: "Rain",
   thunderstorm: "Thunderstorm",
   timeOfDay: "Time of day",
