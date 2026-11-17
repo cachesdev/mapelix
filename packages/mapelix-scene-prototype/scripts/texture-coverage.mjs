@@ -54,5 +54,11 @@ console.log(
   `${requests.length} appearances, ${drawn} drawn: ${full} fully textured, ${partial} partly, ` +
     `${drawn - full - partial} with colors only`,
 );
-console.log(`Blocks with colors only (${untextured.size}):`, [...untextured].sort((a, b) => (a < b ? -1 : 1)).join(" "));
-console.log(`Missing images (${missingImages.size}):`, [...missingImages].sort((a, b) => (a < b ? -1 : 1)).join(" "));
+console.log(
+  `Blocks with colors only (${untextured.size}):`,
+  [...untextured].sort((a, b) => (a < b ? -1 : 1)).join(" "),
+);
+console.log(
+  `Missing images (${missingImages.size}):`,
+  [...missingImages].sort((a, b) => (a < b ? -1 : 1)).join(" "),
+);
