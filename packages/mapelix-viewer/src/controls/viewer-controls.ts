@@ -6,6 +6,8 @@ import {
 } from "@mapelix/scene-prototype/discoveries";
 import type { MapelixViewer, WorldSettings, WorldStatus } from "../viewer/mapelix-viewer.js";
 import type { ViewState } from "../viewer/view-state.js";
+import { MarkerEditor, type EditorSurface, type MarkerEditorOptions } from "./marker-editor.js";
+import { DEFAULT_MARKER_EDITOR_TEXTS } from "./marker-editor-texts.js";
 import { CONTROL_STYLE } from "./style.js";
 import { DEFAULT_CONTROL_TEXTS, type ControlTexts } from "./texts.js";
 
@@ -16,6 +18,11 @@ export interface ViewerControlsOptions {
   readonly theme?: "light" | "dark";
   /** Show the first-use hint for this many ms (0 hides it; default 9000). */
   readonly hintMs?: number;
+  /**
+   * The marker editor. By default a tap on a marker shows its card, read-only; pass options to
+   * let people add, change and delete markers (the host saves them), or `false` for no card.
+   */
+  readonly markers?: MarkerEditorOptions | false;
 }
 
 /** Below this width the panel and the discovery card share the space and take it all. */
@@ -35,6 +42,7 @@ const ICONS = {
   up: "M12 19V5M6 11l6-6 6 6",
   down: "M12 5v14M6 13l6 6 6-6",
   recover: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4",
+  addMarker: "M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11ZM12 7v6M9 10h6",
 };
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -74,7 +82,12 @@ export class ViewerControls {
   private readonly t: ControlTexts;
   private readonly unsubscribe: () => void;
   private readonly resize: ResizeObserver;
-  private openPanel: "settings" | "dimensions" | undefined;
+  private openPanel: "settings" | "dimensions" | "marker" | undefined;
+  private sheetClosed: (() => void) | undefined;
+  private markerCard: { readonly onClosed: () => void } | undefined;
+  private prompt: string | undefined;
+  private keyboard = 0;
+  private readonly editor: MarkerEditor | undefined;
   private panelOpener: HTMLElement | undefined;
   private hintTimer = 0;
   private obstacleRequest = 0;
@@ -179,6 +192,16 @@ export class ViewerControls {
       opener.setAttribute("aria-expanded", "false");
       opener.setAttribute("aria-controls", this.panel.id);
     }
+    const markerOptions = options.markers === undefined ? { editable: false } : options.markers;
+    const editorTexts = { ...DEFAULT_MARKER_EDITOR_TEXTS, ...(markerOptions || {}).texts };
+    const addButton =
+      markerOptions && markerOptions.editable !== false
+        ? this.button(editorTexts.add, ICONS.addMarker, () => undefined)
+        : undefined;
+    if (addButton) {
+      addButton.dataset.part = "add-marker";
+      left.append(addButton);
+    }
     left.append(
       this.settingsButton,
       this.button(t.home, ICONS.home, () => void viewer.goHome()),
@@ -221,6 +244,11 @@ export class ViewerControls {
     // The hint goes at the first gesture on the view.
     container.addEventListener("pointerdown", () => this.hideHint(), { once: true, passive: true });
     container.addEventListener("wheel", () => this.hideHint(), { once: true, passive: true });
+    // The phone keyboard must not hide the form: the controls end above it.
+    window.visualViewport?.addEventListener("resize", this.onViewport);
+    window.visualViewport?.addEventListener("scroll", this.onViewport);
+    this.panel.addEventListener("focusin", this.onPanelFocus);
+    this.panel.addEventListener("focusout", this.onPanelBlur);
     this.resize = new ResizeObserver(() => this.measure());
     this.resize.observe(root);
     this.measure();
@@ -228,10 +256,69 @@ export class ViewerControls {
     this.hintShown = (options.hintMs ?? 9000) > 0;
     if (this.hintShown)
       this.hintTimer = window.setTimeout(() => this.hideHint(), options.hintMs ?? 9000);
+    this.editor = markerOptions
+      ? new MarkerEditor(
+          viewer,
+          this.surface(container, editorTexts.card),
+          markerOptions,
+          addButton,
+        )
+      : undefined;
     this.unsubscribe = viewer.subscribe((view, status, settings) => {
       this.state = { view, status, settings };
       this.render();
     });
+  }
+
+  /** What the marker editor may use: the bottom panel, the card, the readout note. */
+  private surface(container: HTMLElement, cardLabel: string): EditorSurface {
+    return {
+      container,
+      openSheet: (title, content, onClosed, focusFirst) => {
+        this.closePanel();
+        this.openPanel = "marker";
+        this.panelOpener = undefined;
+        this.sheetClosed = onClosed;
+        this.hideHint();
+        this.panelTitle.textContent = title;
+        this.panel.setAttribute("aria-label", title);
+        this.panelBody.replaceChildren(content);
+        this.panel.hidden = false;
+        this.render();
+        if (focusFirst) content.querySelector<HTMLElement>("input, select, button")?.focus();
+      },
+      closeSheet: () => {
+        if (this.openPanel === "marker") this.closePanel();
+      },
+      showCard: (title, content, onClosed) => {
+        this.markerCard = { onClosed };
+        this.card.setAttribute("aria-label", cardLabel);
+        this.cardTitle.textContent = title;
+        this.cardBody.replaceChildren(...content);
+        if (this.state) this.render();
+      },
+      hideCard: () => {
+        if (this.markerCard === undefined) return;
+        this.markerCard = undefined;
+        if (this.state) this.render();
+      },
+      setPrompt: (text) => {
+        this.prompt = text;
+        if (this.state) this.render();
+      },
+      isView: (target) => target instanceof Node && !this.root.contains(target),
+      covers: (clientX, clientY) =>
+        [this.panel, this.card].some((element) => {
+          if (element.hidden) return false;
+          const box = element.getBoundingClientRect();
+          return (
+            clientX >= box.left &&
+            clientX <= box.right &&
+            clientY >= box.top &&
+            clientY <= box.bottom
+          );
+        }),
+    };
   }
 
   dispose(): void {
@@ -239,6 +326,9 @@ export class ViewerControls {
     cancelAnimationFrame(this.obstacleRequest);
     this.viewer.markers.setObstacles([]);
     this.unsubscribe();
+    this.editor?.dispose();
+    window.visualViewport?.removeEventListener("resize", this.onViewport);
+    window.visualViewport?.removeEventListener("scroll", this.onViewport);
     this.resize.disconnect();
     document.removeEventListener("keydown", this.onKey);
     this.root.parentElement?.removeEventListener("pointerdown", this.onOutside, { capture: true });
@@ -353,8 +443,51 @@ export class ViewerControls {
     this.closePanel(true);
   };
 
+  /** Height of the phone keyboard over the controls, from the visual viewport. */
+  private readonly onViewport = (): void => {
+    const viewport = window.visualViewport;
+    const container = this.root.parentElement;
+    if (!viewport || !container) return;
+    const bottom = container.getBoundingClientRect().bottom;
+    const covered = Math.max(0, Math.round(bottom - (viewport.offsetTop + viewport.height)));
+    const keyboard = covered > 60 ? covered : 0;
+    if (keyboard === this.keyboard) return;
+    this.keyboard = keyboard;
+    this.root.style.setProperty("--mx-keyboard", `${keyboard}px`);
+    this.scheduleObstacles();
+    this.keepFocusedInView();
+  };
+
+  /** While typing in the panel on a phone, the bottom buttons make room for it. */
+  private readonly onPanelFocus = (event: FocusEvent): void => {
+    const target = event.target;
+    const typing =
+      (target instanceof HTMLInputElement &&
+        !["checkbox", "radio", "range", "color", "button", "submit"].includes(target.type)) ||
+      target instanceof HTMLTextAreaElement;
+    // Kept until the focus leaves the panel: a tap on a checkbox must not move the panel under it.
+    if (typing) this.root.toggleAttribute("data-typing", true);
+    this.keepFocusedInView();
+  };
+
+  private readonly onPanelBlur = (event: FocusEvent): void => {
+    if (event.relatedTarget instanceof Node && this.panel.contains(event.relatedTarget)) return;
+    this.root.removeAttribute("data-typing");
+  };
+
+  private keepFocusedInView(): void {
+    // After the keyboard and the layout have settled.
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && this.panel.contains(active))
+        active.scrollIntoView({ block: "nearest" });
+    }, 250);
+  }
+
   private readonly onOutside = (event: PointerEvent): void => {
     if (this.openPanel === undefined || !(event.target instanceof Node)) return;
+    // The marker form stays open while its marker is dragged or the map moved.
+    if (this.openPanel === "marker") return;
     if (this.root.contains(event.target)) return;
     this.closePanel();
   };
@@ -400,20 +533,32 @@ export class ViewerControls {
   private closePanel(returnFocus = false): void {
     if (this.openPanel === undefined) return;
     const opener = this.panelOpener;
+    const closed = this.openPanel === "marker" ? this.sheetClosed : undefined;
+    this.sheetClosed = undefined;
     this.openPanel = undefined;
+    this.root.removeAttribute("data-typing");
     this.panel.hidden = true;
     this.panelBody.replaceChildren();
     this.sections.clear();
     this.render();
-    if (returnFocus) opener?.focus();
+    if (returnFocus && opener) opener.focus();
     else if (
       this.panel.contains(document.activeElement) ||
-      document.activeElement === document.body
+      document.activeElement === document.body ||
+      (returnFocus && opener === undefined)
     )
       this.viewer.focus();
+    closed?.();
   }
 
   private closeCard(): void {
+    if (this.markerCard !== undefined) {
+      const { onClosed } = this.markerCard;
+      this.markerCard = undefined;
+      this.render();
+      onClosed();
+      return;
+    }
     this.cardDismissed = this.cardGroup;
     this.viewer.clearDiscoveryFocus();
   }
@@ -735,6 +880,7 @@ export class ViewerControls {
     const t = this.t;
     const is3d = view.mode === "3d";
     this.root.dataset.mode = view.mode;
+    this.root.toggleAttribute("data-editing", this.openPanel === "marker");
 
     // Readout: block under the pointer, else the view center; then scale and status.
     const at = status.pointed ?? { x: Math.floor(view.x), z: Math.floor(view.z) };
@@ -742,15 +888,17 @@ export class ViewerControls {
     this.readoutScale.textContent = t.scale(view.pixelsPerBlock);
     const note = status.failure
       ? status.failure
-      : status.changing
-        ? t.changing
-        : status.emptyCaves
-          ? t.emptyCaves
-          : this.hintShown
-            ? t.hint
-            : status.loading > 0
-              ? t.loading(status.loading)
-              : "";
+      : this.prompt !== undefined
+        ? this.prompt
+        : status.changing
+          ? t.changing
+          : status.emptyCaves
+            ? t.emptyCaves
+            : this.hintShown
+              ? t.hint
+              : status.loading > 0
+                ? t.loading(status.loading)
+                : "";
     this.readoutNote.textContent = note;
     this.readoutNote.hidden = note === "";
     this.readoutNote.toggleAttribute("data-alert", status.failure !== undefined);
@@ -787,6 +935,13 @@ export class ViewerControls {
     if (group !== this.cardGroup) {
       this.cardGroup = group;
       if (group !== undefined) {
+        // A discovery takes the card from a marker.
+        if (this.markerCard !== undefined) {
+          const { onClosed } = this.markerCard;
+          this.markerCard = undefined;
+          onClosed();
+        }
+        this.card.setAttribute("aria-label", t.discoveryCard);
         this.cardDismissed = undefined;
         if (this.openPanel !== undefined && this.root.hasAttribute("data-narrow"))
           this.closePanel();
@@ -796,8 +951,7 @@ export class ViewerControls {
       }
     }
     this.card.hidden =
-      group === undefined ||
-      group === this.cardDismissed ||
+      (this.markerCard === undefined && (group === undefined || group === this.cardDismissed)) ||
       (this.openPanel !== undefined && this.root.hasAttribute("data-narrow"));
 
     if (this.openPanel === "settings") this.renderSettings(view, status, settings);

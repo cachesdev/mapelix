@@ -592,6 +592,24 @@ export class MapelixViewer {
     this.focusTarget()?.focus({ preventScroll: true });
   }
 
+  /**
+   * The block under a screen point: on the map its X and Z, in 3D the first drawn block along
+   * the pointer ray (with Y). `undefined` in 3D where no terrain is drawn.
+   */
+  pickBlock(clientX: number, clientY: number): { x: number; y?: number; z: number } | undefined {
+    if (this.modeNow === "3d" && this.worldViewer !== undefined)
+      return this.worldViewer.pick(clientX, clientY);
+    const bounds = this.element.getBoundingClientRect();
+    const block = blockAt(
+      this.map.view,
+      bounds.width,
+      bounds.height,
+      clientX - bounds.left,
+      clientY - bounds.top,
+    );
+    return { x: Math.floor(block.x), z: Math.floor(block.z) };
+  }
+
   /** Centers a world point and zooms in twice, in either mode (a press on a marker group). */
   zoomToward(x: number, z: number): void {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return;

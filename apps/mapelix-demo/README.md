@@ -48,6 +48,10 @@ with icons, colors and labels, one with an image, one in the Nether, and a surve
 group when zoomed out. They go through `viewer.markers`, as a host's own data would; a tap selects a
 marker and shows its label first, a tap on a group zooms in on it.
 
+Markers can be added, edited and deleted (`src/lib/marker-store.ts`): the demo keeps them in this
+browser's local storage only, adds a "Public" field, and leaves the spawn read-only.
+`?readonly=1` shows the map as a public, read-only page.
+
 ## Tests
 
 ```sh
@@ -70,3 +74,8 @@ each layout.
 labels never overlap and markers group when zoomed out, that labels stay text and images only load
 from http(s) or relative addresses, and that 1,000 markers keep panning and zooming smooth (phone
 profile with a 4× slower CPU).
+
+`tests/marker-editor.e2e.ts` adds, edits and deletes markers (button and tap, long press in 2D and
+3D), checks that a drag or a pinch never adds one, that the edited marker follows a drag, that the
+host's refusals and rights show, that a read-only map offers no editing, that the form stays in view
+above a phone keyboard, and that no panel or card covers a control.

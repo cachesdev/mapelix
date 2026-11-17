@@ -12,6 +12,7 @@
   import { createViewerControls, type ViewerControls } from "@mapelix/viewer/controls";
   import { markerTexts, texts } from "$lib/texts";
   import { sampleMarkers } from "$lib/sample-markers";
+  import { DemoMarkerStore } from "$lib/marker-store";
 
   let { data }: { data: { world: boolean } } = $props();
 
@@ -97,18 +98,27 @@
               ),
           },
         });
-        controls = createViewerControls(viewer, container, { texts });
+        // Markers are edited in place and kept in this browser; `?readonly=1` shows a public,
+        // read-only map.
+        const store = new DemoMarkerStore();
+        const readOnly = new URLSearchParams(location.search).get("readonly") === "1";
+        controls = createViewerControls(viewer, container, {
+          texts,
+          markers: store.editor(readOnly),
+        });
         // Example markers around the world spawn, else around the start view.
         const shown = viewer;
         const origin = { x: shown.view.x, z: shown.view.z };
         void (data.world ? worldSpawn() : Promise.resolve(undefined)).then((spawn) => {
-          if (!disposed) shown.markers.set(sampleMarkers(spawn ?? origin));
+          if (!disposed) shown.markers.set(store.load(sampleMarkers(spawn ?? origin)));
         });
+        Reflect.set(window, "__mapelixMarkerStore", store);
         let lastPreferences = "";
         viewer.subscribe((_view, status, settings) => {
           clearTimeout(urlTimer);
           urlTimer = window.setTimeout(() => {
-            if (viewer !== undefined) replaceState(`?${viewerSearch(viewer)}`, {});
+            if (viewer !== undefined)
+              replaceState(`?${viewerSearch(viewer)}${readOnly ? "&readonly=1" : ""}`, {});
           }, 400);
           const preferences = JSON.stringify({
             clouds: settings.clouds,

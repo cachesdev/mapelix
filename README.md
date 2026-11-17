@@ -114,6 +114,12 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
   on a marker still moves the view.
 - **Light:** only the markers and groups in view exist in the page; 1,000 markers cost about 1 ms
   per frame on a phone-class CPU.
+- **Default editor** in `@mapelix/viewer/controls`: add with a button then a tap, or a long press
+  on the map or the 3D view; tap a marker for its card (edit, delete after confirming); drag the
+  marker being edited. The host turns editing on or off, decides rights per marker, adds its own
+  form fields, validates, and saves in `onCreate` / `onUpdate` / `onDelete`: a refusal shows its
+  message. Texts come from the host; on phones the form is a bottom sheet that stays above the
+  keyboard.
 
 ### Gallery
 

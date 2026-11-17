@@ -22,7 +22,7 @@ export const CONTROL_STYLE = `
   grid-template: "top top top" auto "mid mid mid" minmax(0, 1fr) "left center right" auto / auto minmax(0, 1fr) auto;
   gap: 8px;
   padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
-    calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+    calc(8px + env(safe-area-inset-bottom) + var(--mx-keyboard, 0px)) calc(8px + env(safe-area-inset-left));
   pointer-events: none;
   color: var(--mx-fg);
   font: 15px/1.35 system-ui, sans-serif;
@@ -138,5 +138,29 @@ export const CONTROL_STYLE = `
 .mx-menu { padding: 4px; display: grid; gap: 2px; }
 .mx-menu .mx-text { min-width: 160px; }
 .mx-card .mx-body p { color: var(--mx-fg); }
+/* Editing a marker on a phone: the bottom buttons make room, the form keeps the upper map in view. */
+.mx-ui[data-narrow][data-editing] :is(.mx-left, .mx-center, .mx-right) { display: none; }
+.mx-ui[data-narrow][data-editing] .mx-panel { max-height: 50%; }
+.mx-ui[data-narrow][data-editing][data-typing] .mx-panel { max-height: 100%; }
+.mx-ui input[type="text"] {
+  width: 100%; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--mx-line);
+  font: inherit; font-size: 16px; color: var(--mx-fg); background: var(--mx-bg-strong);
+}
+.mx-ui input[type="color"] { width: 100%; height: 44px; padding: 2px; border-radius: 8px; border: 1px solid var(--mx-line); background: var(--mx-bg-strong); }
+.mx-form .mx-field > span { font-size: 13px; color: var(--mx-muted); }
+.mx-form select { font-size: 16px; }
+.mx-choices { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.mx-choice { min-width: 44px; padding: 0; text-align: center; font-size: 20px; border: 1px solid var(--mx-line); }
+.mx-swatch { background: var(--mx-swatch); border-color: var(--mx-line); }
+.mx-position { border: 0; padding: 0; margin: 8px 0; }
+.mx-position legend { padding: 0; font-size: 13px; color: var(--mx-muted); }
+.mx-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mx-link { padding: 0 4px; color: var(--mx-accent); text-decoration: underline; }
+.mx-ui .mx-error { color: var(--mx-alert); font-weight: 600; }
+.mx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 8px 0 0; }
+.mx-form .mx-actions { position: sticky; bottom: -14px; margin: 0 -14px -14px; padding: 8px 14px 14px; background: var(--mx-bg-strong); border-top: 1px solid var(--mx-line); }
+.mx-body:has(> .mx-form) { scroll-padding-bottom: 84px; }
+.mx-danger { color: var(--mx-alert); }
+.mx-danger.mx-solid, .mx-confirm + .mx-actions .mx-danger { background: var(--mx-alert); color: var(--mx-bg-strong); text-align: center; }
 .mx-caves { display: flex; gap: 8px; pointer-events: none; }
 `;

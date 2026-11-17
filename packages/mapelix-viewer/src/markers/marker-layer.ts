@@ -82,6 +82,8 @@ export interface Markers {
   onClick(listener: (event: MarkerClickEvent) => void): () => void;
   /** Screen areas labels must avoid, such as controls, relative to the viewer element. */
   setObstacles(boxes: readonly Box[]): void;
+  /** The single marker drawn under a screen point (not a group), if any. */
+  markerAt(clientX: number, clientY: number): Marker | undefined;
 }
 
 /** What the layer needs from the viewer, frame by frame. */
@@ -157,7 +159,8 @@ const LABEL_MAX_WIDTH = 200;
 const LABEL_FONT = "600 13px system-ui, sans-serif";
 const MAX_LABELS = 64;
 const TAP_SLOP = 10;
-const TAP_MS = 600;
+/** Shorter than a long press (500 ms), so a long press is never also a tap. */
+const TAP_MS = 450;
 const FALLBACK_Y = 64;
 const HEIGHT_REFRESH = 60;
 const HEIGHT_RETRY = 20;
@@ -396,6 +399,10 @@ export class MarkerLayer implements Markers {
   setObstacles(boxes: readonly Box[]): void {
     this.obstacles = boxes.map((box) => ({ ...box }));
     this.schedule();
+  }
+
+  markerAt(clientX: number, clientY: number): Marker | undefined {
+    return this.itemAt(clientX, clientY)?.marker?.marker;
   }
 
   /** Counters for tests and tuning. */
