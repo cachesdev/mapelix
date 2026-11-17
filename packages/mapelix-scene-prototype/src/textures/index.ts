@@ -27,3 +27,11 @@ export {
   type TerrainEntry,
   type TextureRef,
 } from "./resource-pack.js";
+export {
+  TEXTURE_STATES,
+  faceTextureAxes,
+  resolveBlockTextures,
+  type BlockTextures,
+  type FaceTexture,
+  type TextureNames,
+} from "./block-textures.js";
