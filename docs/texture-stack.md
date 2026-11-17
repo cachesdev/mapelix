@@ -101,10 +101,20 @@ revision.
 - `textures/<revision>/notices.json`: the packs and image files the atlas was made of, for
   attribution on a public map, immutable.
 
+- `regions/0/<x>/<z>?textures=<revision>`: a textured level 0 Surface region, the region format
+  with one more word per quad (header byte 7 set). A stale revision answers 409, like a stale
+  world revision. Plain regions, without `textures`, are unchanged byte for byte.
+
+Textured regions have their own cache, `<cache>/textures/regions/`, bounded by
+`textures.diskCacheMiB` (512 by default) and named after the world and texture revisions
+together; `prewarm()` builds the atlas, then textured level 0 regions after the plain ones, and
+reports them in `stats().prewarm.textures`.
+
 The atlas is built on its first request, or by a prewarm, and stored in
 `<cache>/textures/atlas-v2/<revision>/`. Opening a server with another stack removes the older
 revisions. A `createSceneHandler` with `cacheOnly` never builds an atlas: it answers 404
-`not-cached` until a prewarm stored it. Changing the stack takes a server restart.
+`not-cached` until a prewarm stored it, and never builds a textured region either. Changing
+the stack takes a server restart.
 
 ## Checking a stack
 

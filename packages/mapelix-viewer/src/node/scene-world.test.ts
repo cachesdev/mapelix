@@ -28,7 +28,7 @@ vi.mock("./revision.js", async (original) => ({
 }));
 
 /** A real, decodable region whose heights tell which build made it. */
-function region(level: number, x: number, z: number, tag: number): Uint8Array {
+function region(level: number, x: number, z: number, tag: number, textured = false): Uint8Array {
   const empty = new Uint32Array(0);
   return encodeSceneRegion({
     level,
@@ -40,6 +40,7 @@ function region(level: number, x: number, z: number, tag: number): Uint8Array {
     opaque: empty,
     plants: empty,
     translucent: empty,
+    ...(textured ? { textures: { opaque: empty, plants: empty, translucent: empty } } : {}),
   });
 }
 
@@ -70,12 +71,16 @@ beforeEach(async () => {
       ceilingY: number;
       mode?: string;
       minY?: number;
+      textures?: unknown;
     }) => {
       mocks.built(dimension, request);
       const id = dimension === "overworld" ? 1 : dimension === "nether" ? 2 : 3;
       const tag =
         id * 1000 + request.ceilingY + (request.mode === "caves" ? 500 + request.minY! : 0);
-      return { bytes: region(request.level, request.x, request.z, tag), milliseconds: 1 };
+      return {
+        bytes: region(request.level, request.x, request.z, tag, request.textures !== undefined),
+        milliseconds: 1,
+      };
     },
     buildDiscoveries: async (tile: { x: number; z: number }) => {
       mocks.discovered(dimension, tile);
@@ -323,6 +328,61 @@ describe("scene server", () => {
     const plain = createSceneServer(options);
     expect(await plain.getWorldMetadata()).not.toHaveProperty("textures");
     await plain.close();
+  });
+
+  it("builds textured level 0 Surface regions apart, with the atlas index, and prewarms them", async () => {
+    const pack = join(root, "pack.zip");
+    await writeFile(
+      pack,
+      makeZip(
+        packFiles({
+          terrain: { stone: { textures: "textures/blocks/stone" } },
+          blocks: { stone: { textures: "stone" } },
+          images: { "textures/blocks/stone.png": makePng(16, [9, 8, 7, 255]) },
+        }),
+      ),
+    );
+    const server = createSceneServer({ ...options, textures: { packs: [pack] } });
+    const revision = (await server.getWorldMetadata()).textures!.revision;
+    const request = { level: 0, x: 0, z: 0 };
+    await expect(
+      server.loadRegion(request, signal, sceneContext(), { textures: revision, cacheOnly: true }),
+    ).rejects.toBeInstanceOf(NotCachedError);
+    const textured = await server.loadRegion(request, signal, sceneContext(), {
+      textures: revision,
+    });
+    expect(textured.cacheStatus).toBe("build");
+    expect(textured.bytes[7]).toBe(1);
+    const sent = mocks.built.mock.calls.at(-1)![1] as { textures: { fingerprint: string } };
+    expect(sent.textures.fingerprint).toBe(revision);
+    const plain = await server.loadRegion(request, signal);
+    expect(plain.bytes[7]).toBe(0);
+    for (const [load, context] of [
+      [{ textures: "0".repeat(20) }, sceneContext()],
+      [{ textures: revision }, sceneContext("overworld", { mode: "caves", minY: -64, maxY: -32 })],
+    ] as const) {
+      await expect(server.loadRegion(request, signal, context, load)).rejects.toBeInstanceOf(
+        InvalidRegionError,
+      );
+    }
+    await expect(
+      server.loadRegion({ level: 1, x: 0, z: 0 }, signal, sceneContext(), { textures: revision }),
+    ).rejects.toBeInstanceOf(InvalidRegionError);
+    expect(await server.getTextureRevision()).toBe(revision);
+
+    const result = await server.prewarm({ maxRegions: 1000, discoveries: false });
+    expect(result.textures).toMatchObject({ state: "done", failed: 0 });
+    expect(result.textures.total).toBeGreaterThan(0);
+    expect((await server.stats()).textured?.cache.entries).toBe(result.textures.total);
+    await server.close();
+
+    // Without textures, the prewarm leaves them idle and the stats say nothing.
+    const plainServer = createSceneServer(options);
+    expect((await plainServer.prewarm({ maxRegions: 10, discoveries: false })).textures.state).toBe(
+      "idle",
+    );
+    expect(await plainServer.stats()).not.toHaveProperty("textured");
+    await plainServer.close();
   });
 
   it("serves the world untextured when a pack cannot be read, and says why", async () => {

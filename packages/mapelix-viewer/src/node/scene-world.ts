@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -28,6 +29,7 @@ import { parseExtent, scanWorldExtent, type WorldExtent } from "./extent.js";
 import { DimensionPools } from "./pools.js";
 import { Prewarmer, prewarmPlan, type PrewarmJob, type PrewarmProgress } from "./prewarm.js";
 import {
+  InvalidRegionError,
   RegionService,
   type LoadOptions,
   type RegionResult,
@@ -92,6 +94,10 @@ export type SceneTextureOptions = TextureStackSource & {
   readonly budgetMiB?: number;
   /** Bounds on reading the packs, per pack and for the stack. */
   readonly limits?: Partial<PackLimits>;
+  /** Textured level 0 regions: memory, disk quota and distinct builds waiting (32, 512, 16). */
+  readonly memoryMiB?: number;
+  readonly diskCacheMiB?: number;
+  readonly maxPending?: number;
 };
 
 /** A served region or discovery index and where it came from. */
@@ -151,6 +157,8 @@ export interface PrewarmOptions {
 export interface PrewarmResult {
   readonly regions: PrewarmProgress;
   readonly discoveries: PrewarmProgress;
+  /** The atlas, then textured level 0 Surface regions; idle without textures. */
+  readonly textures: PrewarmProgress;
 }
 
 export interface SceneServerStats {
@@ -160,6 +168,8 @@ export interface SceneServerStats {
   readonly openDimensions: readonly Dimension[];
   readonly surface: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
   readonly caves: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
+  /** Textured level 0 regions, with a texture stack only. */
+  readonly textured?: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
   readonly discoveries: {
     readonly builds: DiscoveryServiceStats;
     readonly cache: DiskCacheStats;
@@ -197,6 +207,7 @@ interface Opened {
   readonly discoveries: DiscoveryService;
   readonly textures: SceneTextures | undefined;
   readonly textureError: string | undefined;
+  readonly textured: { readonly service: RegionService; readonly disk: DiskCache } | undefined;
 }
 
 /**
@@ -246,12 +257,18 @@ export function createSceneServer(options: SceneServerOptions) {
     throw new RangeError("textures.maxTileSize must be a power of two from 4 to 256");
   const textureBudget =
     positiveInteger(textureOptions?.budgetMiB ?? 32, "textures.budgetMiB") * MIB;
+  const texturedSizes = {
+    memory: wholeNumber(textureOptions?.memoryMiB ?? 32, "textures.memoryMiB") * MIB,
+    disk: positiveInteger(textureOptions?.diskCacheMiB ?? 512, "textures.diskCacheMiB") * MIB,
+    pending: positiveInteger(textureOptions?.maxPending ?? 16, "textures.maxPending"),
+  };
   const onEvent = options.onEvent;
   const event = (name: string, detail: Record<string, unknown>) => onEvent?.(name, detail);
   let opening: Promise<Opened> | undefined;
   let closed = false;
   let regionPrewarm: Prewarmer | undefined;
   let discoveryPrewarm: Prewarmer | undefined;
+  let texturePrewarm: Prewarmer | undefined;
   let prewarming: Promise<PrewarmResult> | undefined;
   const stopPrewarm = new AbortController();
 
@@ -326,10 +343,33 @@ export function createSceneServer(options: SceneServerOptions) {
       signal: AbortSignal,
       background?: boolean,
     ) => pools.build(dimension, request, signal, background);
+    let textured: Opened["textured"];
+    if (textures !== undefined) {
+      const stack = textures;
+      // Textured regions depend on the world and the stack: other pairs leave the disk.
+      const disk = await DiskCache.open(
+        join(cacheDirectory, "textures", "regions"),
+        createHash("sha256").update(`${revision}\0${stack.revision}`).digest("hex").slice(0, 20),
+        texturedSizes.disk,
+        events,
+      );
+      const service = new RegionService({
+        mode: "surface",
+        dimensions: servedBounds,
+        build,
+        store: disk,
+        memoryBytes: texturedSizes.memory,
+        maxPending: texturedSizes.pending,
+        onEvent: event,
+        textures: async () => (await stack.load())!.index,
+      });
+      textured = { service, disk };
+    }
     return {
       revision,
       textures,
       textureError,
+      textured,
       info: { name: first.info.name, spawn: first.info.spawn },
       bounds: servedBounds,
       pools,
@@ -436,19 +476,39 @@ export function createSceneServer(options: SceneServerOptions) {
     return (await loadTextureAtlas(revision, load))?.notices;
   }
 
+  /** The texture revision served, or undefined without textures. */
+  async function getTextureRevision(): Promise<string | undefined> {
+    return (await ready()).textures?.revision;
+  }
+
   /**
    * A serialized region from memory, the disk cache, a shared build, or an empty one outside
    * the stored area. A build every caller abandoned stops before it starts. Rejects with
-   * `InvalidRegionError`, `OverloadedError` or, with `cacheOnly`, `NotCachedError`.
+   * `InvalidRegionError`, `OverloadedError` or, with `cacheOnly`, `NotCachedError`. With
+   * `textures`, the texture revision served, it is the textured level 0 Surface region.
    */
   async function loadRegion(
     request: RegionRequest,
     signal: AbortSignal,
     input: SceneContextInput = sceneContext("overworld", request),
-    load: Pick<LoadOptions, "cacheOnly"> = {},
+    load: Pick<LoadOptions, "cacheOnly"> & { readonly textures?: string } = {},
   ): Promise<LoadedRegion> {
     const context = sceneContext(input.dimension, input);
     const world = await ready();
+    if (load.textures !== undefined) {
+      if (world.textured === undefined || load.textures !== world.textures?.revision) {
+        throw new InvalidRegionError(`No texture revision ${load.textures} is served`);
+      }
+      if (context.mode !== "surface") {
+        throw new InvalidRegionError("Textured regions are Surface regions only");
+      }
+      return world.textured.service.load(
+        context.dimension,
+        { level: request.level, x: request.x, z: request.z, ceilingY: context.ceilingY },
+        signal,
+        load.cacheOnly === true ? { cacheOnly: true } : {},
+      );
+    }
     const position = { level: request.level, x: request.x, z: request.z };
     const resolved: RegionRequest =
       context.mode === "caves"
@@ -529,7 +589,26 @@ export function createSceneServer(options: SceneServerOptions) {
       const discoveries = signal.aborted
         ? discoveryPrewarm.progress
         : await discoveryPrewarm.run(signal);
-      return { regions, discoveries };
+      let textures = IDLE;
+      if (world.textures !== undefined && world.textured !== undefined && !signal.aborted) {
+        const stack = world.textures;
+        const textured = world.textured;
+        const jobs = prewarmPlan(world.bounds, maxRegions).filter((job) => job.level === 0);
+        texturePrewarm = new Prewarmer(
+          {
+            load: async (dimension, request, jobSignal, load) => {
+              // The atlas comes first; a failed atlas stops the run on its first job.
+              await stack.load();
+              return textured.service.load(dimension, request, jobSignal, load);
+            },
+          },
+          jobs,
+          nearlyFull(textured.disk),
+          (name, detail) => event(`textures.${name}`, detail),
+        );
+        textures = await texturePrewarm.run(signal);
+      }
+      return { regions, discoveries, textures };
     })();
     return prewarming;
   }
@@ -544,10 +623,14 @@ export function createSceneServer(options: SceneServerOptions) {
       openDimensions: world.pools.openDimensions,
       surface: { builds: world.surface.stats, cache: world.disks.surface.stats },
       caves: { builds: world.caves.stats, cache: world.disks.caves.stats },
+      ...(world.textured === undefined
+        ? {}
+        : { textured: { builds: world.textured.service.stats, cache: world.textured.disk.stats } }),
       discoveries: { builds: world.discoveries.stats, cache: world.disks.discoveries.stats },
       prewarm: {
         regions: regionPrewarm?.progress ?? IDLE,
         discoveries: discoveryPrewarm?.progress ?? IDLE,
+        textures: texturePrewarm?.progress ?? IDLE,
       },
       ...(world.textures !== undefined
         ? { textures: textureStats(world.textures) }
@@ -574,6 +657,7 @@ export function createSceneServer(options: SceneServerOptions) {
     loadDiscoveries,
     loadTextureAtlas,
     loadTextureNotices,
+    getTextureRevision,
     getRevision,
     getSnapshotRevision: getRevision,
     prewarm,

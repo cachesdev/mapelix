@@ -14,6 +14,7 @@ function fakeServer() {
   return {
     getWorldMetadata: vi.fn(async () => ({ revision: "r1", name: "Fixture" })),
     getRevision: vi.fn(async () => "r1"),
+    getTextureRevision: vi.fn(async () => "a".repeat(20)),
     loadTextureAtlas: vi.fn(async (revision: string, load?: { cacheOnly?: boolean }) =>
       revision === "a".repeat(20) && load?.cacheOnly !== true
         ? {
@@ -27,7 +28,7 @@ function fakeServer() {
           : undefined,
     ),
     getSnapshotRevision: vi.fn(async () => "s1"),
-    loadRegion: vi.fn(async (_request: unknown) => ({
+    loadRegion: vi.fn(async (..._args: unknown[]) => ({
       bytes: new Uint8Array([1, 2, 3]),
       cacheStatus: "build" as const,
       milliseconds: 2,
@@ -114,6 +115,32 @@ describe("scene handler", () => {
       "a".repeat(20),
       { cacheOnly: true },
     ]);
+  });
+
+  it("serves textured level 0 Surface regions by texture revision, never built when cache-only", async () => {
+    const server = fakeServer();
+    const handle = createSceneHandler(server as unknown as SceneServer);
+    const current = "a".repeat(20);
+    const ok = await handle(get(`/regions/0/1/2?revision=r1&textures=${current}`));
+    expect(ok?.status).toBe(200);
+    expect(server.loadRegion.mock.calls.at(-1)![3]).toEqual({
+      cacheOnly: false,
+      textures: current,
+    });
+    for (const [path, status] of [
+      ["/regions/0/0/0?textures=nope", 400],
+      [`/regions/1/0/0?textures=${current}`, 400],
+      [`/regions/0/0/0?mode=caves&minY=-64&maxY=-32&textures=${current}`, 400],
+      [`/regions/0/0/0?textures=${"b".repeat(20)}`, 409],
+    ] as const) {
+      expect((await handle(get(path)))?.status, path).toBe(status);
+    }
+    const cached = createSceneHandler(server as unknown as SceneServer, "", {
+      cacheOnly: true,
+      maxBuilds: 4,
+    });
+    await cached(get(`/regions/0/1/2?textures=${current}`));
+    expect(server.loadRegion.mock.calls.at(-1)![3]).toEqual({ cacheOnly: true, textures: current });
   });
 
   it("refuses invalid requests and stale revisions with JSON errors", async () => {

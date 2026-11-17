@@ -143,7 +143,7 @@ export function createSceneHandler(
     const texture = /^\/textures\/([0-9a-f]{20})\/(atlas\.bin|notices\.json)$/.exec(path);
     if (texture !== null) return textureResponse(server, request, texture, options);
     const region = /^\/regions\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
-    if (region !== null) return regionResponse(server, request, url, region, admit);
+    if (region !== null) return regionResponse(server, request, url, region, admit, options);
     const discovery = /^\/discoveries\/([^/]+)\/([^/]+)\.bin$/.exec(path);
     if (discovery !== null) return discoveryResponse(server, request, url, discovery, admit);
     return undefined;
@@ -223,6 +223,7 @@ async function regionResponse(
   url: URL,
   [, rawLevel, rawX, rawZ]: RegExpExecArray,
   admit: Admit,
+  options: SceneHandlerOptions,
 ): Promise<Response> {
   let context;
   try {
@@ -240,16 +241,44 @@ async function regionResponse(
   if (context.mode === "caves" && level > CAVE_LIMITS.maxLevel)
     return failure(400, `Caves support LOD 0 through ${CAVE_LIMITS.maxLevel}`);
   const revision = url.searchParams.get("revision");
+  const textures = url.searchParams.get("textures");
+  if (textures !== null) {
+    if (!/^[0-9a-f]{20}$/.test(textures)) return failure(400, "Invalid texture revision");
+    if (level !== 0) return failure(400, "Textured regions are level 0 only");
+    if (context.mode !== "surface") return failure(400, "Textured regions are Surface only");
+  }
   try {
     if (revision !== null && revision !== (await server.getRevision()))
       return failure(409, "World revision changed; reload world metadata");
+    if (textures !== null && textures !== (await server.getTextureRevision()))
+      return failure(409, "Texture revision changed; reload world metadata");
   } catch (cause) {
     return refusal(request, cause);
   }
-  // Surface regions come from the prewarm; cave slices may be built on demand.
+  // Surface regions come from the prewarm; cave slices may be built on demand. A cache-only
+  // handler never builds a textured region.
+  if (textures !== null && options.cacheOnly === true) {
+    return admitted(
+      request,
+      () => ({ cacheOnly: true, release: () => undefined }),
+      false,
+      async () =>
+        binary(
+          await server.loadRegion({ level, x, z }, request.signal, context, {
+            cacheOnly: true,
+            textures,
+          }),
+          revision !== null,
+          "region",
+        ),
+    );
+  }
   return admitted(request, admit, context.mode === "caves", async (cacheOnly) =>
     binary(
-      await server.loadRegion({ level, x, z }, request.signal, context, { cacheOnly }),
+      await server.loadRegion({ level, x, z }, request.signal, context, {
+        cacheOnly,
+        ...(textures === null ? {} : { textures }),
+      }),
       revision !== null,
       "region",
     ),

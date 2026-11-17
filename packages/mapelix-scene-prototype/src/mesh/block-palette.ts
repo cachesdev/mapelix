@@ -10,6 +10,22 @@ import {
 } from "../blocks/block-appearance.js";
 import { Face, PlantSprite, QuadMaterial } from "../format.js";
 import { MODEL_STATES, blockModelParts, type BlockModel } from "../blocks/block-models.js";
+import { packQuadTexture } from "../textures/atlas-format.js";
+import {
+  TEXTURE_STATES,
+  resolveBlockTextures,
+  type FaceTexture,
+  type TextureNames,
+} from "../textures/block-textures.js";
+import type { BlockTextureNames, TerrainEntry } from "../textures/resource-pack.js";
+
+/** What a palette needs to texture blocks: a `TextureIndex` of the atlas. */
+export interface PaletteTextures {
+  readonly fingerprint: string;
+  readonly tiles: Readonly<Record<string, number>>;
+  readonly blocks: Readonly<Record<string, BlockTextureNames>>;
+  readonly terrain: Readonly<Record<string, TerrainEntry>>;
+}
 
 /** Shape codes stored per palette id. */
 export const Shape = {
@@ -92,12 +108,24 @@ const APPEARANCE_STATES = [
   "dirt_type",
 ];
 const APPEARANCE_STATE_KEYS: ReadonlySet<string> = new Set(APPEARANCE_STATES);
+const TEXTURED_STATE_KEYS: ReadonlySet<string> = new Set([...APPEARANCE_STATES, ...TEXTURE_STATES]);
 
 /**
  * Flat, id-indexed tables of block appearances. Id 0 is air. The mesher's inner
- * loops read only these typed arrays, never the appearance objects.
+ * loops read only these typed arrays, never the appearance objects. A textured palette also
+ * holds each face's atlas texture word; it tells apart the states that turn textures, so its
+ * ids differ from a plain palette's.
  */
 export class BlockPalette {
+  /** The atlas this palette textures blocks with, or undefined for a plain palette. */
+  readonly textures: PaletteTextures | undefined;
+  /** Texture words (`packQuadTexture`), six per id in `Face` order; 0 draws the color. */
+  textureWords = new Uint32Array(0);
+  /** Texture word of each id's crossed plant quads. */
+  crossWords = new Uint32Array(0);
+  /** Texture word of water surfaces and waterlogged cells. */
+  readonly waterWord: number = 0;
+  private readonly names: TextureNames | undefined;
   shape = new Uint8Array(256);
   material = new Uint8Array(256);
   boxSize = new Uint8Array(256);
@@ -117,9 +145,32 @@ export class BlockPalette {
   private readonly ids = new Map<string, number>([["minecraft:air", 0]]);
   private size = 1;
 
+  constructor(textures?: PaletteTextures) {
+    this.textures = textures;
+    if (textures === undefined) return;
+    const index = textures;
+    this.names = {
+      blockTextures: (block) => index.blocks[block],
+      terrainEntry: (name) => index.terrain[name],
+    };
+    this.textureWords = new Uint32Array(256 * 6);
+    this.crossWords = new Uint32Array(256);
+    const water = resolveBlockTextures(
+      this.names,
+      "minecraft:water",
+      {},
+      resolveBlockAppearance("minecraft:water", {}),
+    );
+    this.waterWord = this.textureWord(water?.faces[Face.PositiveY], true);
+  }
+
   /** Returns the palette id for a block, registering it on first use. */
   idFor(name: string, states: LittleEndianNbtCompoundValue | undefined): number {
-    const key = appearanceKey(name, states);
+    const key = appearanceKey(
+      name,
+      states,
+      this.textures === undefined ? APPEARANCE_STATE_KEYS : TEXTURED_STATE_KEYS,
+    );
     const known = this.ids.get(key);
     if (known !== undefined) return known;
 
@@ -127,9 +178,38 @@ export class BlockPalette {
     if (id > PALETTE_ID_MASK) throw new Error("Scene block palette is full");
     this.size += 1;
     this.ensureCapacity(this.size);
-    this.write(id, resolveBlockAppearance(name, states ?? {}));
+    const appearance = resolveBlockAppearance(name, states ?? {});
+    this.write(id, appearance);
+    if (this.names !== undefined) this.writeTextures(id, name, states ?? {}, appearance);
     this.ids.set(key, id);
     return id;
+  }
+
+  private writeTextures(
+    id: number,
+    name: string,
+    states: LittleEndianNbtCompoundValue,
+    appearance: BlockAppearance,
+  ): void {
+    const textures = resolveBlockTextures(this.names!, name, states, appearance);
+    if (textures === undefined) return;
+    for (let face = 0; face < 6; face += 1) {
+      this.textureWords[id * 6 + face] = this.textureWord(
+        textures.faces[face],
+        this.tints[id * 6 + face] !== TintCode.None,
+      );
+    }
+    this.crossWords[id] = this.textureWord(
+      textures.cross,
+      this.tints[id * 6 + Face.PositiveY] !== TintCode.None,
+    );
+  }
+
+  /** The texture word of a face, tinted as its color is; 0 when the atlas lacks the image. */
+  private textureWord(texture: FaceTexture | undefined, tinted: boolean): number {
+    if (texture === undefined) return 0;
+    const tile = this.textures!.tiles[texture.path];
+    return tile === undefined ? 0 : packQuadTexture(tile, texture.rotation, tinted);
   }
 
   isOpaque(id: number): boolean {
@@ -222,6 +302,14 @@ export class BlockPalette {
     const colors = new Uint32Array(capacity * 6);
     colors.set(this.colors);
     this.colors = colors;
+    if (this.textures !== undefined) {
+      const words = new Uint32Array(capacity * 6);
+      words.set(this.textureWords);
+      this.textureWords = words;
+      const cross = new Uint32Array(capacity);
+      cross.set(this.crossWords);
+      this.crossWords = cross;
+    }
   }
 }
 
@@ -275,13 +363,18 @@ function faceAxis(face: number): "x" | "y" | "z" {
   return "z";
 }
 
-function appearanceKey(name: string, states: LittleEndianNbtCompoundValue | undefined): string {
+function appearanceKey(
+  name: string,
+  states: LittleEndianNbtCompoundValue | undefined,
+  stateKeys: ReadonlySet<string>,
+): string {
   if (states === undefined) return name;
   let key = name;
   const colorStates = BEDROCK_COLOR_STATES[name.replace(/^minecraft:/, "")];
   const keys = Object.keys(states).filter(
-    (key) => APPEARANCE_STATE_KEYS.has(key) || colorStates?.includes(key),
+    (key) => stateKeys.has(key) || colorStates?.includes(key),
   );
+
   if (keys.length > 1) keys.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   for (const state of keys) {
     const value = states[state];

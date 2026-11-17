@@ -8,6 +8,7 @@ import { assertDiscoveryRequest, type DiscoveryRequest } from "./discoveries.js"
 
 export type { BuiltRegion } from "./node/worker-pool.js";
 export type { RegionRequest } from "./node/region-builder.js";
+export type { PaletteTextures } from "./mesh/block-palette.js";
 export type { Dimension } from "./world/chunk-source.js";
 export type { LevelInfo } from "./world/level-info.js";
 

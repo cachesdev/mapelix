@@ -23,6 +23,8 @@ interface PendingBuild {
 interface WorkerSlot {
   readonly worker: Worker;
   active: PendingBuild | undefined;
+  /** The texture index this worker holds, sent with its first textured build. */
+  textures: string | undefined;
 }
 
 /**
@@ -102,7 +104,7 @@ export class RegionWorkerPool {
     const worker = new Worker(new URL("./region-worker.js", import.meta.url), {
       workerData: this.options,
     });
-    const slot: WorkerSlot = { worker, active: undefined };
+    const slot: WorkerSlot = { worker, active: undefined, textures: undefined };
     worker.unref();
     worker.on("message", (reply: WorkerReply) => this.complete(slot, reply));
     worker.on("error", (cause) => this.fail(slot, cause));
@@ -120,7 +122,22 @@ export class RegionWorkerPool {
       if (pending === undefined) return;
       slot.active = pending;
       slot.worker.ref();
-      slot.worker.postMessage({ id: pending.id, ...pending.payload });
+      let { payload } = pending;
+      const textures = "region" in payload ? payload.region.textures : undefined;
+      if (typeof textures === "object") {
+        // The index is large: each worker receives it once, then its fingerprint.
+        if (slot.textures === textures.fingerprint) {
+          payload = {
+            region: {
+              ...(payload as { region: RegionRequest }).region,
+              textures: textures.fingerprint,
+            },
+          };
+        } else {
+          slot.textures = textures.fingerprint;
+        }
+      }
+      slot.worker.postMessage({ id: pending.id, ...payload });
     }
   }
 

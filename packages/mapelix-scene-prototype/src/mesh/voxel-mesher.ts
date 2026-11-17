@@ -84,9 +84,13 @@ class VoxelMesher {
   /** Lowest open cell of each volume column, in layers above `WORLD_MIN_Y`. */
   private lowestOpen: Int16Array = new Int16Array(0);
   private readonly tints: Uint32Array[];
-  private readonly opaque = new QuadList();
-  private readonly plants = new QuadList();
-  private readonly translucent = new QuadList();
+  private readonly opaque: QuadList;
+  private readonly plants: QuadList;
+  private readonly translucent: QuadList;
+  /** A textured palette's face texture words, or undefined for a plain mesh. */
+  private readonly textureWords: Uint32Array | undefined;
+  /** The texture word of each face in the slice masks being written. */
+  private maskTextures: Uint32Array | undefined;
   /** Lowest block per region column that can own a visible face. */
   private readonly columnLow = new Int16Array(SPAN * SPAN);
   private low = WORLD_MAX_Y;
@@ -99,6 +103,11 @@ class VoxelMesher {
     this.geometry = geometry;
     this.volume = volume;
     this.palette = palette;
+    const textured = palette.textures !== undefined;
+    this.textureWords = textured ? palette.textureWords : undefined;
+    this.opaque = new QuadList(textured);
+    this.plants = new QuadList(textured);
+    this.translucent = new QuadList(textured);
     this.cells = volume.cells;
     this.baseY = volume.baseY ?? WORLD_MIN_Y;
     this.limitY = volume.limitY ?? WORLD_MAX_Y;
@@ -120,16 +129,26 @@ class VoxelMesher {
       this.meshPlants();
       if (this.hasModels) this.meshModels();
     }
-    return {
+    const opaqueTextures = this.opaque.finishTextures();
+    const region: SceneRegion = {
       level: 0,
       x: regionX,
       z: regionZ,
       heights: this.heights(),
       minY: this.minY === this.limitY ? 0 : this.minY,
       maxY: this.minY === this.limitY ? 0 : this.maxY,
-      opaque: partitionLavaQuads(this.opaque.finish()),
+      opaque: partitionLavaQuads(this.opaque.finish(), opaqueTextures),
       plants: this.plants.finish(),
       translucent: this.translucent.finish(),
+    };
+    if (opaqueTextures === undefined) return region;
+    return {
+      ...region,
+      textures: {
+        opaque: opaqueTextures,
+        plants: this.plants.finishTextures()!,
+        translucent: this.translucent.finishTextures()!,
+      },
     };
   }
 
@@ -182,6 +201,9 @@ class VoxelMesher {
     const layout = sliceLayout(face, SPAN, this.high - this.low + 1);
     const keys = new Uint32Array(layout.slices * layout.area);
     const colors = new Uint32Array(layout.slices * layout.area);
+    const textures =
+      this.textureWords === undefined ? undefined : new Uint32Array(layout.slices * layout.area);
+    this.maskTextures = textures;
     const used = new Uint8Array(layout.slices);
 
     for (let z = 0; z < SPAN; z += 1) {
@@ -205,9 +227,10 @@ class VoxelMesher {
         keys.subarray(start, start + layout.area),
         colors.subarray(start, start + layout.area),
         layout,
-        (key, color, u, v, width, height) => {
-          this.emit(key, color, face, slice, u, v, width, height);
+        (key, color, u, v, width, height, texture) => {
+          this.emit(key, color, face, slice, u, v, width, height, texture);
         },
+        textures?.subarray(start, start + layout.area),
       );
     }
   }
@@ -266,6 +289,8 @@ class VoxelMesher {
     const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
     keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
     colors[mask] = packQuadWord2(color, occlusion);
+    if (this.maskTextures !== undefined)
+      this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
     return true;
   }
 
@@ -296,6 +321,7 @@ class VoxelMesher {
     }
     keys[mask] = mergeKey(QuadMaterial.Water, size, 0, false, face);
     colors[mask] = packQuadWord2(this.tintOf(TintCode.Water, column, y), FULLY_LIT);
+    if (this.maskTextures !== undefined) this.maskTextures[mask] = this.palette.waterWord;
     return true;
   }
 
@@ -338,6 +364,8 @@ class VoxelMesher {
     keys[mask] =
       (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) | KEY_LAVA | (flow << 12)) >>> 0;
     colors[mask] = packQuadWord2(this.colorOf(id, face, column, y), FULLY_LIT);
+    if (this.maskTextures !== undefined)
+      this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
     return true;
   }
 
@@ -360,6 +388,7 @@ class VoxelMesher {
     v: number,
     width: number,
     height: number,
+    texture: number,
   ): void {
     const [x, y, z] = slicePosition(face, slice, u, v, this.low);
     const material = keyMaterial(key);
@@ -370,6 +399,7 @@ class VoxelMesher {
       packQuadWord1(width, height, box, 0) |
         ((key & KEY_LAVA) !== 0 ? QUAD_LAVA_FLAG | (((key >>> 12) & 15) << 28) : 0),
       color,
+      texture,
     );
     this.minY = Math.min(this.minY, y);
     this.maxY = Math.max(this.maxY, y + (isFlatFace(face) ? 1 : height));
@@ -393,8 +423,19 @@ class VoxelMesher {
           };
           const word1 = packQuadWord1(1, 1, box, spriteOf(palette.sprite[id]!));
           const word2 = packQuadWord2(this.colorOf(id, Face.PositiveY, column, y), FULLY_LIT);
-          this.plants.push(packQuadWord0(x, y, z, Face.CrossA, QuadMaterial.Plant), word1, word2);
-          this.plants.push(packQuadWord0(x, y, z, Face.CrossB, QuadMaterial.Plant), word1, word2);
+          const texture = this.textureWords === undefined ? 0 : palette.crossWords[id]!;
+          this.plants.push(
+            packQuadWord0(x, y, z, Face.CrossA, QuadMaterial.Plant),
+            word1,
+            word2,
+            texture,
+          );
+          this.plants.push(
+            packQuadWord0(x, y, z, Face.CrossB, QuadMaterial.Plant),
+            word1,
+            word2,
+            texture,
+          );
           if (this.geometry !== "surface") {
             this.minY = Math.min(this.minY, y);
             this.maxY = Math.max(this.maxY, y + box.size / 16);
@@ -461,7 +502,11 @@ class VoxelMesher {
                 packQuadWord0(x, y, z, faceOf(face), material) | QUAD_MODEL_FLAG,
                 packModelWord1(modelBoxId(part.bounds)),
                 packQuadWord2(color, occlusion),
+                this.textureWords === undefined || part.color !== undefined
+                  ? 0
+                  : this.textureWords[id * 6 + face]!,
               );
+
               this.minY = Math.min(this.minY, y);
               this.maxY = Math.max(this.maxY, y + 1);
             }

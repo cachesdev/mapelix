@@ -1,4 +1,5 @@
-import type { Dimension, RegionRequest } from "@mapelix/scene-prototype";
+import type { Dimension, PaletteTextures, RegionRequest } from "@mapelix/scene-prototype";
+
 import {
   CAVE_LIMITS,
   regionCacheKey,
@@ -61,6 +62,11 @@ export interface RegionServiceOptions {
   readonly memoryBytes: number;
   readonly maxPending: number;
   readonly onEvent?: (event: string, detail: Record<string, unknown>) => void;
+  /**
+   * Builds textured level 0 regions with the texture index this returns, which may build the
+   * atlas first. Such a service serves level 0 only.
+   */
+  readonly textures?: () => Promise<PaletteTextures>;
 }
 
 export interface RegionServiceStats {
@@ -135,6 +141,10 @@ export class RegionService {
       throw new InvalidRegionError(`Dimension ${dimension} is not served`);
     }
     validateRegion(level, x, z);
+    const textured = this.options.textures !== undefined;
+    if (textured && level !== 0) {
+      throw new InvalidRegionError("Textured regions are level 0 only");
+    }
     const context = resolveContext(dimension, request);
     if (context.mode !== this.mode) {
       throw new InvalidRegionError(`This service builds ${this.mode} regions only`);
@@ -145,7 +155,7 @@ export class RegionService {
     const bounds = this.options.dimensions.get(dimension);
     if (bounds === undefined || !regionTouches(bounds, regionSpan(level), x, z)) {
       return {
-        bytes: emptyRegionBytes(level, x, z),
+        bytes: emptyRegionBytes(level, x, z, textured),
         cacheStatus: "empty",
         milliseconds: performance.now() - startedAt,
       };
@@ -205,7 +215,13 @@ export class RegionService {
 
     let built: BuiltBytes;
     try {
-      built = await this.options.build(dimension, request, signal, background);
+      const textures = await this.options.textures?.();
+      built = await this.options.build(
+        dimension,
+        textures === undefined ? request : { ...request, textures },
+        signal,
+        background,
+      );
     } catch (cause) {
       if (!isAbort(cause)) {
         this.failed += 1;
@@ -226,7 +242,7 @@ export class RegionService {
     const stored = await store?.read(key);
     if (stored === undefined) return undefined;
     const bytes = aligned(stored);
-    if (isValidRegion(bytes, request)) {
+    if (isValidRegion(bytes, request, this.options.textures !== undefined)) {
       this.memory.set(key, bytes);
       return bytes;
     }
@@ -270,7 +286,12 @@ export function validateRegion(level: number, x: number, z: number): void {
 }
 
 /** A region with no blocks, which the viewer treats as already loaded and empty. */
-export function emptyRegionBytes(level: number, x: number, z: number): Uint8Array {
+export function emptyRegionBytes(
+  level: number,
+  x: number,
+  z: number,
+  textured = false,
+): Uint8Array {
   const empty = new Uint32Array(0);
   return encodeSceneRegion({
     level,
@@ -282,13 +303,19 @@ export function emptyRegionBytes(level: number, x: number, z: number): Uint8Arra
     opaque: empty,
     plants: empty,
     translucent: empty,
+    ...(textured ? { textures: { opaque: empty, plants: empty, translucent: empty } } : {}),
   });
 }
 
-function isValidRegion(bytes: Uint8Array, request: RegionRequest): boolean {
+function isValidRegion(bytes: Uint8Array, request: RegionRequest, textured: boolean): boolean {
   try {
     const region = decodeSceneRegion(bytes);
-    return region.level === request.level && region.x === request.x && region.z === request.z;
+    return (
+      region.level === request.level &&
+      region.x === request.x &&
+      region.z === request.z &&
+      (region.textures !== undefined) === textured
+    );
   } catch {
     return false;
   }
