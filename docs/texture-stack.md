@@ -104,6 +104,9 @@ revision.
 - `regions/0/<x>/<z>?textures=<revision>`: a textured level 0 Surface region, the region format
   with one more word per quad (header byte 7 set). A stale revision answers 409, like a stale
   world revision. Plain regions, without `textures`, are unchanged byte for byte.
+- `regions/0/<x>/<z>?textures=<revision>&cutout=1`: the same region for detailed leaves, with
+  the faces between neighbouring cut-out cubes such as leaves. `cutout=1` without `textures`
+  answers 400. It is cached apart, under `cutout/` in the textured region cache.
 
 Textured regions have their own cache, `<cache>/textures/regions/`, bounded by
 `textures.diskCacheMiB` (512 by default) and named after the world and texture revisions
@@ -141,6 +144,17 @@ its block colors.
   textures take the biome color. An `overlay_color` texture, like the grass block side, uses its
   alpha as the mask of the pixels that take the block color; terrain stays opaque elsewhere, and
   plant sprites cut out along the texture's alpha once it shows.
+- Leaves and other cubes with transparent texels draw `fast` by default: those texels take half
+  the block's own color, the leaves' tint, so a canopy stays opaque, costs nothing more and
+  looks like its plain color from afar. `leaves: "detailed"` (or `setLeaves("detailed")`, the
+  "Detailed leaves" switch, `leaves=detailed` in the address) cuts them out and loads the
+  `cutout=1` regions, which also draw the faces inside the foliage. In a dense forest these
+  hold about 2.1 times the quads and bytes of fast regions; the frame rate did not change on
+  an emulated phone, measured on a desktop GPU.
+- Thin cut-out shapes, such as leaf litter, always cut out and never hide the face below them.
+  Stained glass keeps its glass material.
+- Turning textures off draws the same pixels as a server without textures, checked frame by
+  frame in the browser tests.
 
 ## Checking a stack
 

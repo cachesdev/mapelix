@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { delimiter, resolve } from "node:path";
 import { createSceneHandler, createSceneServer } from "@mapelix/viewer/node";
 
 function positive(name: string, fallback: number): number {
@@ -9,6 +9,9 @@ function positive(name: string, fallback: number): number {
   return value;
 }
 
+/** Bedrock resource packs for block textures, highest priority first, as a path list. */
+const texturePacks = process.env.MAPELIX_TEXTURE_PACKS?.split(delimiter).filter((path) => path);
+
 /** The local world, configured from the environment. */
 export const scene = createSceneServer({
   worldDirectory:
@@ -18,6 +21,9 @@ export const scene = createSceneServer({
   workers: positive("MAPELIX_SCENE_WORKERS", 1),
   caveMemoryMiB: positive("MAPELIX_CAVE_MEMORY_MIB", 16),
   discoveryMemoryMiB: positive("MAPELIX_DISCOVERY_MEMORY_MIB", 4),
+  ...(texturePacks !== undefined && texturePacks.length > 0
+    ? { textures: { packs: texturePacks } }
+    : {}),
 });
 
 export const handleScene = createSceneHandler(scene);

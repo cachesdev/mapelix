@@ -6,8 +6,41 @@ import {
 } from "../../../packages/mapelix-scene-prototype/test/dimension-fixture";
 import { modelFixtureRecords } from "../../../packages/mapelix-scene-prototype/test/model-fixture";
 import { caveFixtureRecords } from "../../../packages/mapelix-scene-prototype/test/cave-fixture";
+import {
+  makePng,
+  packFiles,
+  writePackFolder,
+} from "../../../packages/mapelix-scene-prototype/test/synthetic-pack";
+
+/** Generated block textures, never game assets: one flat color per block, unlike its map color. */
+const TEXTURES: Record<string, readonly [number, number, number, number]> = {
+  stone: [40, 120, 220, 255],
+  dirt: [230, 200, 40, 255],
+  oak_planks: [200, 40, 200, 255],
+  quartz_block: [40, 200, 90, 255],
+  red_concrete: [20, 20, 20, 255],
+};
+
+/** Writes the synthetic texture pack the test server offers. */
+async function writeTexturePack(): Promise<void> {
+  const names = Object.keys(TEXTURES);
+  await writePackFolder(
+    resolve("../../.local/dimension-textures"),
+    packFiles({
+      name: "Generated test textures",
+      terrain: Object.fromEntries(
+        names.map((name) => [name, { textures: `textures/blocks/${name}` }]),
+      ),
+      blocks: Object.fromEntries(names.map((name) => [name, { textures: name }])),
+      images: Object.fromEntries(
+        names.map((name) => [`textures/blocks/${name}.png`, makePng(16, TEXTURES[name]!)]),
+      ),
+    }),
+  );
+}
 
 export default async function setupWorld(): Promise<void> {
+  await writeTexturePack();
   if (process.env.MAPELIX_E2E_WORLD_DIRECTORY) return;
   await writeFixtureWorld(resolve("../../.local/dimension-world"), [
     ...modelFixtureRecords(),

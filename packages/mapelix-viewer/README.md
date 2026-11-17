@@ -67,8 +67,11 @@ working unchanged, with textures off, and with a server that has no texture stac
   per block, 4 and 8 by default) and `onTextureState`; `setTextures()`, `setTextureFade()`, and
   `snapshot().textures` with the atlas GPU bytes. `world.options.textureFade` sets the fade
   through `MapelixViewer`.
-- Control texts `textures`, `texturesUnavailable` and `texturesFailed`; the address keeps
-  `textures=1`.
+- `WorldSettings.leaves` (`"fast"` by default or `"detailed"`), `MapelixViewer.setLeaves()`,
+  the `WorldViewer` option `leaves` and `setLeaves()`: how textured leaves and other cut-out
+  cubes draw; `snapshot().textures.leaves`.
+- Control texts `textures`, `texturesUnavailable`, `texturesFailed` and `detailedLeaves`; the
+  address keeps `textures=1` and `leaves=detailed`.
 
 ### API version 4 (changes from 3)
 

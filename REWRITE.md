@@ -161,6 +161,7 @@ Append entries. Do not rewrite earlier results.
 | 2026-11-17 | 3D engine package | Move the 3D engine from `apps/prototype-viewer-3d/src/lib/viewer` to the new browser package `@mapelix/viewer` (`packages/mapelix-viewer/src/three`, exported as `@mapelix/viewer/three`) so other apps can embed it. 41 files renamed without changes; the prototype imports the package. | 4,461 3D appearance cases and six-region samples unchanged; 80 unit tests and the 3D browser suite pass; Linux build/check/tests pass. | Accepted; committed |
 
 | 2026-11-17 | 3D block textures | Host-provided Bedrock packs (a stack folder with `mapelix-stack.json`, or a pack list) feed a 16-pixel atlas with copied gutters and mipmaps down to 4-pixel tiles, served Brotli/gzip under an immutable texture revision kept apart from the world revision. Level 0 Surface regions get a textured variant (one more word per quad); the viewer, off by default, swaps near regions for it and blends each pixel from block color to texture between 4 and 8 CSS pixels per block, measured from the projection. Overlay textures (grass sides) keep their alpha as a color mask. Embed API 5, compatible with version 4 hosts. | 208 scene and 155 viewer unit tests; vanilla atlas 1,883 tiles, 5.46 MiB on the GPU, 629 KiB Brotli / 824 KiB gzip transferred; textured regions cover 99.8% of quads with the same quad count and 1.31 times the bytes; peak RSS 146 MiB to check the stack, 193 MiB to build regions, 531 MiB for the whole dev demo. WebGPU and WebGL 2 render in perspective and isometric without tile bleeding. Emulated phone (375×812, DPR 3, CPU ×4, desktop GPU): same frame rate with and without textures; no real phone GPU measured. | Prototype evidence; pending review |
+| 2026-11-18 | Fast and detailed leaves | Transparent texels of cut-out cubes such as leaves take half the leaves' tint by default (`fast`: opaque, no extra faces). `detailed` cuts them out from a separate `cutout=1` region variant that also draws the faces inside foliage. Thin cut-out shapes such as leaf litter always cut out and never hide the face below; leaf litter takes its own color; rotated textures on lying logs no longer turn black. | 209 scene and 156 viewer unit tests. Dense forest: detailed regions hold 2.07–2.1 times the quads and bytes of fast ones (region −2,3: 20,974 → 43,941 quads, 350 → 709 KiB); same frame rate with both modes, desktop and emulated phone, on a desktop GPU. New browser test: with textures off, frames are pixel-identical to a server without textures, in WebGPU and WebGL 2, perspective and isometric; a one-off comparison against `main` gave identical SHA-256 frames for 12 Overworld, Nether and End views. | Prototype evidence; pending review |
 
 ## Open production questions
 
@@ -178,6 +179,12 @@ Append entries. Do not rewrite earlier results.
 - What is the invalidation contract between Canopy events, changed chunks, shadow halos, and
   biome-blend neighbors?
 - Which texture-pack or resource-pack behavior belongs in the first production release?
+- Follow-up: textured block models. Models take their texture from world coordinates, which
+  suits fences, walls, stairs and doors; anvils, grindstones, lightning rods, lecterns and other
+  detailed blocks still draw as full cubes, lanterns, torches, chains, end rods and flower pots
+  use sprite-sheet textures that need per-face texture rectangles, and beds use entity textures.
+  Weathered copper lanterns also miss the lantern model.
+- Follow-up: textures in the Caves view.
 - Follow-up: far block colors (2D map and coarse 3D levels) could derive from the host's texture
   stack instead of the built-in catalog; postponed.
 - Follow-up: lava, water and glass keep their own materials with textures on, and block models
