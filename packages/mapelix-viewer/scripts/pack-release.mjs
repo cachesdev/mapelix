@@ -89,6 +89,23 @@ await requireFile(join(embed, "mapelix-viewer.css"), build);
 // Only compiled modules ship: the engine fingerprints hash `.js` files, so a release and the
 // checkout it came from name the same revisions.
 const javascript = (path) => path.endsWith(".js") && !path.endsWith(".test.js");
+// The compiler never removes the output of a deleted source; such a leftover would ship and
+// change the revisions.
+for (const directory of [...Object.values(packages), viewerPackage]) {
+  const output = join(directory, "dist");
+  const leftovers = [];
+  for (const path of (await listFiles(output)).map((file) => relative(output, file))) {
+    const source = join(directory, "src", path.replace(/\.js$/, ".ts"));
+    if (javascript(path) && (await stat(source).catch(() => undefined)) === undefined) {
+      leftovers.push(path);
+    }
+  }
+  if (leftovers.length > 0) {
+    throw new Error(
+      `${join(directory, "dist")} has output without a source (${leftovers.join(", ")}); delete it and build again`,
+    );
+  }
+}
 const modules = join(target, "node_modules");
 for (const [name, directory] of Object.entries(packages)) {
   const into = join(modules, "@mapelix", name);
