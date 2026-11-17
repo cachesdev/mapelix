@@ -743,6 +743,8 @@ export class WorldViewer {
       this.autoPerspective,
     );
     if (shown !== this.projectionShown) {
+      // An isometric camera passes through the terrain; a perspective one must stand clear.
+      if (shown === "perspective") this.rig.clearCamera();
       this.projectionShown = shown;
       this.projectionFrom = this.camera.projectionBlend;
       this.projectionProgress = 0;

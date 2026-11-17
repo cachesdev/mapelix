@@ -29,3 +29,17 @@ export class HeldKeys {
 export function keyboardSpeed(distance: number, caves: boolean): number {
   return Math.min(caves ? 32 : 160, Math.max(24, distance * 1.1));
 }
+
+/**
+ * The distance that sets the keyboard pace, for moves along the ground and up or down alike:
+ * the orbit distance, or the camera's height above the ground below it when that is more.
+ * Over high terrain the pivot can sit close to the camera; the height restores the pace once
+ * the camera is past it. `ground` is undefined while the terrain below is not loaded.
+ */
+export function keyboardReach(
+  distance: number,
+  cameraY: number,
+  ground: number | undefined,
+): number {
+  return Math.max(distance, ground === undefined ? 0 : cameraY - ground);
+}

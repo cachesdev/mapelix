@@ -539,7 +539,7 @@
     <div class="bottom-center">
       {#if hintVisible}
         <p class="glass hint">
-          Drag to move, right-drag to turn, scroll to zoom. WASD, Q and E work too.
+          Drag to move, right-drag to turn, scroll to zoom. WASD, Q, E, Space and C work too.
         </p>
       {/if}
       {#if dimension === "overworld" && mode === "surface"}<TimeOfDay bind:hour />{/if}

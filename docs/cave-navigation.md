@@ -11,15 +11,16 @@ nearby wall. This avoids the oversized collision sweep and wall pivot that could
 trap exploration in a narrow cavern. The orbit focus stays within the visible
 slice; the camera can stand above the cut for an overview.
 
-Space/C move the camera and focus vertically at 12 blocks/second.
+Space/C move the camera and focus vertically, in Caves as in Surface views, at
+the keyboard pace of WASD, which follows the zoom (see `keyboardSpeed`).
 Page Up/Page Down remain aliases. Shift has no camera action; it never swaps
 mouse pan/orbit. Space never takes over focused buttons or form controls.
 The prototype also supplies 44-pixel touch buttons held to ascend/descend. Input
 stops on release, cancellation, lost capture, blur, hidden document, selection
 drag or manual view switch. Text/number/select/contenteditable fields keep their
 keyboard input. Existing WASD/QE/RF controls are preserved. Keys expire after
-600 ms without a keydown/repeat, protecting against a lost keyup. Translation
-is capped at 96 blocks/s in Surface and 32 in Caves, independently of zoom.
+600 ms without a keydown/repeat, protecting against a lost keyup. Translation,
+vertical moves included, is capped at 160 blocks/s in Surface and 32 in Caves.
 
 Recover view stops movement, cancels pending automatic metadata, turns off the
 selection tool and restores a distance of 80 and pitch of 60 degrees around the

@@ -12,7 +12,8 @@ import {
 import type { SurfaceHit } from "./quad-collider";
 import { CAVE_LIMITS, type VerticalBounds } from "@mapelix/scene-prototype/dimensions";
 import { projectionRay, rayReach, ViewCamera } from "./view-projection";
-import { HeldKeys, keyboardSpeed } from "./camera-input";
+import { HeldKeys, keyboardReach, keyboardSpeed } from "./camera-input";
+import { retarget } from "./camera-anchor";
 
 /** What the camera reads from the loaded terrain. */
 export interface Terrain {
@@ -49,12 +50,15 @@ interface Flight {
 }
 
 const UP = new Vector3(0, 1, 0);
+const DOWN = new Vector3(0, -1, 0);
 /** Room kept above the highest block while the camera settles after a jump, in blocks. */
 const CLEARANCE = 2.5;
 /** Room kept around the camera, as a multiple of its near plane distance. */
 const NEAR_ROOM = 1.5;
 /** How far the camera stops short of a face it runs into, in blocks. */
 const SKIN = 0.02;
+/** How far from the orbit point a check for terrain in front of the camera starts, in blocks. */
+const PIVOT_ROOM = 0.5;
 /** Distance change per 100 pixels of wheel travel. */
 const WHEEL_ZOOM = 0.95 ** -1.1;
 /** Farthest the camera orbits from the point it looks at, in blocks. */
@@ -73,8 +77,9 @@ export type CameraInteraction = "pan" | "zoom" | "rotate" | "click";
  * Map-style camera: left drag pans, right drag orbits, and the wheel zooms toward the
  * surface under the cursor. Each drag, wheel step, or key press puts the orbit point on
  * the first surface in the middle of the view. The camera slides along surfaces it runs
- * into and climbs walls. Keyboard keys pan (WASD), turn (Q and E), and zoom (R and F).
- * Caves retain their pivot, allow passage through walls, and add Space/C movement.
+ * into and climbs walls. Keyboard keys pan (WASD), turn (Q and E), zoom (R and F), and move
+ * up and down (Space and C) in every view, at a pace that follows the zoom. Caves retain
+ * their pivot and allow passage through walls. An isometric view keeps its scale.
  */
 export class CameraRig {
   private readonly camera: PerspectiveCamera;
@@ -154,7 +159,7 @@ export class CameraRig {
 
   /** Input intent remains available when the focus reaches a slice boundary. */
   get verticalMovement(): VerticalMovement {
-    if (!this.enabled || !this.window) return 0;
+    if (!this.enabled) return 0;
     return Math.sign(
       this.heldVertical +
         Number(this.keys.has("Space") || this.keys.has("PageUp")) -
@@ -164,7 +169,7 @@ export class CameraRig {
 
   /** Held touch/button input, stopped on release, blur, or a view change. */
   setVerticalMovement(direction: VerticalMovement): void {
-    this.heldVertical = this.enabled && this.window ? direction : 0;
+    this.heldVertical = this.enabled ? direction : 0;
     if (this.heldVertical) {
       this.interact("pan");
       this.takeOver();
@@ -266,6 +271,31 @@ export class CameraRig {
     this.camera.position.copy(this.controls.target).add(offset);
   }
 
+  /**
+   * Brings the camera out of the terrain between it and the orbit point, for a perspective
+   * view after an isometric one, where the camera does not collide.
+   */
+  clearCamera(): void {
+    if (this.window !== undefined || this.pinned) return;
+    const target = this.controls.target;
+    const distance = this.distance;
+    if (!(distance > 1e-6)) return;
+    const direction = this.camera.position.clone().sub(target).divideScalar(distance);
+    // The pivot rests on a face: start half a block off it, so the faces around it do not count.
+    const start = Math.min(PIVOT_ROOM, distance);
+    const origin = target.clone().addScaledVector(direction, start);
+    const hit = this.terrain.raycast(origin, direction, distance - start);
+    if (hit !== undefined) {
+      const reach = Math.max(0, start + hit.distance - SKIN);
+      this.camera.position.copy(target).addScaledVector(direction, reach);
+      // Too close to orbit, the pivot moves on ahead along the same view.
+      const minDistance = this.controls.minDistance;
+      if (reach < minDistance)
+        target.copy(this.camera.position).addScaledVector(direction, -minDistance);
+    }
+    this.clearPosition.copy(this.camera.position);
+  }
+
   /** Advances input and flights. Returns whether the camera moved this frame. */
   update(delta: number): boolean {
     if (!this.enabled) return false;
@@ -273,17 +303,12 @@ export class CameraRig {
     this.fly(delta);
     this.applyKeys(delta);
     const vertical = this.verticalMovement;
-    if (vertical) {
-      this.interact("pan");
-      const step = vertical * 12 * delta;
-      this.controls.target.y += step;
-      this.camera.position.y += step;
-    }
+    if (vertical) this.moveVertically(vertical, delta);
     this.controls.update(delta);
     // Flights arc over the terrain on their own.
     if (this.flight === undefined) {
       if (this.settling) this.settle(delta);
-      else if (this.window === undefined && !this.pinned) this.collide();
+      else if (this.window === undefined && !this.pinned && !this.isometric) this.collide();
     }
     if (this.window !== undefined) {
       const y = MathUtils.clamp(this.controls.target.y, this.window.minY, this.window.maxY - 1);
@@ -336,13 +361,31 @@ export class CameraRig {
     // repeatedly move the orbit pivot and trap the camera in narrow passages.
     if (this.window !== undefined || this.pinned) return;
     const { minDistance, target } = this.controls;
-    // The camera looks at the orbit point, so moving it along the view ray keeps the view.
     const direction = target.clone().sub(this.camera.position).normalize();
-    const hit = this.terrain.raycast(this.camera.position, direction, this.anchorReach());
+    // An isometric view also draws the terrain behind the camera: the ray starts as far back,
+    // so the pivot lands on what shows in the middle of the screen.
+    const back = this.isometric ? this.camera.far : 0;
+    const origin = this.camera.position.clone().addScaledVector(direction, -back);
+    const found = this.terrain.raycast(origin, direction, back + this.anchorReach());
+    const hit = found && { distance: found.distance - back };
     if (hit === undefined) return;
-    target
-      .copy(this.camera.position)
-      .addScaledVector(direction, Math.max(hit.distance, minDistance));
+    // The camera looks at the orbit point, so moving it along the view ray keeps the view;
+    // an isometric view also keeps its orbit distance, which sets its scale.
+    retarget(
+      this.camera.position,
+      target,
+      this.isometric ? hit.distance : Math.max(hit.distance, minDistance),
+      this.isometric,
+    );
+  }
+
+  /**
+   * True while the view has an orthographic share, during a projection change too. Its scale
+   * follows the orbit distance, and it draws the terrain behind the camera, so the camera
+   * neither collides with the terrain nor rises above it.
+   */
+  private get isometric(): boolean {
+    return this.camera instanceof ViewCamera && this.camera.blended;
   }
 
   /** A local gesture must not replace its pivot with distant terrain on the horizon. */
@@ -380,6 +423,46 @@ export class CameraRig {
     this.settling = this.window === undefined;
   }
 
+  /** Blocks per second for keyboard moves, following the zoom. */
+  private keyboardSpeed(): number {
+    const position = this.camera.position;
+    const ground = this.terrain.heightAt(position.x, position.z);
+    return keyboardSpeed(
+      keyboardReach(this.distance, position.y, ground),
+      this.window !== undefined,
+    );
+  }
+
+  /**
+   * Moves the camera and its orbit point up or down, at the keyboard pace. Caves keep the
+   * focus in the slice afterwards (see `update`). On the Surface, the camera stays above the
+   * terrain and no higher above the ground than the zoom limit; nothing moves down before the
+   * terrain below is loaded.
+   */
+  private moveVertically(vertical: VerticalMovement, delta: number): void {
+    this.interact("pan");
+    let step = vertical * this.keyboardSpeed() * delta;
+    if (this.window === undefined) step = this.surfaceStep(step);
+    this.controls.target.y += step;
+    this.camera.position.y += step;
+  }
+
+  private surfaceStep(step: number): number {
+    const position = this.camera.position;
+    const ground = this.terrain.heightAt(position.x, position.z);
+    if (step > 0)
+      return ground === undefined
+        ? step
+        : MathUtils.clamp(ground + this.controls.maxDistance - position.y, 0, step);
+    if (ground === undefined) return 0;
+    // An isometric camera passes through the terrain, so only the height map stops it.
+    if (this.isometric) return MathUtils.clamp(ground + CLEARANCE - position.y, step, 0);
+    // A perspective camera stops short of the first face below, and may stand under a bridge.
+    const radius = this.camera.near * NEAR_ROOM;
+    const hit = this.terrain.raycast(position, DOWN, SKIN - step, radius);
+    return hit === undefined ? step : -Math.max(0, hit.distance - SKIN);
+  }
+
   private applyKeys(delta: number): void {
     if (this.keys.size === 0) return;
     const forward = new Vector3();
@@ -387,12 +470,7 @@ export class CameraRig {
     forward.y = 0;
     forward.normalize();
     const right = new Vector3().crossVectors(forward, UP);
-    // Over high terrain the pivot can sit close to the camera; the height above the
-    // ground below restores the pace once the camera is past it.
-    const ground = this.terrain.heightAt(this.camera.position.x, this.camera.position.z);
-    const altitude = ground === undefined ? 0 : this.camera.position.y - ground;
-    const reach = Math.max(this.distance, altitude);
-    const speed = keyboardSpeed(reach, this.window !== undefined) * delta;
+    const speed = this.keyboardSpeed() * delta;
     const move = new Vector3();
     if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) move.add(forward);
     if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) move.sub(forward);
@@ -423,6 +501,7 @@ export class CameraRig {
       target.y += rise;
       this.camera.position.y += rise;
     }
+    if (this.isometric) return;
     const below = this.terrain.heightAt(this.camera.position.x, this.camera.position.z);
     if (below !== undefined && this.camera.position.y < below + CLEARANCE) {
       this.camera.position.y = below + CLEARANCE;
@@ -497,7 +576,7 @@ export class CameraRig {
       event.ctrlKey ||
       event.metaKey ||
       (VERTICAL_KEYS.has(event.code) && !this.navigationTarget(event.target)) ||
-      (!MOVE_KEYS.has(event.code) && !(this.window && VERTICAL_KEYS.has(event.code)))
+      (!MOVE_KEYS.has(event.code) && !VERTICAL_KEYS.has(event.code))
     )
       return;
     event.preventDefault();

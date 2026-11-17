@@ -585,7 +585,7 @@ export class MapelixViewer {
 
   /**
    * Gives the keyboard focus to the view shown: arrows and +/− on the map; WASD, arrows, Q/E,
-   * R/F, +/− (and Space/C in caves) in 3D. Hosts call it after a pointer press on their own
+   * R/F, +/− and Space/C in 3D. Hosts call it after a pointer press on their own
    * controls, so a focused button never takes those keys.
    */
   focus(): void {

@@ -101,7 +101,7 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
 - **Controls:** one set of buttons for 2D and 3D that keep their place across the switch, sized for
   touch (48 px), light and dark, from `@mapelix/viewer/controls`. Touch: drag to move, two fingers
   to turn and tilt, pinch to zoom. Mouse: drag, right button to turn, wheel. Keys: WASD or arrows,
-  Q/E, R/F, +/−, and Space/C up and down in caves. Compass, return home, go to coordinates.
+  Q/E, R/F, +/−, and Space/C up and down. Compass, return home, go to coordinates.
 
 ### Markers
 

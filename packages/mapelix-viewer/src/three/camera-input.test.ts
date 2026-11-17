@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HeldKeys, keyboardSpeed } from "./camera-input";
+import { HeldKeys, keyboardReach, keyboardSpeed } from "./camera-input";
 
 describe("camera keyboard safety", () => {
   it("expires a missing release after 600 ms", () => {
@@ -36,5 +36,13 @@ describe("camera keyboard safety", () => {
     expect(keyboardSpeed(2600, false)).toBe(160);
     expect(keyboardSpeed(20_000, false)).toBe(160);
     expect(keyboardSpeed(96, true)).toBe(32);
+  });
+  it("paces moves by the orbit distance, or the height above the ground when that is more", () => {
+    expect(keyboardReach(80, 100, 90)).toBe(80);
+    // A pivot on a peak close to the camera, far above the ground below it.
+    expect(keyboardReach(20, 300, 64)).toBe(236);
+    // Below the surface height, in a cave or under a roof.
+    expect(keyboardReach(80, -20, 70)).toBe(80);
+    expect(keyboardReach(12, 200, undefined)).toBe(12);
   });
 });

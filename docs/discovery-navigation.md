@@ -12,7 +12,7 @@ visibility are described in [immediate discovery labels](discovery-labels.md).
 
 ## Keyboard and selection tools
 
-In Caves, Space ascends and C descends. Page Up/Down remain compatible aliases.
+Space ascends and C descends, in every view. Page Up/Down remain compatible aliases.
 Shift has no camera action; repeated/held Shift can open Windows accessibility
 dialogs and cannot be reliably intercepted by a page. Vertical keys are taken
 only when the event belongs to the canvas,

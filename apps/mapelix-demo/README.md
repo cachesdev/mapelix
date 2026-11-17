@@ -34,7 +34,7 @@ zooming out below 4 turns the camera back north and down and shows the map again
 On phones the panel and the discovery card take the free space between the top row and the
 buttons; they close with ×, Escape, a swipe down on the panel header or a tap on the map. Keys go to
 the map or the 3D view after any tap on a button: arrows and +/− on the map; WASD, arrows, Q/E,
-R/F, +/− in 3D, and Space/C up and down in caves. Clouds, weather and automatic depth are kept on the
+R/F, +/− and Space/C up and down in 3D. Clouds, weather and automatic depth are kept on the
 device; the address keeps the view and the other settings. `MAPELIX_CACHE_DIRECTORY`
 chooses where 3D regions are cached (default: the system temporary folder).
 

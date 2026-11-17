@@ -64,6 +64,8 @@ An unvisited dimension displays empty space until the copied world contains chun
 - Nether starts at the Overworld spawn divided by eight; End starts at X 100, Z 0. These
   are navigation entry points, not stored portal or player positions.
 - Drag to move. Right-drag to turn and tilt. Scroll to zoom toward the point under the cursor.
+- Space and C move up and down in every view; on the Surface the camera stays above the
+  terrain.
 - W, A, S, and D move. Q and E turn. R and F zoom.
 - Enter X and Z coordinates to fly there. The house button returns to spawn.
 - The compass turns the view to face north. The cube button next to it switches between the

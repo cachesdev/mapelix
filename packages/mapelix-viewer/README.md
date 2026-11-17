@@ -9,6 +9,28 @@ The Mapelix viewer and its server side.
 | `@mapelix/viewer/three`    | browser    | The 3D engine (`WorldViewer`) on its own                                                     |
 | `@mapelix/viewer/node`     | Node.js 24 | The 3D scene server and request handlers for the tiles and the world                         |
 
+## 3D keys
+
+Once the 3D view has the keyboard focus (`MapelixViewer.focus()`), these keys work in every
+view: Surface and Caves, perspective and isometric. Keys pressed with Ctrl, Alt or Meta are left
+to the browser.
+
+| Key              | Action                                            |
+| ---------------- | ------------------------------------------------- |
+| W or ↑, S or ↓   | Move forward, back                                |
+| A or ←, D or →   | Move left, right                                  |
+| Q, E             | Turn left, right                                  |
+| R, F             | Zoom in, out                                      |
+| `+`, `−`         | Zoom in, out by a factor of two (`MapelixViewer`) |
+| Space or Page Up | Move up                                           |
+| C or Page Down   | Move down                                         |
+
+Moves along the ground and up or down go at the same pace, which follows the zoom: from 24
+blocks per second up close to 160 far out (32 in Caves). On the Surface the camera never goes
+below the terrain, nor higher above the ground than the zoom limit; in Caves the focus stays in
+the slice, which follows the depth when the host allows it. Shift has no camera action. A
+focused button, field or other control keeps its own keys.
+
 ## Browser bundle
 
 `pnpm run build:embed` writes `dist-embed/mapelix-viewer.js`, one ES module with three.js
