@@ -40,7 +40,7 @@ export type { CacheStatus } from "./region-service.js";
 export type SceneEvent = (event: string, detail: Record<string, unknown>) => void;
 
 export interface SceneServerOptions {
-  /** A Bedrock world folder (`level.dat` and `db/`); it is only read. */
+  /** A Bedrock world folder (`db/`, and `level.dat` for the name and spawn); it is only read. */
   readonly worldDirectory: string;
   /** Region, cave and discovery caches, one folder per world revision. */
   readonly cacheDirectory: string;
@@ -454,12 +454,10 @@ export function createSceneServer(options: SceneServerOptions) {
 
 /** A missing or partial snapshot is a configuration error: retrying cannot fix it. */
 async function requireWorld(directory: string): Promise<void> {
-  const [level, database] = await Promise.all([
-    stat(join(directory, "level.dat")).catch(() => undefined),
-    stat(join(directory, "db")).catch(() => undefined),
-  ]);
-  if (level?.isFile() !== true || database?.isDirectory() !== true)
-    throw new MissingWorldError("The world folder holds no Bedrock world (level.dat and db/)");
+  // The name and spawn in `level.dat` are optional; the database is not.
+  const database = await stat(join(directory, "db")).catch(() => undefined);
+  if (database?.isDirectory() !== true)
+    throw new MissingWorldError("The world folder holds no Bedrock world database (db/)");
 }
 
 /** Discovery folders of an older index schema can never be read again. */

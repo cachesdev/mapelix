@@ -41,7 +41,7 @@ async function javascriptFiles(directory: string): Promise<string[]> {
 
 /**
  * Names one world snapshot as built by one engine. It hashes the database file
- * names, sizes, and modification times plus `level.dat`, without reading the
+ * names, sizes, and modification times plus `level.dat` when present, without reading the
  * tables, and leaves out the folder path so a moved snapshot keeps its cache.
  */
 export async function worldRevision(worldDirectory: string, engine: string): Promise<string> {
@@ -54,7 +54,7 @@ export async function worldRevision(worldDirectory: string, engine: string): Pro
     if (!details.isFile()) continue;
     hash.update(`db/${name}\0${details.size}\0${details.mtimeNs}\n`);
   }
-  const level = await stat(join(worldDirectory, "level.dat"), { bigint: true });
-  hash.update(`level.dat\0${level.size}\0${level.mtimeNs}\n`);
+  const level = await stat(join(worldDirectory, "level.dat"), { bigint: true }).catch(() => null);
+  if (level !== null) hash.update(`level.dat\0${level.size}\0${level.mtimeNs}\n`);
   return hash.digest("hex").slice(0, 20);
 }

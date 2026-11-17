@@ -58,7 +58,7 @@ requests, with `createSceneHandler` or its own routes.
 import { createSceneHandler, createSceneServer, createTileHandler } from "@mapelix/viewer/node";
 
 const scene = createSceneServer({
-  worldDirectory: "/srv/world", // level.dat and db/
+  worldDirectory: "/srv/world", // db/ and level.dat
   cacheDirectory: "/var/cache/mapelix",
   workers: 2,
   onEvent: (event, detail) => console.log(event, detail),
@@ -88,7 +88,7 @@ const response = (await world(request)) ?? (await tiles(request)) ?? notFound();
 ### Behavior
 
 - **Revision.** The world revision hashes the engine code that builds regions, the database file
-  names, sizes and times and `level.dat`, without reading the tables and without the folder path:
+  names, sizes and times and `level.dat` when present, without reading the tables and without the folder path:
   a new snapshot or a new engine gets a new revision, a moved snapshot keeps its cache. Clients
   add it to region URLs, so responses can be cached forever.
 - **Caches.** Memory, then disk (one folder per revision, each with its byte quota; the oldest

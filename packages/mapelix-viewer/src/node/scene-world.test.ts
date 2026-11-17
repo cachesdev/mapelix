@@ -99,6 +99,9 @@ describe("scene server", () => {
       MissingWorldError,
     );
     await expect(createSceneServer(options).ready()).resolves.toBeUndefined();
+    // Without level.dat the world opens with a default name and spawn.
+    await rm(join(options.worldDirectory, "level.dat"));
+    await expect(createSceneServer(options).ready()).resolves.toBeUndefined();
   });
 
   it("builds, remembers and stores each dimension and ceiling apart, across a restart", async () => {
