@@ -12,7 +12,8 @@ import {
   DISCOVERY_SCHEMA_VERSION,
 } from "@mapelix/scene-prototype/discoveries";
 
-import type { LoadedRegion, SceneServer } from "./scene-world.js";
+import { InvalidRegionError, NotCachedError, OverloadedError } from "./region-service.js";
+import { MissingWorldError, type LoadedRegion, type SceneServer } from "./scene-world.js";
 
 /** Answers a request it owns, or returns `undefined` so the host can route it elsewhere. */
 export type MapelixHandler = (request: Request) => Promise<Response | undefined>;
@@ -50,11 +51,75 @@ function routePath(request: Request, base: string): string | undefined {
   return pathname.slice(prefix.length);
 }
 
+export interface SceneHandlerOptions {
+  /**
+   * Serve Surface regions from the cache only: one not built yet answers 404 `not-cached` (a
+   * prewarm builds them). For an anonymous or public front end.
+   */
+  readonly cacheOnly?: boolean;
+  /**
+   * With `cacheOnly`: cave slices and discovery indexes may still be built, at most this many
+   * requests at once through this handler (503 beyond). 0, the default, serves them from the
+   * cache only too.
+   */
+  readonly maxBuilds?: number;
+}
+
+/** Turns the server's typed refusals into JSON answers; anything else goes to the host. */
+function refusal(request: Request, cause: unknown): Response {
+  if (cancelled(request, cause)) return new Response(null, { status: 499, headers: NO_STORE });
+  if (cause instanceof InvalidRegionError) return failure(400, cause.message);
+  if (cause instanceof NotCachedError)
+    return Response.json(
+      { error: "not-cached", message: cause.message },
+      { status: 404, headers: NO_STORE },
+    );
+  if (cause instanceof OverloadedError) return overloaded();
+  if (cause instanceof MissingWorldError) return failure(503, cause.message);
+  throw cause;
+}
+
+function overloaded(): Response {
+  return Response.json(
+    { error: "overloaded", message: "Too many builds are waiting; retry shortly" },
+    { status: 503, headers: { ...NO_STORE, "retry-after": "2" } },
+  );
+}
+
+/** Whether a request may build, and how it gives its slot back; or the refusal. */
+type Admission = { readonly cacheOnly: boolean; readonly release: () => void } | Response;
+type Admit = (buildable: boolean) => Admission;
+
 /**
  * Serves the 3D viewer endpoints below `base`: `world.json`, `regions/<level>/<x>/<z>` and
- * `discoveries/<x>/<z>.bin`, each with the scene context in the query string.
+ * `discoveries/<x>/<z>.bin`, each with the scene context in the query string. A request outside
+ * the stored world gets an empty payload (`x-mapelix-cache: empty`), too many waiting builds a
+ * 503 with `retry-after`, and a missing world a 503.
  */
-export function createSceneHandler(server: SceneServer, base = ""): MapelixHandler {
+export function createSceneHandler(
+  server: SceneServer,
+  base = "",
+  options: SceneHandlerOptions = {},
+): MapelixHandler {
+  const maxBuilds = options.maxBuilds ?? 0;
+  if (!Number.isSafeInteger(maxBuilds) || maxBuilds < 0)
+    throw new RangeError("maxBuilds must be a whole number");
+  let building = 0;
+  const admit: Admit = (buildable) => {
+    if (options.cacheOnly !== true) return { cacheOnly: false, release: () => undefined };
+    if (!buildable || maxBuilds === 0) return { cacheOnly: true, release: () => undefined };
+    if (building >= maxBuilds) return overloaded();
+    building += 1;
+    let released = false;
+    return {
+      cacheOnly: false,
+      release: () => {
+        if (released) return;
+        released = true;
+        building -= 1;
+      },
+    };
+  };
   return async (request) => {
     const path = routePath(request, base);
     if (path === undefined) return undefined;
@@ -66,14 +131,36 @@ export function createSceneHandler(server: SceneServer, base = ""): MapelixHandl
       } catch (cause) {
         return failure(400, cause instanceof Error ? cause.message : "Invalid scene context");
       }
-      return Response.json(await server.getWorldMetadata(context), { headers: NO_STORE });
+      try {
+        return Response.json(await server.getWorldMetadata(context), { headers: NO_STORE });
+      } catch (cause) {
+        return refusal(request, cause);
+      }
     }
     const region = /^\/regions\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
-    if (region !== null) return regionResponse(server, request, url, region);
+    if (region !== null) return regionResponse(server, request, url, region, admit);
     const discovery = /^\/discoveries\/([^/]+)\/([^/]+)\.bin$/.exec(path);
-    if (discovery !== null) return discoveryResponse(server, request, url, discovery);
+    if (discovery !== null) return discoveryResponse(server, request, url, discovery, admit);
     return undefined;
   };
+}
+
+/** Runs a load with an admission slot, and answers its refusals. */
+async function admitted(
+  request: Request,
+  admit: Admit,
+  buildable: boolean,
+  load: (cacheOnly: boolean) => Promise<Response>,
+): Promise<Response> {
+  const admission = admit(buildable);
+  if (admission instanceof Response) return admission;
+  try {
+    return await load(admission.cacheOnly);
+  } catch (cause) {
+    return refusal(request, cause);
+  } finally {
+    admission.release();
+  }
 }
 
 async function regionResponse(
@@ -81,6 +168,7 @@ async function regionResponse(
   request: Request,
   url: URL,
   [, rawLevel, rawX, rawZ]: RegExpExecArray,
+  admit: Admit,
 ): Promise<Response> {
   let context;
   try {
@@ -98,15 +186,20 @@ async function regionResponse(
   if (context.mode === "caves" && level > CAVE_LIMITS.maxLevel)
     return failure(400, `Caves support LOD 0 through ${CAVE_LIMITS.maxLevel}`);
   const revision = url.searchParams.get("revision");
-  if (revision !== null && revision !== (await server.getWorldMetadata(context)).revision)
-    return failure(409, "World revision changed; reload world metadata");
   try {
-    const loaded = await server.loadRegion({ level, x, z }, request.signal, context);
-    return binary(loaded, revision !== null, "region");
+    if (revision !== null && revision !== (await server.getRevision()))
+      return failure(409, "World revision changed; reload world metadata");
   } catch (cause) {
-    if (cancelled(request, cause)) return new Response(null, { status: 499, headers: NO_STORE });
-    throw cause;
+    return refusal(request, cause);
   }
+  // Surface regions come from the prewarm; cave slices may be built on demand.
+  return admitted(request, admit, context.mode === "caves", async (cacheOnly) =>
+    binary(
+      await server.loadRegion({ level, x, z }, request.signal, context, { cacheOnly }),
+      revision !== null,
+      "region",
+    ),
+  );
 }
 
 async function discoveryResponse(
@@ -114,6 +207,7 @@ async function discoveryResponse(
   request: Request,
   url: URL,
   [, rawX, rawZ]: RegExpExecArray,
+  admit: Admit,
 ): Promise<Response> {
   let dimension;
   const tile = { x: Number(rawX), z: Number(rawZ) };
@@ -130,15 +224,19 @@ async function discoveryResponse(
     return failure(400, cause instanceof Error ? cause.message : "Invalid discovery request");
   }
   const revision = url.searchParams.get("revision");
-  if (revision !== null && revision !== (await server.getSnapshotRevision()))
-    return failure(409, "Snapshot revision changed; reload metadata");
   try {
-    const result = await server.loadDiscoveries(dimension, tile, request.signal);
-    return binary(result, revision !== null, "discoveries");
+    if (revision !== null && revision !== (await server.getSnapshotRevision()))
+      return failure(409, "Snapshot revision changed; reload metadata");
   } catch (cause) {
-    if (cancelled(request, cause)) return new Response(null, { status: 499, headers: NO_STORE });
-    throw cause;
+    return refusal(request, cause);
   }
+  return admitted(request, admit, true, async (cacheOnly) =>
+    binary(
+      await server.loadDiscoveries(dimension, tile, request.signal, { cacheOnly }),
+      revision !== null,
+      "discoveries",
+    ),
+  );
 }
 
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;

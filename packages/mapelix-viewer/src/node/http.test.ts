@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { OverloadedError } from "./build-cache";
 import { createSceneHandler, createTileHandler } from "./http";
+import { InvalidRegionError, NotCachedError } from "./region-service";
+import { MissingWorldError } from "./scene-world";
 import type { SceneServer } from "./scene-world";
 
 const GENERATION = "a".repeat(64);
@@ -10,6 +13,7 @@ const GENERATION = "a".repeat(64);
 function fakeServer() {
   return {
     getWorldMetadata: vi.fn(async () => ({ revision: "r1", name: "Fixture" })),
+    getRevision: vi.fn(async () => "r1"),
     getSnapshotRevision: vi.fn(async () => "s1"),
     loadRegion: vi.fn(async (_request: unknown) => ({
       bytes: new Uint8Array([1, 2, 3]),
@@ -68,6 +72,57 @@ describe("scene handler", () => {
     server.loadRegion.mockRejectedValue(new DOMException("Cancelled", "AbortError"));
     const handle = createSceneHandler(server as unknown as SceneServer);
     expect((await handle(get("/regions/0/0/0")))?.status).toBe(499);
+  });
+
+  it("answers the server's refusals: invalid, overloaded, missing world", async () => {
+    const server = fakeServer();
+    const handle = createSceneHandler(server as unknown as SceneServer);
+    server.loadRegion.mockRejectedValueOnce(new InvalidRegionError("Beyond the border"));
+    expect((await handle(get("/regions/0/0/0")))?.status).toBe(400);
+    server.loadRegion.mockRejectedValueOnce(new OverloadedError("Busy"));
+    const busy = await handle(get("/regions/0/0/0"));
+    expect(busy?.status).toBe(503);
+    expect(busy?.headers.get("retry-after")).toBe("2");
+    expect((await busy!.json()).error).toBe("overloaded");
+    server.getWorldMetadata.mockRejectedValueOnce(new MissingWorldError("No world"));
+    expect((await handle(get("/world.json")))?.status).toBe(503);
+  });
+
+  it("serves the cache only, with a bounded number of cave and discovery builds", async () => {
+    const server = fakeServer();
+    const handle = createSceneHandler(server as unknown as SceneServer, "", {
+      cacheOnly: true,
+      maxBuilds: 1,
+    });
+    server.loadRegion.mockRejectedValueOnce(new NotCachedError("Not built"));
+    const missing = await handle(get("/regions/0/0/0"));
+    expect(missing?.status).toBe(404);
+    expect((await missing!.json()).error).toBe("not-cached");
+    expect(server.loadRegion.mock.calls[0]).toContainEqual({ cacheOnly: true });
+
+    // A cave slice may build; a second one while it runs waits for a free slot.
+    let finish!: () => void;
+    server.loadRegion.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({ bytes: new Uint8Array([9]), cacheStatus: "build", milliseconds: 1 });
+        }),
+    );
+    const caves = "/regions/0/0/0?mode=caves&minY=-64&maxY=-32";
+    const first = handle(get(caves));
+    await vi.waitFor(() => expect(server.loadRegion).toHaveBeenCalledTimes(2));
+    expect(server.loadRegion.mock.calls[1]).toContainEqual({ cacheOnly: false });
+    const second = await handle(get("/discoveries/0/0.bin?dimension=overworld"));
+    expect(second?.status).toBe(503);
+    finish();
+    expect((await first)?.status).toBe(200);
+    expect((await handle(get("/discoveries/0/0.bin?dimension=overworld")))?.status).toBe(200);
+    expect(server.loadDiscoveries.mock.calls[0]).toContainEqual({ cacheOnly: false });
+
+    const closed = createSceneHandler(server as unknown as SceneServer, "", { cacheOnly: true });
+    await closed(get("/discoveries/1/1.bin?dimension=overworld"));
+    expect(server.loadDiscoveries.mock.calls.at(-1)).toContainEqual({ cacheOnly: true });
   });
 });
 

@@ -1,46 +1,75 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
-import { openSceneWorld, type RegionRequest, type SceneWorld } from "@mapelix/scene-prototype";
-import { REGION_FORMAT_VERSION } from "@mapelix/scene-prototype/format";
-import { DISCOVERY_LIMITS } from "@mapelix/scene-prototype/discoveries";
+import { openSceneWorld, type RegionRequest } from "@mapelix/scene-prototype";
 import {
   DIMENSIONS,
   CAVE_LIMITS,
-  regionCacheKey,
   sceneContext,
   type Dimension,
   type DimensionConfig,
   type SceneContext,
   type SceneContextInput,
 } from "@mapelix/scene-prototype/dimensions";
-import { createDiscoveryCache } from "./discoveries.js";
+import {
+  DISCOVERY_LIMITS,
+  DISCOVERY_SCHEMA_VERSION,
+  type DiscoveryRequest,
+} from "@mapelix/scene-prototype/discoveries";
 
-/** Bump when mesh output changes without a format change, so stale disk caches are ignored. */
-const meshRevision = 23;
-const maxMemoryRegions = 384;
+import { checkBounds, type BlockBounds } from "./bounds.js";
+import { DiskCache, type DiskCacheStats } from "./disk-cache.js";
+import {
+  DiscoveryService,
+  discoveryTiles,
+  type DiscoveryServiceStats,
+} from "./discovery-service.js";
+import { parseExtent, scanWorldExtent, type WorldExtent } from "./extent.js";
+import { DimensionPools } from "./pools.js";
+import { Prewarmer, prewarmPlan, type PrewarmJob, type PrewarmProgress } from "./prewarm.js";
+import {
+  RegionService,
+  type LoadOptions,
+  type RegionResult,
+  type RegionServiceStats,
+} from "./region-service.js";
+import { engineFingerprint, worldRevision } from "./revision.js";
+
+export type { CacheStatus } from "./region-service.js";
+
+export type SceneEvent = (event: string, detail: Record<string, unknown>) => void;
 
 export interface SceneServerOptions {
-  /** A Bedrock world folder (with `db`); opened read-only. */
+  /** A Bedrock world folder (`level.dat` and `db/`); it is only read. */
   readonly worldDirectory: string;
-  /** Folder for built Surface regions, keyed by world revision. */
+  /** Region, cave and discovery caches, one folder per world revision. */
   readonly cacheDirectory: string;
-  /** Region builder worker threads per dimension (default 1). */
+  /** Builds that may run at once, across every dimension (default 1). */
   readonly workers?: number;
-  /** Memory for cave slices, which are never written to disk (default 16 MiB). */
+  /** Dimensions served (default all three). */
+  readonly dimensions?: readonly Dimension[];
+  /** A dimension's builders close after this many idle seconds; 0 keeps them (default 300). */
+  readonly poolIdleSeconds?: number;
+  /** Serve only this block rectangle in every dimension, instead of each one's stored area. */
+  readonly bounds?: BlockBounds;
+  /** Surface regions: memory, disk quota and distinct builds waiting (64, 1024, 32). */
+  readonly memoryMiB?: number;
+  readonly diskCacheMiB?: number;
+  readonly maxPending?: number;
+  /** Cave slices (16, 128, 8). */
   readonly caveMemoryMiB?: number;
-  /** Memory for discovery indexes (default 4 MiB). */
+  readonly caveDiskCacheMiB?: number;
+  readonly caveMaxPending?: number;
+  /** Discovery indexes (4, 64, 8). */
   readonly discoveryMemoryMiB?: number;
+  readonly discoveryDiskCacheMiB?: number;
+  readonly discoveryMaxPending?: number;
+  /** Cache, pool and build events, for the host's log. */
+  readonly onEvent?: SceneEvent;
 }
 
-export type CacheStatus = "memory" | "disk" | "build";
-
-export interface LoadedRegion {
-  readonly bytes: Uint8Array;
-  readonly cacheStatus: CacheStatus;
-  readonly milliseconds: number;
-}
+/** A served region or discovery index and where it came from. */
+export type LoadedRegion = RegionResult;
 
 export interface WorldMetadata extends SceneContext {
   readonly dimension: Dimension;
@@ -48,225 +77,420 @@ export interface WorldMetadata extends SceneContext {
   readonly dimensions: readonly DimensionConfig[];
   readonly name: string;
   readonly spawn: { readonly x: number; readonly y: number; readonly z: number };
-  /** Changes whenever the world files or the mesh output change. */
+  /** Changes with the world snapshot or the engine; clients add it to region URLs. */
   readonly revision: string;
   readonly caves: typeof CAVE_LIMITS;
   readonly snapshotRevision: string;
   readonly discoveries: typeof DISCOVERY_LIMITS;
 }
 
-/** Region, metadata and discovery loading for one world, with bounded caches. */
+export interface PrewarmOptions {
+  /** At most this many Surface regions, coarse levels and the middle of the world first. */
+  readonly maxRegions?: number;
+  /** Then every discovery index of the stored area (default true). */
+  readonly discoveries?: boolean;
+  readonly signal?: AbortSignal;
+}
+
+export interface PrewarmResult {
+  readonly regions: PrewarmProgress;
+  readonly discoveries: PrewarmProgress;
+}
+
+export interface SceneServerStats {
+  readonly revision: string;
+  readonly workers: number;
+  readonly dimensions: readonly Dimension[];
+  readonly openDimensions: readonly Dimension[];
+  readonly surface: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
+  readonly caves: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
+  readonly discoveries: {
+    readonly builds: DiscoveryServiceStats;
+    readonly cache: DiskCacheStats;
+  };
+  readonly prewarm: PrewarmResult;
+}
+
+/** The world folder holds no Bedrock world: a configuration error that a retry cannot fix. */
+export class MissingWorldError extends Error {
+  override readonly name = "MissingWorldError";
+}
+
 export type SceneServer = ReturnType<typeof createSceneServer>;
 
+const MIB = 1024 * 1024;
+const IDLE: PrewarmProgress = { state: "idle", done: 0, total: 0, built: 0, failed: 0 };
+
+interface Opened {
+  readonly revision: string;
+  readonly info: {
+    readonly name: string;
+    readonly spawn: { readonly x: number; readonly y: number; readonly z: number };
+  };
+  readonly bounds: ReadonlyMap<Dimension, BlockBounds | undefined>;
+  readonly pools: DimensionPools;
+  readonly disks: {
+    readonly surface: DiskCache;
+    readonly caves: DiskCache;
+    readonly discoveries: DiskCache;
+  };
+  readonly surface: RegionService;
+  readonly caves: RegionService;
+  readonly discoveries: DiscoveryService;
+}
+
+/**
+ * Builds and caches 3D scene regions and discovery indexes of one Bedrock world. Builds are
+ * shared between callers and bounded (`OverloadedError` past `maxPending`), every cache has a
+ * byte budget, older world revisions leave the disk when the server opens, and anything outside
+ * the stored area is answered with an empty payload without a build. A dimension's builder
+ * threads close when it stays idle. Nothing here listens on a port: the host routes requests,
+ * for instance through `createSceneHandler`.
+ */
 export function createSceneServer(options: SceneServerOptions) {
   const worldDirectory = resolve(options.worldDirectory);
   const cacheDirectory = resolve(options.cacheDirectory);
   const workers = positiveInteger(options.workers ?? 1, "workers");
-  const caveMemoryBudget =
-    positiveInteger(options.caveMemoryMiB ?? 16, "caveMemoryMiB") * 1024 * 1024;
-  const worlds = new Map<Dimension, Promise<SceneWorld>>();
-  let fingerprintPromise: Promise<{ terrain: string; snapshot: string }> | undefined;
-  const memory = new Map<string, Promise<LoadedRegion>>();
-  // Local caves are memory-only: exploring depths cannot create unbounded disk variants.
-  // Production disk quotas and revision cleanup belong to the production server.
-  const caveMemory = new Map<string, LoadedRegion>();
-  const cavePending = new Map<string, Promise<LoadedRegion>>();
-  let caveBytes = 0;
+  const served = [...new Set(options.dimensions ?? (Object.keys(DIMENSIONS) as Dimension[]))];
+  if (served.length === 0) throw new RangeError("dimensions must name at least one dimension");
+  for (const dimension of served)
+    if (!Object.hasOwn(DIMENSIONS, dimension))
+      throw new RangeError(`Unknown dimension ${dimension}`);
+  const idleSeconds = wholeNumber(options.poolIdleSeconds ?? 300, "poolIdleSeconds");
+  const bounds = options.bounds === undefined ? undefined : checkBounds(options.bounds);
+  const sizes = {
+    memory: wholeNumber(options.memoryMiB ?? 64, "memoryMiB") * MIB,
+    disk: positiveInteger(options.diskCacheMiB ?? 1024, "diskCacheMiB") * MIB,
+    pending: positiveInteger(options.maxPending ?? 32, "maxPending"),
+    caveMemory: wholeNumber(options.caveMemoryMiB ?? 16, "caveMemoryMiB") * MIB,
+    caveDisk: positiveInteger(options.caveDiskCacheMiB ?? 128, "caveDiskCacheMiB") * MIB,
+    cavePending: positiveInteger(options.caveMaxPending ?? 8, "caveMaxPending"),
+    discoveryMemory: wholeNumber(options.discoveryMemoryMiB ?? 4, "discoveryMemoryMiB") * MIB,
+    discoveryDisk:
+      positiveInteger(options.discoveryDiskCacheMiB ?? 64, "discoveryDiskCacheMiB") * MIB,
+    discoveryPending: positiveInteger(options.discoveryMaxPending ?? 8, "discoveryMaxPending"),
+  };
+  const onEvent = options.onEvent;
+  const event = (name: string, detail: Record<string, unknown>) => onEvent?.(name, detail);
+  let opening: Promise<Opened> | undefined;
+  let closed = false;
+  let regionPrewarm: Prewarmer | undefined;
+  let discoveryPrewarm: Prewarmer | undefined;
+  let prewarming: Promise<PrewarmResult> | undefined;
+  const stopPrewarm = new AbortController();
 
-  function getSceneWorld(dimension: Dimension = "overworld"): Promise<SceneWorld> {
-    let pending = worlds.get(dimension);
-    if (pending === undefined) {
-      pending = openSceneWorld({ directory: worldDirectory, dimension, workers });
-      worlds.set(dimension, pending);
-      void pending.catch(() => worlds.delete(dimension));
+  /** Checks the world, opens the caches and reads the stored area, once. */
+  function ready(): Promise<Opened> {
+    if (closed) return Promise.reject(new Error("The scene server is closed"));
+    if (opening === undefined) {
+      const started = open();
+      opening = started;
+      // A failed start may be retried, such as once the world folder is in place.
+      started.catch(() => {
+        if (opening === started) opening = undefined;
+      });
     }
-    return pending;
+    return opening;
+  }
+
+  async function open(): Promise<Opened> {
+    await requireWorld(worldDirectory);
+    const revision = await worldRevision(worldDirectory, await engineFingerprint());
+    const events = { onEvent: event };
+    const surfaceDisk = await DiskCache.open(cacheDirectory, revision, sizes.disk, events);
+    const caveDisk = await DiskCache.open(
+      join(cacheDirectory, "caves"),
+      revision,
+      sizes.caveDisk,
+      events,
+    );
+    const discoveryFolder = `discoveries-v${DISCOVERY_SCHEMA_VERSION}`;
+    await removeOldDiscoveryFolders(cacheDirectory, discoveryFolder, event);
+    const discoveryDisk = await DiskCache.open(
+      join(cacheDirectory, discoveryFolder),
+      revision,
+      sizes.discoveryDisk,
+      events,
+    );
+    const extent = bounds === undefined ? await loadExtent(revision) : undefined;
+    const servedBounds = new Map<Dimension, BlockBounds | undefined>(
+      served.map((dimension) => [dimension, bounds ?? extent?.[dimension]]),
+    );
+    const pools = new DimensionPools({
+      open: (dimension) => openSceneWorld({ directory: worldDirectory, dimension, workers }),
+      permits: workers,
+      idleMilliseconds: idleSeconds * 1000,
+      onEvent: event,
+    });
+    // Opening one dimension proves the snapshot reads; its name and spawn serve every dimension.
+    const first = await pools.world(served.includes("overworld") ? "overworld" : served[0]!);
+    const build = (
+      dimension: Dimension,
+      request: RegionRequest,
+      signal: AbortSignal,
+      background?: boolean,
+    ) => pools.build(dimension, request, signal, background);
+    return {
+      revision,
+      info: { name: first.info.name, spawn: first.info.spawn },
+      bounds: servedBounds,
+      pools,
+      disks: { surface: surfaceDisk, caves: caveDisk, discoveries: discoveryDisk },
+      surface: new RegionService({
+        mode: "surface",
+        dimensions: servedBounds,
+        build,
+        store: surfaceDisk,
+        memoryBytes: sizes.memory,
+        maxPending: sizes.pending,
+        onEvent: event,
+      }),
+      caves: new RegionService({
+        mode: "caves",
+        dimensions: servedBounds,
+        build,
+        store: caveDisk,
+        memoryBytes: sizes.caveMemory,
+        maxPending: sizes.cavePending,
+        onEvent: event,
+      }),
+      discoveries: new DiscoveryService({
+        dimensions: servedBounds,
+        build: (dimension, tile, signal, background) =>
+          pools.discoveries(dimension, tile, signal, background),
+        store: discoveryDisk,
+        memoryBytes: sizes.discoveryMemory,
+        memoryEntries: 256,
+        maxPending: sizes.discoveryPending,
+        onEvent: event,
+      }),
+    };
+  }
+
+  /** The stored area saved for this revision, or one scan of the database keys. */
+  async function loadExtent(revision: string): Promise<WorldExtent> {
+    const saved = join(cacheDirectory, revision, "extent.json");
+    const cached = await readFile(saved, "utf8")
+      .then(parseExtent)
+      .catch(() => undefined);
+    if (cached !== undefined) return cached;
+    const startedAt = performance.now();
+    const extent = await scanWorldExtent(worldDirectory);
+    event("world.extent-scanned", {
+      milliseconds: Math.round(performance.now() - startedAt),
+      extent,
+    });
+    await writeFile(saved, JSON.stringify(extent)).catch((cause: unknown) =>
+      event("world.extent-not-saved", { message: String(cause) }),
+    );
+    return extent;
   }
 
   async function getWorldMetadata(
     input: SceneContextInput = sceneContext(),
   ): Promise<WorldMetadata> {
     const context = sceneContext(input.dimension, input);
-    const [world, revision] = await Promise.all([getSceneWorld(context.dimension), getRevision()]);
+    const world = await ready();
     const spawn =
       context.dimension === "overworld"
         ? world.info.spawn
         : context.dimension === "nether"
-          ? { x: Math.floor(world.info.spawn.x / 8), y: 64, z: Math.floor(world.info.spawn.z / 8) }
+          ? {
+              x: Math.floor(world.info.spawn.x / 8),
+              y: 64,
+              z: Math.floor(world.info.spawn.z / 8),
+            }
           : { x: 100, y: 64, z: 0 };
     return {
       name: world.info.name,
       spawn: context.mode === "caves" ? { ...spawn, y: (context.minY + context.maxY) / 2 } : spawn,
-      revision,
+      revision: world.revision,
       ...context,
-      dimensions: Object.values(DIMENSIONS),
+      dimensions: served.map((dimension) => DIMENSIONS[dimension]),
       caves: CAVE_LIMITS,
-      snapshotRevision: await getSnapshotRevision(),
+      snapshotRevision: world.revision,
       discoveries: DISCOVERY_LIMITS,
     };
   }
 
   /**
-   * Returns a serialized region from memory, the disk cache, or a fresh build.
-   * A cancelled request stops a queued build, but never a build already running.
+   * A serialized region from memory, the disk cache, a shared build, or an empty one outside
+   * the stored area. A build every caller abandoned stops before it starts. Rejects with
+   * `InvalidRegionError`, `OverloadedError` or, with `cacheOnly`, `NotCachedError`.
    */
-  function loadRegion(
+  async function loadRegion(
     request: RegionRequest,
     signal: AbortSignal,
     input: SceneContextInput = sceneContext("overworld", request),
+    load: Pick<LoadOptions, "cacheOnly"> = {},
   ): Promise<LoadedRegion> {
     const context = sceneContext(input.dimension, input);
-    const key = regionCacheKey(context, request);
-    if (context.mode === "caves") {
-      if (
-        !Number.isInteger(request.level) ||
-        request.level < 0 ||
-        request.level > CAVE_LIMITS.maxLevel
-      ) {
-        throw new RangeError(`Caves support LOD 0 through ${CAVE_LIMITS.maxLevel}`);
-      }
-      const cached = caveMemory.get(key);
-      if (cached !== undefined) {
-        caveMemory.delete(key);
-        caveMemory.set(key, cached);
-        return Promise.resolve({ ...cached, cacheStatus: "memory" });
-      }
-      const active = cavePending.get(key);
-      if (active !== undefined) return active;
-      const pending = getSceneWorld(context.dimension)
-        .then((world) => world.buildRegion({ ...request, ...context }, signal))
-        .then((built) => {
-          const region: LoadedRegion = { ...built, cacheStatus: "build" };
-          if (region.bytes.byteLength <= caveMemoryBudget) {
-            caveMemory.set(key, region);
-            caveBytes += region.bytes.byteLength;
-            while (caveBytes > caveMemoryBudget) {
-              const oldest = caveMemory.keys().next().value!;
-              caveBytes -= caveMemory.get(oldest)!.bytes.byteLength;
-              caveMemory.delete(oldest);
-            }
+    const world = await ready();
+    const position = { level: request.level, x: request.x, z: request.z };
+    const resolved: RegionRequest =
+      context.mode === "caves"
+        ? {
+            ...position,
+            mode: "caves",
+            minY: context.minY,
+            maxY: context.maxY,
+            ceilingY: context.ceilingY,
           }
-          return region;
-        })
-        .finally(() => cavePending.delete(key));
-      cavePending.set(key, pending);
-      return pending;
-    }
-    const cached = memory.get(key);
-    if (cached !== undefined) {
-      memory.delete(key);
-      memory.set(key, cached);
-      return cached.then((region) => ({ ...region, cacheStatus: "memory" }));
-    }
-
-    const pending = readOrBuild(
-      { ...request, ceilingY: context.ceilingY },
-      key,
-      signal,
+        : { ...position, ceilingY: context.ceilingY };
+    return (context.mode === "caves" ? world.caves : world.surface).load(
       context.dimension,
+      resolved,
+      signal,
+      load.cacheOnly === true ? { cacheOnly: true } : {},
     );
-    memory.set(key, pending);
-    void pending.catch(() => {
-      if (memory.get(key) === pending) memory.delete(key);
-    });
-    while (memory.size > maxMemoryRegions) {
-      const oldest = memory.keys().next().value;
-      if (oldest === undefined) break;
-      memory.delete(oldest);
-    }
-    return pending;
   }
 
-  async function readOrBuild(
-    request: RegionRequest,
-    key: string,
-    signal: AbortSignal,
+  /** The all-height discovery index of one 32-block tile; it depends on the snapshot only. */
+  async function loadDiscoveries(
     dimension: Dimension,
+    tile: DiscoveryRequest,
+    signal: AbortSignal,
+    load: Pick<LoadOptions, "cacheOnly"> = {},
   ): Promise<LoadedRegion> {
-    const startedAt = performance.now();
-    const path = join(cacheDirectory, await getRevision(), `${key}.bin`);
-    const stored = await readFile(path).catch(() => undefined);
-    if (stored !== undefined) {
-      return { bytes: stored, cacheStatus: "disk", milliseconds: performance.now() - startedAt };
-    }
-
-    const world = await getSceneWorld(dimension);
-    const built = await world.buildRegion(request, signal);
-    await writeAtomically(path, built.bytes);
-    return { bytes: built.bytes, cacheStatus: "build", milliseconds: built.milliseconds };
+    const world = await ready();
+    return world.discoveries.load(
+      dimension,
+      tile,
+      signal,
+      load.cacheOnly === true ? { cacheOnly: true } : {},
+    );
   }
 
   async function getRevision(): Promise<string> {
-    fingerprintPromise ??= fingerprintWorld();
-    return (await fingerprintPromise).terrain;
+    return (await ready()).revision;
   }
 
-  async function getSnapshotRevision(): Promise<string> {
-    fingerprintPromise ??= fingerprintWorld();
-    return (await fingerprintPromise).snapshot;
+  /**
+   * Builds the Surface regions of the stored area, coarse levels and the middle first, then
+   * every discovery index, one at a time behind every visitor; regions already on disk are only
+   * read. It stops when a disk cache is nearly full. A second call returns the first run.
+   */
+  function prewarm(prewarmOptions: PrewarmOptions = {}): Promise<PrewarmResult> {
+    prewarming ??= (async () => {
+      const world = await ready();
+      const signal =
+        prewarmOptions.signal === undefined
+          ? stopPrewarm.signal
+          : AbortSignal.any([stopPrewarm.signal, prewarmOptions.signal]);
+      const maxRegions = positiveInteger(prewarmOptions.maxRegions ?? 100_000, "maxRegions");
+      const nearlyFull = (disk: DiskCache) => () => disk.stats.bytes > disk.stats.maxBytes * 0.85;
+      regionPrewarm = new Prewarmer(
+        world.surface,
+        prewarmPlan(world.bounds, maxRegions),
+        nearlyFull(world.disks.surface),
+        event,
+      );
+      const discoveryJobs: PrewarmJob[] =
+        prewarmOptions.discoveries === false
+          ? []
+          : [...world.bounds].flatMap(([dimension, stored]) =>
+              stored === undefined
+                ? []
+                : discoveryTiles(stored).map((tile) => ({ dimension, level: 0, ...tile })),
+            );
+      discoveryPrewarm = new Prewarmer(
+        {
+          load: (dimension, request, jobSignal, load) =>
+            world.discoveries.load(dimension, { x: request.x, z: request.z }, jobSignal, load),
+        },
+        discoveryJobs,
+        nearlyFull(world.disks.discoveries),
+        (name, detail) => event(`discoveries.${name}`, detail),
+      );
+      const regions = await regionPrewarm.run(signal);
+      const discoveries = signal.aborted
+        ? discoveryPrewarm.progress
+        : await discoveryPrewarm.run(signal);
+      return { regions, discoveries };
+    })();
+    return prewarming;
   }
 
-  /** Hashes table names, sizes, and modification times. Reading the tables is not needed. */
-  async function fingerprintWorld(): Promise<{ terrain: string; snapshot: string }> {
-    const hash = createHash("sha256");
-    const snapshot = createHash("sha256");
-    hash.update(`scene-v${REGION_FORMAT_VERSION}-mesh-v${meshRevision}\0${worldDirectory}\0`);
-    snapshot.update(`snapshot-v1\0${worldDirectory}\0`);
-    const database = join(worldDirectory, "db");
-    const names = (await readdir(database))
-      .filter((name) => /\.(?:ldb|sst|log)$/i.test(name))
-      .sort((left, right) => left.localeCompare(right));
-    for (const name of names) {
-      const details = await stat(join(database, name), { bigint: true });
-      hash.update(`${name}\0${details.size}\0${details.mtimeNs}\n`);
-      snapshot.update(`${name}\0${details.size}\0${details.mtimeNs}\n`);
-    }
+  /** Builds, caches, open dimensions and prewarm progress, for a health page. */
+  async function stats(): Promise<SceneServerStats> {
+    const world = await ready();
     return {
-      terrain: hash.digest("hex").slice(0, 20),
-      snapshot: snapshot.digest("hex").slice(0, 20),
+      revision: world.revision,
+      workers,
+      dimensions: served,
+      openDimensions: world.pools.openDimensions,
+      surface: { builds: world.surface.stats, cache: world.disks.surface.stats },
+      caves: { builds: world.caves.stats, cache: world.disks.caves.stats },
+      discoveries: { builds: world.discoveries.stats, cache: world.disks.discoveries.stats },
+      prewarm: {
+        regions: regionPrewarm?.progress ?? IDLE,
+        discoveries: discoveryPrewarm?.progress ?? IDLE,
+      },
     };
   }
 
-  const loadDiscoveries = createDiscoveryCache({
-    memoryMiB: options.discoveryMemoryMiB ?? 4,
-    getSceneWorld,
-    getSnapshotRevision,
-  });
-
-  /** Closes the world databases and worker threads. */
+  /** Stops the prewarm and closes the world databases and worker threads. */
   async function close(): Promise<void> {
-    const opened = [...worlds.values()];
-    worlds.clear();
-    await Promise.all(
-      opened.map((world) =>
-        world.then(
-          (w) => w.close(),
-          () => undefined,
-        ),
-      ),
-    );
+    stopPrewarm.abort();
+    const pending = opening;
+    closed = true;
+    const world = await pending?.catch(() => undefined);
+    await world?.pools.close();
   }
 
   return {
-    getSceneWorld,
+    /** Resolves once the world is checked and the caches are open; rejects on a missing world. */
+    ready: async (): Promise<void> => void (await ready()),
     getWorldMetadata,
     loadRegion,
-    getSnapshotRevision,
     loadDiscoveries,
+    getRevision,
+    getSnapshotRevision: getRevision,
+    prewarm,
+    stats,
     close,
   };
 }
 
-async function writeAtomically(path: string, bytes: Uint8Array): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temporary, bytes);
-  await rename(temporary, path);
+/** A missing or partial snapshot is a configuration error: retrying cannot fix it. */
+async function requireWorld(directory: string): Promise<void> {
+  const [level, database] = await Promise.all([
+    stat(join(directory, "level.dat")).catch(() => undefined),
+    stat(join(directory, "db")).catch(() => undefined),
+  ]);
+  if (level?.isFile() !== true || database?.isDirectory() !== true)
+    throw new MissingWorldError("The world folder holds no Bedrock world (level.dat and db/)");
+}
+
+/** Discovery folders of an older index schema can never be read again. */
+async function removeOldDiscoveryFolders(
+  root: string,
+  current: string,
+  event: SceneEvent,
+): Promise<void> {
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (
+      entry.isDirectory() &&
+      /^discoveries-v\d{1,4}$/.test(entry.name) &&
+      entry.name !== current
+    ) {
+      await rm(join(root, entry.name), { recursive: true, force: true });
+      event("cache.schema-removed", { folder: entry.name });
+    }
+  }
 }
 
 export function positiveInteger(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new RangeError(`${name} must be a positive integer, received ${value}`);
+  }
+  return value;
+}
+
+function wholeNumber(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${name} must be a whole number, received ${value}`);
   }
   return value;
 }
