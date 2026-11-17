@@ -121,7 +121,8 @@ export class ViewerControls {
   constructor(viewer: MapelixViewer, container: HTMLElement, options: ViewerControlsOptions = {}) {
     this.viewer = viewer;
     this.t = { ...DEFAULT_CONTROL_TEXTS, ...options.texts };
-    if (!styleInstalled) {
+    // A host whose policy forbids inline styles links `mapelix-viewer.css` with this marker.
+    if (!styleInstalled && !document.querySelector("link[data-mapelix-styles]")) {
       const style = document.createElement("style");
       style.textContent = CONTROL_STYLE;
       document.head.append(style);

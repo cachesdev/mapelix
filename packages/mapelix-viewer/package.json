@@ -31,6 +31,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
+    "build:embed": "vite build --config vite.embed.config.ts && node scripts/embed-css.mjs",
     "check": "tsc --noEmit --project tsconfig.json",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -52,6 +53,7 @@
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2",
+    "vite": "8.0.16",
     "vitest": "4.1.0"
   },
   "engines": {

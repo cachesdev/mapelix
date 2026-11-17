@@ -9,6 +9,45 @@ The Mapelix viewer and its server side.
 | `@mapelix/viewer/three`    | browser    | The 3D engine (`WorldViewer`) on its own                                                     |
 | `@mapelix/viewer/node`     | Node.js 24 | The 3D scene server and request handlers for the tiles and the world                         |
 
+## Browser bundle
+
+`pnpm run build:embed` writes `dist-embed/mapelix-viewer.js`, one ES module with three.js
+included, for hosts without a build step, and `dist-embed/mapelix-viewer.css`. The module holds
+everything the browser entries above export, plus `EMBED_API_VERSION` and `isViewerSupported()`
+(WebGPU or WebGL 2). It has no inline code, eval or workers, so it runs under
+`script-src 'self'`.
+
+```js
+const mapelix = await import("/assets/mapelix-viewer.js");
+if (mapelix.EMBED_API_VERSION !== 4 || !mapelix.isViewerSupported()) showFallback();
+const viewer = new mapelix.MapelixViewer(element, {
+  tiles: await mapelix.TileIndex.load("/tiles/manifest.json"),
+  world: { base: "/world/" },
+});
+```
+
+The viewer adds its styles to the page. Where the content policy forbids inline styles, link the
+stylesheet first; the viewer then adds none:
+
+```html
+<link rel="stylesheet" href="/assets/mapelix-viewer.css" data-mapelix-styles />
+```
+
+### API version 4 (changes from 3)
+
+Version 3 was a 3D-only bundle, `mapelix-viewer-3d.js`. Version 4 is `mapelix-viewer.js`:
+
+- The main class is `MapelixViewer`: the 2D tile map, the 3D world and the switch between them,
+  with markers and the optional `createViewerControls`. `WorldViewer` is still exported, with
+  the same options, for a host that shows the 3D view alone.
+- With `MapelixViewer`, the world is given as `world.base`, the URL prefix of `world.json`,
+  `regions/` and `discoveries/`. Other 3D options, such as `regionSuffix` and `discoverySuffix`,
+  go in `world.options`.
+- `CAVE_LIMITS`, `DEFAULT_DISCOVERY_FILTERS`, `DISCOVERY_CATEGORIES`, `DISCOVERY_KINDS`,
+  `DISCOVERY_LIMITS`, `SELECTION_LIMITS`, `selectionAround` and `isViewerSupported` keep their
+  names and meaning.
+- Styles come from the bundle, or from `mapelix-viewer.css` linked with `data-mapelix-styles`.
+
 ## Serving the 3D world (`@mapelix/viewer/node`)
 
 `createSceneServer` reads a Bedrock world folder (never writes it) and builds the 3D scene

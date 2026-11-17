@@ -279,7 +279,7 @@ export class MarkerLayer implements Markers {
     this.host = host;
     this.texts = { ...DEFAULT_MARKER_TEXTS, ...texts };
     const document = element.ownerDocument;
-    if (!document.querySelector("style[data-mapelix-markers]")) {
+    if (!document.querySelector("style[data-mapelix-markers], link[data-mapelix-styles]")) {
       const style = document.createElement("style");
       style.dataset.mapelixMarkers = "";
       style.textContent = MARKER_STYLE;

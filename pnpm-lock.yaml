@@ -326,9 +326,12 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.10.13)
       vitest:
         specifier: 4.1.0
-        version: 4.1.0(@types/node@24.10.13)(vite@8.2.1(@types/node@24.10.13))
+        version: 4.1.0(@types/node@24.10.13)(vite@8.0.16(@types/node@24.10.13))
 
 packages:
 
