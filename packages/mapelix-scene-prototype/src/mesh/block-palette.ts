@@ -72,6 +72,14 @@ export const TintCode = {
  */
 const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter"]);
 
+/**
+ * Blocks whose pack texture is a sheet of small parts the game maps piece by piece, such as a
+ * lantern's body, top and handle. Drawn from block coordinates they would show stray fragments,
+ * so they keep their block color until models carry their own texture rectangles.
+ */
+const SPRITE_SHEET =
+  /(?:^|_)(?:lantern|torch|chain|candle|lightning_rod)$|^(?:end_rod|flower_pot)$/;
+
 const TINT_CODES: Readonly<Record<BiomeTint, number>> = {
   none: TintCode.None,
   ground: TintCode.Ground,
@@ -208,9 +216,11 @@ export class BlockPalette {
     states: LittleEndianNbtCompoundValue,
     appearance: BlockAppearance,
   ): void {
+    const base = name.replace(/^minecraft:/, "");
+    if (SPRITE_SHEET.test(base)) return;
     const textures = resolveBlockTextures(this.names!, name, states, appearance);
     if (textures === undefined) return;
-    const ownColor = SELF_TINTED.has(name.replace(/^minecraft:/, ""));
+    const ownColor = SELF_TINTED.has(base);
     for (let face = 0; face < 6; face += 1) {
       this.textureWords[id * 6 + face] = this.textureWord(
         textures.faces[face],

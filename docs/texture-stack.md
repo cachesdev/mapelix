@@ -153,6 +153,9 @@ its block colors.
   an emulated phone, measured on a desktop GPU.
 - Thin cut-out shapes, such as leaf litter, always cut out and never hide the face below them.
   Stained glass keeps its glass material.
+- Blocks whose pack texture is a sheet of small parts (lanterns, torches, chains, candles, end
+  rods, flower pots, lightning rods) keep their block color: drawn from block coordinates they
+  would only show stray fragments of the sheet.
 - Turning textures off draws the same pixels as a server without textures, checked frame by
   frame in the browser tests.
 
