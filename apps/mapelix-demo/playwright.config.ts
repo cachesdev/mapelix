@@ -8,6 +8,9 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535)
 export const TILES_DIRECTORY =
   process.env.MAPELIX_E2E_TILES_DIRECTORY ?? resolve("../../.local/demo-export");
 
+/** The same tiles with the fixture world behind them, for the 2D ↔ 3D switch. */
+export const WORLD_URL = `http://127.0.0.1:${port + 1}`;
+
 export default defineConfig({
   projects: [
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
@@ -32,10 +35,24 @@ export default defineConfig({
     channel: process.env.MAPELIX_TEST_BROWSER,
   },
   // The production build, so first-display times compare like with like.
-  webServer: {
-    command: "node build/index.js",
-    url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: false,
-    env: { HOST: "127.0.0.1", PORT: String(port), MAPELIX_TILES_DIRECTORY: TILES_DIRECTORY },
-  },
+  webServer: [
+    {
+      command: "node build/index.js",
+      url: `http://127.0.0.1:${port}`,
+      reuseExistingServer: false,
+      env: { HOST: "127.0.0.1", PORT: String(port), MAPELIX_TILES_DIRECTORY: TILES_DIRECTORY },
+    },
+    {
+      command: "node build/index.js",
+      url: WORLD_URL,
+      reuseExistingServer: false,
+      env: {
+        HOST: "127.0.0.1",
+        PORT: String(port + 1),
+        MAPELIX_TILES_DIRECTORY: TILES_DIRECTORY,
+        MAPELIX_WORLD_DIRECTORY: resolve("../../.local/dimension-world"),
+        MAPELIX_CACHE_DIRECTORY: resolve("../../.local/demo-scene-cache"),
+      },
+    },
+  ],
 });

@@ -40,6 +40,8 @@ export interface TileMapOptions {
   readonly label?: string;
   /** Called when every tile the view needs is drawn, like a tile layer's "load" event. */
   readonly onIdle?: () => void;
+  /** Called when the map comes to rest: no finger or button down, no animation or glide. */
+  readonly onRest?: (view: MapView) => void;
   /** Called once per frame in which the view changed. */
   readonly onViewChange?: (view: MapView) => void;
 }
@@ -105,6 +107,7 @@ export class TileMap {
   private readonly resizeObserver: ResizeObserver;
   private stats: TileMapStats = { wanted: 0, pending: 0, loading: 0, cached: 0, level: 0 };
   private disposed = false;
+  private active = false;
 
   constructor(element: HTMLElement, options: TileMapOptions) {
     this.element = element;
@@ -187,6 +190,16 @@ export class TileMap {
     return { min: this.minScale, max: this.maxScale };
   }
 
+  /** A gesture, animation or glide is under way. */
+  get interacting(): boolean {
+    return (
+      this.pointers.size > 0 ||
+      this.animation !== undefined ||
+      this.wheel !== undefined ||
+      this.velocity !== undefined
+    );
+  }
+
   snapshot(): TileMapStats {
     return this.stats;
   }
@@ -198,6 +211,7 @@ export class TileMap {
     if (!animate) return this.apply(target);
     const from = this.current;
     const ratio = target.pixelsPerBlock / from.pixelsPerBlock;
+    this.active = true;
     this.animation = {
       start: performance.now(),
       duration: 350,
@@ -216,6 +230,7 @@ export class TileMap {
     const from = this.current;
     const scale = this.clampScale(from.pixelsPerBlock * factor);
     this.stopMotion();
+    this.active = true;
     this.animation = {
       start: performance.now(),
       duration: 250,
@@ -365,6 +380,9 @@ export class TileMap {
       this.options.onViewChange?.(this.current);
     }
     if (moving) this.invalidate();
+    const active = this.interacting;
+    if (this.active && !active) this.options.onRest?.(this.current);
+    this.active = active;
   };
 
   private key(tile: TileAddress): string {
@@ -542,6 +560,7 @@ export class TileMap {
     const point = this.local(event);
     this.pointers.set(event.pointerId, point);
     this.stopMotion();
+    this.active = true;
     if (this.pointers.size === 1) {
       this.drag = { id: event.pointerId, ...point, downAt: event.timeStamp, moved: 0 };
       this.tracker.reset(event.timeStamp, point.x, point.y);
@@ -584,6 +603,8 @@ export class TileMap {
 
   private readonly onPointerUp = (event: PointerEvent): void => {
     if (!this.pointers.delete(event.pointerId)) return;
+    // The next frame reports the rest once nothing moves any more.
+    this.invalidate();
     if (this.pinchStart !== undefined) {
       if (this.pointers.size >= 2) return this.startPinch();
       this.pinchStart = undefined;
@@ -619,6 +640,7 @@ export class TileMap {
     this.velocity = undefined;
     const base = this.wheel?.target ?? this.current.pixelsPerBlock;
     this.wheel = { target: this.clampScale(base * factor), ...point };
+    this.active = true;
     this.invalidate();
   };
 

@@ -16,6 +16,57 @@ that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
 | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | ![A village rendered by Mapelix](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/mapelix-baseline.png) | ![The same village rendered by uNmINeD](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/unmined.png) |
 
+## Quick start
+
+Work on a copy of the world: Mapelix only reads it, but the game may change it while it runs.
+
+1. **Install.** With [Mise](https://mise.jdx.dev/), which selects Node.js 24 and pnpm 11:
+
+   ```sh
+   mise install
+   mise exec -- pnpm install
+   mise exec -- pnpm exec turbo run build --filter=@mapelix/render-cli... --filter=@mapelix/demo...
+   ```
+
+2. **Render** the 2D map into an output folder:
+
+   ```sh
+   node apps/render-cli/dist/index.js --world /path/to/world --output /path/to/map \
+     --dimension overworld,nether
+   ```
+
+3. **View** it. The demo is a full-screen map for phones and desktops. With
+   `MAPELIX_WORLD_DIRECTORY`, zooming in past 5 CSS pixels per block turns the map into the 3D
+   world at the same place and scale, and zooming out below 4 turns it back into the map:
+
+   ```sh
+   MAPELIX_TILES_DIRECTORY=/path/to/map \
+   MAPELIX_WORLD_DIRECTORY=/path/to/world \
+   PORT=3000 node apps/mapelix-demo/build/index.js
+   ```
+
+   Open `http://localhost:3000`, or the computer's address from a phone on the same network.
+   Leave out `MAPELIX_WORLD_DIRECTORY` for the 2D map alone.
+
+4. **Update** after the world changes: render again into the same folder with `--incremental`
+   (only tiles whose chunks changed are drawn again) and `--surface-cache` (chunk surfaces are kept
+   between runs, so redrawn tiles read less of the world). The open map picks up the new
+   publication on the next page load.
+
+   ```sh
+   node apps/render-cli/dist/index.js --world /path/to/world --output /path/to/map \
+     --dimension overworld,nether --incremental --surface-cache
+   ```
+
+See [`apps/render-cli`](apps/render-cli/README.md) for every option and
+[`apps/mapelix-demo`](apps/mapelix-demo/README.md) for the viewer.
+
+**Other viewers.** [`apps/prototype-viewer`](apps/prototype-viewer/README.md) renders tiles on
+demand from the world into a Leaflet map, with no render step: handy to look at a world once, slower
+to browse. [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md) is the full 3D explorer
+(caves, discoveries, weather, time of day and the developer panel); use it until the demo offers
+those controls in 3D.
+
 ## What works
 
 - Bedrock LevelDB table and log files, including sequence ordering and tombstones

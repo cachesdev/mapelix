@@ -1,7 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { replaceState } from "$app/navigation";
-  import { TileIndex, TileMap, type MapView, type PublishedTileManifest } from "@mapelix/viewer";
+  import {
+    MapelixViewer,
+    TileIndex,
+    type MapView,
+    type PublishedTileManifest,
+    type ViewState,
+  } from "@mapelix/viewer";
+
+  let { data }: { data: { world: boolean } } = $props();
 
   const NAMES: Record<string, string> = {
     overworld: "Overworld",
@@ -10,8 +18,10 @@
   };
 
   let container: HTMLDivElement;
-  let map = $state<TileMap>();
-  let view = $state<MapView>();
+  let viewer = $state.raw<MapelixViewer>();
+  let view = $state.raw<ViewState>();
+  let worldShown = $state(false);
+  let worldFailed = $state(false);
   let dimensions = $state<string[]>([]);
   let dimension = $state("");
   let error = $state<string>();
@@ -39,12 +49,14 @@
   function writeUrl(): void {
     clearTimeout(urlTimer);
     urlTimer = window.setTimeout(() => {
-      if (map === undefined) return;
+      if (viewer === undefined) return;
+      const current = viewer.view;
       const url = new URL(location.href);
-      url.searchParams.set("dimension", map.dimension);
-      url.searchParams.set("x", String(Math.round(map.view.x)));
-      url.searchParams.set("z", String(Math.round(map.view.z)));
-      url.searchParams.set("scale", String(Number(map.view.pixelsPerBlock.toPrecision(3))));
+      url.searchParams.set("dimension", current.dimension);
+      url.searchParams.set("x", String(Math.round(current.x)));
+      url.searchParams.set("z", String(Math.round(current.z)));
+      url.searchParams.set("scale", String(Number(current.pixelsPerBlock.toPrecision(3))));
+      url.searchParams.set("projection", current.projection);
       replaceState(url, {});
     }, 400);
   }
@@ -54,6 +66,18 @@
     // Safari ignores user-scalable=no; this stops its page pinch outside the map too.
     const prevent = (event: Event) => event.preventDefault();
     document.addEventListener("gesturestart", prevent);
+    // A button pressed with a finger or the mouse hands the keys back to the view, so Space or
+    // an arrow never presses it again. Keyboard presses (detail 0) keep the focus for Tab users.
+    const release = (event: MouseEvent) => {
+      // The path, not `target.closest`: the click may have swapped the icon it landed on.
+      const button = event
+        .composedPath()
+        .find((node): node is HTMLButtonElement => node instanceof HTMLButtonElement);
+      if (button === undefined || event.detail === 0) return;
+      button.blur();
+      viewer?.focus();
+    };
+    document.addEventListener("click", release);
     void (async () => {
       try {
         const url = new URL("/tiles/manifest.json", location.href);
@@ -69,26 +93,34 @@
             : index.dimensions.includes("overworld")
               ? "overworld"
               : index.dimensions[0];
-        map = new TileMap(container, {
-          index,
+        const projection = new URLSearchParams(location.search).get("projection");
+        viewer = new MapelixViewer(container, {
+          tiles: index,
           dimension: chosen,
           view: start.view,
           label: "World map",
-          onIdle: () =>
-            Reflect.set(
-              window,
-              "__mapelixIdleAt",
-              Reflect.get(window, "__mapelixIdleAt") ?? performance.now(),
-            ),
+          ...(data.world ? { world: { base: "/world" } } : {}),
+          projection: projection === "perspective" ? "perspective" : "isometric",
+          map: {
+            onIdle: () =>
+              Reflect.set(
+                window,
+                "__mapelixIdleAt",
+                Reflect.get(window, "__mapelixIdleAt") ?? performance.now(),
+              ),
+          },
           onViewChange: (next) => {
             view = next;
             writeUrl();
           },
+          onModeChange: (mode) => (worldShown = mode === "3d"),
+          onWorldError: () => (worldFailed = true),
         });
         dimensions = index.dimensions;
-        dimension = map.dimension;
-        view = map.view;
-        Reflect.set(window, "__mapelixMap", map);
+        dimension = viewer.dimension;
+        view = viewer.view;
+        Reflect.set(window, "__mapelixViewer", viewer);
+        Reflect.set(window, "__mapelixMap", viewer.map);
       } catch (cause) {
         error = cause instanceof Error ? cause.message : "The map could not be loaded";
       }
@@ -97,13 +129,14 @@
       disposed = true;
       clearTimeout(urlTimer);
       document.removeEventListener("gesturestart", prevent);
-      map?.dispose();
+      document.removeEventListener("click", release);
+      viewer?.dispose();
     };
   });
 
   function choose(next: string): void {
-    if (map === undefined || next === map.dimension) return;
-    map.setDimension(next);
+    if (viewer === undefined || next === viewer.dimension) return;
+    viewer.setDimension(next);
     dimension = next;
   }
 
@@ -165,12 +198,42 @@
   {/if}
 </div>
 
-{#if map}
-  <div class="corner bottom" role="group" aria-label="Zoom">
-    <button class="round" aria-label="Zoom in" onclick={() => map?.zoomBy(2)}>
+{#if viewer}
+  <div class="corner bottom" role="group" aria-label="View">
+    {#if data.world && !worldFailed}
+      <!-- Hidden rather than removed in 2D, so the buttons below never move. -->
+      <button
+        class="round"
+        class:hidden={!worldShown}
+        aria-hidden={!worldShown}
+        tabindex={worldShown ? 0 : -1}
+        aria-pressed={view?.projection === "isometric"}
+        aria-label="Isometric view"
+        title={view?.projection === "isometric"
+          ? "Switch to perspective view"
+          : "Switch to isometric view"}
+        onclick={() =>
+          viewer?.setProjection(viewer.projection === "isometric" ? "perspective" : "isometric")}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          {#if view?.projection === "isometric"}
+            <path d="m12 3 8 4.6v8.8L12 21l-8-4.6V7.6Zm-8 4.6 8 4.6 8-4.6M12 12.2V21" />
+          {:else}
+            <path d="M8 4h8l4.5 16h-17ZM3.5 20l8.5-6 8.5 6M12 14V4" />
+          {/if}
+        </svg>
+      </button>
+      <button
+        class="round mode"
+        aria-label={worldShown ? "Show the map" : "Show in 3D"}
+        onclick={() => (worldShown ? viewer?.showMap() : viewer?.showWorld())}
+        >{worldShown ? "2D" : "3D"}</button
+      >
+    {/if}
+    <button class="round" aria-label="Zoom in" onclick={() => viewer?.zoomBy(2)}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
-    <button class="round" aria-label="Zoom out" onclick={() => map?.zoomBy(0.5)}>
+    <button class="round" aria-label="Zoom out" onclick={() => viewer?.zoomBy(0.5)}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
     </button>
   </div>
@@ -196,7 +259,7 @@
     inset: 0;
     height: 100dvh;
   }
-  .map:focus-visible {
+  .map :global(:focus-visible) {
     outline: 2px solid #7fb4ff;
     outline-offset: -2px;
   }
@@ -248,6 +311,16 @@
     place-items: center;
     background: rgb(20 22 26 / 0.85);
     box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+  }
+  .round.hidden {
+    visibility: hidden;
+  }
+  .mode {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .round:active {
+    background: rgb(45 79 124 / 0.95);
   }
   .round:focus-visible,
   .choice:focus-visible {

@@ -420,6 +420,12 @@ export class WorldViewer {
     this.updateProjectionTarget(true);
   }
 
+  /** Places the camera; fields left out keep their current value. */
+  setCameraView(view: Partial<CameraView>): void {
+    this.rig.setView({ ...this.snapshot().view, ...view }, { settle: false });
+    this.fitViewDistance();
+  }
+
   /** Tilts the camera to `pitch` radians above the horizon, keeping the focus and zoom. */
   setPitch(pitch: number): void {
     this.rig.setView({ ...this.snapshot().view, pitch }, { settle: false });

@@ -213,7 +213,8 @@ test("the wheel and keys zoom and move with animation", async ({ page }, info) =
   const anchor = blockAt(page, before, 300, 200);
   expect(blockAt(page, zoomed, 300, 200).x).toBeCloseTo(anchor.x, 2);
 
-  await page.locator(".map").focus();
+  // The map layer holds the keyboard focus; its canvas carries the label.
+  await page.locator('canvas[aria-label="World map"]').locator("..").focus();
   await page.keyboard.press("ArrowRight");
   const moved = await settle(page);
   expect(moved.x).toBeGreaterThan(zoomed.x);

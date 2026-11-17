@@ -10,3 +10,16 @@ export {
   type MapView,
   type TileAddress,
 } from "./map/tile-math.js";
+export {
+  MapelixViewer,
+  type MapelixViewerOptions,
+  type WorldSource,
+} from "./viewer/mapelix-viewer.js";
+export {
+  DEFAULT_THRESHOLDS,
+  restingMode,
+  type Projection,
+  type SwitchThresholds,
+  type ViewMode,
+  type ViewState,
+} from "./viewer/view-state.js";
