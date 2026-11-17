@@ -121,3 +121,32 @@ Authentication, rate limits and routes stay with the host.
 `createTileHandler(directory, base)` serves a `mapelix-render` output folder: the root
 `manifest.json` uncached and the immutable `generations/<sha256>/…` files, refusing any path that
 leaves the folder.
+
+## Release
+
+`pack:release` assembles a self-contained folder that runs with Node.js alone, without pnpm
+or the workspace, from a built and committed checkout:
+
+```sh
+pnpm turbo run build --filter=@mapelix/viewer... --filter=@mapelix/render-cli...
+pnpm --filter @mapelix/viewer build:embed
+pnpm --filter @mapelix/viewer pack:release /path/to/empty/folder
+```
+
+| Path                                         | Content                                                         |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `release.json`                               | What the release holds, below                                   |
+| `node_modules/@mapelix/viewer/`              | The Node entry only: `import { … } from "@mapelix/viewer/node"` |
+| `node_modules/@mapelix/render-cli/`          | `mapelix-render`, the 2D export                                 |
+| `node_modules/@mapelix/…`, `pako/`, `pngjs/` | The engine modules and their two third-party dependencies       |
+| `viewer/`                                    | The browser bundle `mapelix-viewer.js` and `mapelix-viewer.css` |
+| `notices/`                                   | Licenses of the bundled code                                    |
+
+`release.json` gives the full `commit` (and `dirty`, false unless `--allow-dirty` packed
+uncommitted changes), the Node.js version, `embedApiVersion`, `regionFormatVersion`,
+`discoverySchemaVersion`, `renderCliVersion`, the entry paths `renderCli`
+(`node <release>/<renderCli> --help`), `sceneServer`, `viewer` and `viewerStyles`, and the
+SHA-256 of every other file under `files`. A host can check those hashes before it runs the
+release. Only compiled modules ship, so the release computes the same scene revisions as the
+checkout it came from, and the same commit packs the same bytes: nothing records a time or a
+machine path.

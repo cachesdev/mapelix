@@ -36,6 +36,7 @@
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware --type-check .",
+    "pack:release": "node scripts/pack-release.mjs",
     "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
     "test": "vitest run src",
     "test:unit": "vitest run src",
