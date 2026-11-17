@@ -1,3 +1,4 @@
+import type { MarkerTexts } from "@mapelix/viewer";
 import { DEFAULT_CONTROL_TEXTS, type ControlTexts } from "@mapelix/viewer/controls";
 
 /**
@@ -8,4 +9,11 @@ export const texts: Partial<ControlTexts> = {
   ...DEFAULT_CONTROL_TEXTS,
   dimensionName: (dimension) =>
     ({ overworld: "Overworld", nether: "Nether", "the-end": "The End" })[dimension] ?? dimension,
+};
+
+/** Names the marker layer and its groups for screen readers. */
+export const markerTexts: Partial<MarkerTexts> = {
+  layer: "Places",
+  marker: "Place",
+  cluster: (count) => `${count} places, tap to zoom in`,
 };

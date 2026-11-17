@@ -103,6 +103,18 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
   to turn and tilt, pinch to zoom. Mouse: drag, right button to turn, wheel. Keys: WASD or arrows,
   Q/E, R/F, +/−, and Space/C up and down in caves. Compass, return home, go to coordinates.
 
+### Markers
+
+- **Host markers** on the map and in 3D (isometric and perspective) at the same place:
+  `viewer.markers.set / upsert / update / remove / clear`, with an icon (a few characters or an
+  http(s) image), a color, a label, a group to show or hide, a priority and free host data.
+  Mapelix stores nothing; a tap or a click reports `onClick` with the marker.
+- **Readable on phones:** labels go where they overlap no marker, label or control, and markers
+  closer than about 48 px group into a count bubble that zooms in when tapped. A drag that starts
+  on a marker still moves the view.
+- **Light:** only the markers and groups in view exist in the page; 1,000 markers cost about 1 ms
+  per frame on a phone-class CPU.
+
 ### Gallery
 
 | Isometric                                                                 | Thunderstorm at dusk                                                                    |
@@ -115,17 +127,17 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
 
 ## Packages and apps
 
-| Path                                                                             | Role                                                                                                                                                                                     |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`packages/mapelix-core`](packages/mapelix-core/README.md)                       | 2D dimension profiles, the shared block-color catalog and the batch export API (`@mapelix/core/node/batch`) used by the CLI.                                                             |
-| [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md)             | Reference 2D renderer: reads Bedrock LevelDB worlds and renders uNmINeD-style tiles. Holds the visual regression suite.                                                                  |
-| [`packages/mapelix-scene-prototype`](packages/mapelix-scene-prototype/README.md) | Builds 3D scene regions from a world in worker threads: meshes, levels of detail, cave slices, discoveries.                                                                              |
-| `packages/mapelix-viewer`                                                        | Browser viewer: the 2D tile map, `MapelixViewer` (one API for the map, the 3D view and the switch between them), the optional DOM controls (`./controls`) and the 3D engine (`./three`). |
-| [`apps/render-cli`](apps/render-cli/README.md)                                   | `mapelix-render`: exports and updates the 2D tiles and their manifest.                                                                                                                   |
-| [`apps/mapelix-demo`](apps/mapelix-demo/README.md)                               | Full-screen SvelteKit host for phones and desktops: serves an export and, optionally, the 3D world.                                                                                      |
-| [`apps/prototype-viewer`](apps/prototype-viewer/README.md)                       | Leaflet map that renders tiles on demand from the world, with no render step: handy to look at a world once, slower to browse.                                                           |
-| [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md)                 | Full 3D explorer with its developer panel (F3) and the automatic-perspective demo.                                                                                                       |
-| `apps/prototype-visual-check`                                                    | Browser smoke test that renders the committed fixture world with the reference renderer.                                                                                                 |
+| Path                                                                             | Role                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/mapelix-core`](packages/mapelix-core/README.md)                       | 2D dimension profiles, the shared block-color catalog and the batch export API (`@mapelix/core/node/batch`) used by the CLI.                                                                               |
+| [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md)             | Reference 2D renderer: reads Bedrock LevelDB worlds and renders uNmINeD-style tiles. Holds the visual regression suite.                                                                                    |
+| [`packages/mapelix-scene-prototype`](packages/mapelix-scene-prototype/README.md) | Builds 3D scene regions from a world in worker threads: meshes, levels of detail, cave slices, discoveries.                                                                                                |
+| `packages/mapelix-viewer`                                                        | Browser viewer: the 2D tile map, `MapelixViewer` (one API for the map, the 3D view and the switch between them), the marker layer, the optional DOM controls (`./controls`) and the 3D engine (`./three`). |
+| [`apps/render-cli`](apps/render-cli/README.md)                                   | `mapelix-render`: exports and updates the 2D tiles and their manifest.                                                                                                                                     |
+| [`apps/mapelix-demo`](apps/mapelix-demo/README.md)                               | Full-screen SvelteKit host for phones and desktops: serves an export and, optionally, the 3D world.                                                                                                        |
+| [`apps/prototype-viewer`](apps/prototype-viewer/README.md)                       | Leaflet map that renders tiles on demand from the world, with no render step: handy to look at a world once, slower to browse.                                                                             |
+| [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md)                 | Full 3D explorer with its developer panel (F3) and the automatic-perspective demo.                                                                                                                         |
+| `apps/prototype-visual-check`                                                    | Browser smoke test that renders the committed fixture world with the reference renderer.                                                                                                                   |
 
 All packages are private and their APIs can still change.
 

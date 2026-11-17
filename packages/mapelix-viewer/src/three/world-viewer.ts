@@ -192,6 +192,10 @@ export class WorldViewer {
   /** A fixed render distance in blocks, or undefined to follow the zoom. */
   private renderDistance: number | undefined;
   private frames = 0;
+  private readonly frameListeners = new Set<() => void>();
+  private screenWidth = 1;
+  private screenHeight = 1;
+  private readonly projected = new Vector3();
   private frameWindowStart = performance.now();
   private framesPerSecond = 0;
   private projectionChoice: ViewProjection = "perspective";
@@ -773,6 +777,34 @@ export class WorldViewer {
     this.rig.faceNorth();
   }
 
+  /** Calls `listener` after every drawn frame, with the camera of that frame; returns a stop function. */
+  onFrame(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /**
+   * Where a world point shows on the canvas, in CSS pixels from its top left corner, with the
+   * camera of the last drawn frame; `undefined` behind the camera or past its far plane. Read only.
+   */
+  projectToScreen(
+    x: number,
+    y: number,
+    z: number,
+    out: { x: number; y: number } = { x: 0, y: 0 },
+  ): { x: number; y: number } | undefined {
+    const point = this.projected.set(x, y, z).project(this.camera);
+    if (!(point.z >= -1 && point.z <= 1)) return undefined;
+    out.x = ((point.x + 1) * this.screenWidth) / 2;
+    out.y = ((1 - point.y) * this.screenHeight) / 2;
+    return out;
+  }
+
+  /** Y of the highest drawn block in a column, finest loaded detail first; `undefined` where nothing is drawn. Read only. */
+  surfaceHeightAt(x: number, z: number): number | undefined {
+    return this.streamer.exactHeightAt(x, z) ?? this.streamer.heightAt(x, z);
+  }
+
   /** The block under a canvas position: the first loaded surface along the pointer ray. */
   pick(clientX: number, clientY: number): Pointed | undefined {
     const ray = pointerRay(this.camera, this.renderer.domElement, clientX, clientY);
@@ -785,6 +817,7 @@ export class WorldViewer {
   }
 
   dispose(): void {
+    this.frameListeners.clear();
     this.clearDiscoveryFocus();
     this.depthFollow.cancel();
     this.renderer.setAnimationLoop(null);
@@ -865,6 +898,7 @@ export class WorldViewer {
     this.regionsChanged = false;
     this.pipeline.render();
     this.countFrame();
+    for (const listener of this.frameListeners) listener();
   }
 
   /** Sees farther from higher up, in steps so streaming does not churn while zooming. */
@@ -975,6 +1009,8 @@ export class WorldViewer {
     const height = Math.max(1, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
     this.renderer.setSize(width, height, false);
+    this.screenWidth = width;
+    this.screenHeight = height;
     this.camera.aspect = width / height;
     this.camera.focusDistance = this.rig.distance;
     this.camera.updateProjectionMatrix();

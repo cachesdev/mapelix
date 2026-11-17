@@ -77,6 +77,8 @@ export class ViewerControls {
   private openPanel: "settings" | "dimensions" | undefined;
   private panelOpener: HTMLElement | undefined;
   private hintTimer = 0;
+  private obstacleRequest = 0;
+  private obstacleKey = "";
   private hintShown: boolean;
   private lastGroups = "";
   private cardGroup: DiscoveryGroup | undefined;
@@ -234,6 +236,8 @@ export class ViewerControls {
 
   dispose(): void {
     clearTimeout(this.hintTimer);
+    cancelAnimationFrame(this.obstacleRequest);
+    this.viewer.markers.setObstacles([]);
     this.unsubscribe();
     this.resize.disconnect();
     document.removeEventListener("keydown", this.onKey);
@@ -288,6 +292,40 @@ export class ViewerControls {
       if (event.code === "Space" || event.code === "Enter") this.viewer.setVerticalMovement(0);
     });
     return button;
+  }
+
+  /** Tells the marker layer where the controls are, so marker labels go around them. */
+  private scheduleObstacles(): void {
+    if (this.obstacleRequest !== 0) return;
+    this.obstacleRequest = requestAnimationFrame(() => {
+      this.obstacleRequest = 0;
+      const container = this.root.parentElement;
+      if (!container) return;
+      const origin = container.getBoundingClientRect();
+      const boxes = [];
+      for (const element of this.root.querySelectorAll(
+        ".mx-btn, .mx-readout, .mx-panel, .mx-card",
+      )) {
+        if (
+          element.closest(".mx-panel, .mx-card") !== element &&
+          element.closest(".mx-panel, .mx-card")
+        )
+          continue;
+        if (!element.checkVisibility({ visibilityProperty: true })) continue;
+        const box = element.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) continue;
+        boxes.push({
+          left: box.left - origin.left,
+          top: box.top - origin.top,
+          right: box.right - origin.left,
+          bottom: box.bottom - origin.top,
+        });
+      }
+      const key = boxes.map((box) => `${box.left},${box.top},${box.right},${box.bottom}`).join(";");
+      if (key === this.obstacleKey) return;
+      this.obstacleKey = key;
+      this.viewer.markers.setObstacles(boxes);
+    });
   }
 
   private measure(): void {
@@ -692,6 +730,7 @@ export class ViewerControls {
   }
 
   private render(): void {
+    this.scheduleObstacles();
     const { view, status, settings } = this.state;
     const t = this.t;
     const is3d = view.mode === "3d";

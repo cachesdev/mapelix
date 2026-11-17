@@ -28,3 +28,13 @@ export {
   type ViewState,
 } from "./viewer/view-state.js";
 export { startFromSearch, viewerSearch, type SearchStart } from "./viewer/url-state.js";
+export {
+  DEFAULT_MARKER_TEXTS,
+  checkMarker,
+  type Box,
+  type Marker,
+  type MarkerClickEvent,
+  type MarkerInput,
+  type MarkerTexts,
+  type Markers,
+} from "./markers/index.js";

@@ -29,6 +29,7 @@ import type { SelectionTool } from "../three/selection-box.js";
 import type { AutoPerspective } from "../three/view-projection.js";
 import type { WeatherMode } from "../three/weather-layer.js";
 import type { WorldInfo, WorldViewer, WorldViewerOptions } from "../three/world-viewer.js";
+import { MarkerLayer, type MarkerTexts, type Markers } from "../markers/marker-layer.js";
 import {
   cameraOverMap,
   checkThresholds,
@@ -159,6 +160,8 @@ export interface MapelixViewerOptions {
   >;
   /** Accessible name of the view. */
   readonly label?: string;
+  /** Texts of the marker layer (default English). */
+  readonly markerTexts?: Partial<MarkerTexts>;
   /** Text of the discovery card (default English). */
   readonly formatDiscoveryDetails?: (group: DiscoveryGroup) => DiscoveryDetailText;
   readonly onViewChange?: (view: ViewState) => void;
@@ -204,6 +207,12 @@ function isWorldDimension(dimension: string): boolean {
  */
 export class MapelixViewer {
   readonly map: TileMap;
+  /**
+   * Host markers, drawn at the same place on the map and in 3D. Mapelix keeps no store: the host
+   * gives the markers and listens to presses.
+   */
+  readonly markers: Markers;
+  private readonly markerLayer: MarkerLayer;
   private readonly element: HTMLElement;
   private readonly options: MapelixViewerOptions;
   private readonly mapLayer: HTMLDivElement;
@@ -268,8 +277,33 @@ export class MapelixViewer {
       maxPixelsPerBlock: MAP_MAX_SCALE,
       label: options.label,
       onRest: () => this.mapRested(),
-      onViewChange: () => this.emit(),
+      onViewChange: () => {
+        this.emit();
+        this.markerLayer?.redraw();
+      },
     });
+    this.markerLayer = new MarkerLayer(
+      element,
+      {
+        mode: () => this.modeNow,
+        dimension: () => this.map.dimension,
+        project: (x, y, z, width, height, out) => {
+          if (this.modeNow === "3d")
+            return this.worldViewer?.projectToScreen(x, y, z, out) !== undefined;
+          const view = this.map.view;
+          out.x = width / 2 + (x - view.x) * view.pixelsPerBlock;
+          out.y = height / 2 + (z - view.z) * view.pixelsPerBlock;
+          return true;
+        },
+        heightAt: (x, z) => this.worldViewer?.surfaceHeightAt(x, z),
+        zoomToward: (x, z) => this.zoomToward(x, z),
+        isView: (target) =>
+          target instanceof Node &&
+          (this.mapLayer.contains(target) || this.worldLayer.contains(target)),
+      },
+      options.markerTexts,
+    );
+    this.markers = this.markerLayer;
     this.lastState = this.mapState();
     // A view that starts zoomed in past the switch scale, or in caves, opens in 3D.
     queueMicrotask(() => {
@@ -388,6 +422,7 @@ export class MapelixViewer {
   setDimension(dimension: string): void {
     if (dimension === this.map.dimension) return;
     this.map.setDimension(dimension);
+    this.markerLayer.schedule();
     this.settingsNow = { ...this.settingsNow, viewMode: "surface" };
     this.focused = undefined;
     if (this.modeNow === "3d") {
@@ -557,6 +592,20 @@ export class MapelixViewer {
     this.focusTarget()?.focus({ preventScroll: true });
   }
 
+  /** Centers a world point and zooms in twice, in either mode (a press on a marker group). */
+  zoomToward(x: number, z: number): void {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (this.modeNow === "3d" && this.worldViewer !== undefined) {
+      this.worldViewer.flyTo(x + 0.5, z + 0.5);
+      this.worldViewer.zoom(0.5);
+    } else
+      this.map.setView({
+        x: x + 0.5,
+        z: z + 0.5,
+        pixelsPerBlock: this.map.view.pixelsPerBlock * 2,
+      });
+  }
+
   /** Zooms in (`factor` > 1) or out around the center, in either mode. */
   zoomBy(factor: number): void {
     if (this.modeNow === "3d" && this.worldViewer !== undefined) this.worldViewer.zoom(1 / factor);
@@ -584,6 +633,7 @@ export class MapelixViewer {
     this.worldViewer?.dispose();
     this.worldViewer = undefined;
     this.listeners.clear();
+    this.markerLayer.dispose();
     this.element.removeEventListener("pointerdown", this.onPointerDown, { capture: true });
     this.element.removeEventListener("pointermove", this.onPointerMove);
     this.element.removeEventListener("pointerleave", this.onPointerLeave);
@@ -909,6 +959,7 @@ export class MapelixViewer {
       world.setCameraView({ x: now.x, z: now.z, heading: 0, pitch: TOP_DOWN_PITCH });
       world.setPixelsPerBlock(now.pixelsPerBlock);
       this.worldViewer = world;
+      world.onFrame(() => this.markerLayer.redraw());
       world = undefined;
       this.modeNow = "3d";
       this.worldLayer.style.opacity = "1";
@@ -1000,6 +1051,7 @@ export class MapelixViewer {
     this.pointed = undefined;
     this.map.setView({ x: state.x, z: state.z, pixelsPerBlock: state.pixelsPerBlock }, false);
     this.modeNow = "2d";
+    this.markerLayer.schedule();
     this.mapLayer.inert = false;
     this.mapLayer.style.pointerEvents = "";
     this.mapLayer.style.opacity = "1";

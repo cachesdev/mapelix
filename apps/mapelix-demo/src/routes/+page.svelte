@@ -10,7 +10,8 @@
     type WorldSettings,
   } from "@mapelix/viewer";
   import { createViewerControls, type ViewerControls } from "@mapelix/viewer/controls";
-  import { texts } from "$lib/texts";
+  import { markerTexts, texts } from "$lib/texts";
+  import { sampleMarkers } from "$lib/sample-markers";
 
   let { data }: { data: { world: boolean } } = $props();
 
@@ -39,6 +40,20 @@
       return result;
     } catch {
       return {};
+    }
+  }
+
+  /** The world spawn, from the 3D world description. */
+  async function worldSpawn(): Promise<{ x: number; z: number } | undefined> {
+    try {
+      const response = await fetch("/world/world.json");
+      if (!response.ok) return undefined;
+      const spawn = ((await response.json()) as { spawn?: { x?: unknown; z?: unknown } }).spawn;
+      return typeof spawn?.x === "number" && typeof spawn.z === "number"
+        ? { x: spawn.x, z: spawn.z }
+        : undefined;
+    } catch {
+      return undefined;
     }
   }
 
@@ -71,6 +86,7 @@
           projection: start.projection,
           settings: { ...storedPreferences(), ...start.settings },
           label: "World map",
+          markerTexts,
           ...(data.world ? { world: { base: "/world" } } : {}),
           map: {
             onIdle: () =>
@@ -82,6 +98,12 @@
           },
         });
         controls = createViewerControls(viewer, container, { texts });
+        // Example markers around the world spawn, else around the start view.
+        const shown = viewer;
+        const origin = { x: shown.view.x, z: shown.view.z };
+        void (data.world ? worldSpawn() : Promise.resolve(undefined)).then((spawn) => {
+          if (!disposed) shown.markers.set(sampleMarkers(spawn ?? origin));
+        });
         let lastPreferences = "";
         viewer.subscribe((_view, status, settings) => {
           clearTimeout(urlTimer);

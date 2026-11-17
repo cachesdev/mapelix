@@ -41,6 +41,13 @@ chooses where 3D regions are cached (default: the system temporary folder).
 For development, `pnpm --filter @mapelix/demo dev` serves on `127.0.0.1`, and `dev:lan` on every
 network interface.
 
+## Markers
+
+The demo shows example markers around the world spawn (`src/lib/sample-markers.ts`): a few places
+with icons, colors and labels, one with an image, one in the Nether, and a survey of 40 points that
+group when zoomed out. They go through `viewer.markers`, as a host's own data would; a tap selects a
+marker and shows its label first, a tap on a group zooms in on it.
+
 ## Tests
 
 ```sh
@@ -57,3 +64,9 @@ the controls, and the first display time against Leaflet on the same export.
 the discovery card, in 2D and 3D, panels open and closed, on phones (portrait and landscape),
 tablets and desktops, in light and dark. Set `MAPELIX_CAPTURES` to a folder to keep a screenshot of
 each layout.
+
+`tests/markers.e2e.ts` checks that a marker shows at the same place on the map and in 3D
+(isometric and perspective), that a tap selects it and a drag starting on it moves the view, that
+labels never overlap and markers group when zoomed out, that labels stay text and images only load
+from http(s) or relative addresses, and that 1,000 markers keep panning and zooming smooth (phone
+profile with a 4× slower CPU).
