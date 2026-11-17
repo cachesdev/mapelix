@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { WorldInfo, WorldViewer } from "../src/lib/viewer/world-viewer";
+import type { WorldInfo, WorldViewer } from "@mapelix/viewer/three";
 
 interface Sample {
   index: number;
@@ -60,7 +60,7 @@ test("104 real view switches retain bounded GPU/CPU resources and release the re
     samples.push(sample);
   });
   const backend = await page.evaluate(async (worlds) => {
-    const modulePath = "/src/lib/viewer/world-viewer.ts";
+    const modulePath = "/src/lib/world-viewer.ts";
     const { WorldViewer } = await import(modulePath);
     const viewer: WorldViewer = await WorldViewer.create(
       document.getElementById("viewer")!,

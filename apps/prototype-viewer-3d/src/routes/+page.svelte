@@ -29,7 +29,7 @@
     type DiscoveryGroup,
   } from "@mapelix/scene-prototype/discoveries";
   import { selectionAround, type HorizontalSelection } from "@mapelix/scene-prototype/selection";
-  import type { SelectionTool } from "$lib/viewer/selection-box";
+  import type { SelectionTool } from "@mapelix/viewer/three/selection-box";
   import { readViewFromUrl, writeViewToUrl } from "$lib/view-url";
   import type {
     Pointed,
@@ -38,7 +38,7 @@
     WorldViewer,
     WeatherMode,
     ViewProjection,
-  } from "$lib/viewer/world-viewer";
+  } from "@mapelix/viewer/three";
 
   const DEFAULT_HOUR = 15.5;
 
@@ -220,7 +220,7 @@
 
     void (async () => {
       const [{ WorldViewer }, response] = await Promise.all([
-        import("$lib/viewer/world-viewer"),
+        import("@mapelix/viewer/three"),
         fetch(`/world.json?${contextSearch(start.context)}`, { signal: metadataRequest.signal }),
       ]);
       if (!response.ok) throw new Error(`The world could not be opened (${response.status})`);

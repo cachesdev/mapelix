@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import type { WorldViewer, WorldInfo } from "../src/lib/viewer/world-viewer";
-import type { SelectionChange } from "../src/lib/viewer/selection-box";
+import type { WorldViewer, WorldInfo } from "@mapelix/viewer/three";
+import type { SelectionChange } from "@mapelix/viewer/three/selection-box";
 import type { Object3D, Mesh, PerspectiveCamera } from "three/webgpu";
 
 declare global {
@@ -29,7 +29,7 @@ test("dragging a 3D selection handle commits bounds only on release and suspends
   );
   await page.goto("/selection-drag");
   await page.evaluate(async (world) => {
-    const path = "/src/lib/viewer/world-viewer.ts";
+    const path = "/src/lib/world-viewer.ts";
     const { WorldViewer } = await import(path);
     window.__selectionChanges = [];
     window.__selectionViewer = await WorldViewer.create(

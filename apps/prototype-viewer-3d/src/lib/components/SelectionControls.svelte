@@ -3,7 +3,7 @@
     horizontalSelection,
     type HorizontalSelection,
   } from "@mapelix/scene-prototype/selection";
-  import type { SelectionTool } from "$lib/viewer/selection-box";
+  import type { SelectionTool } from "@mapelix/viewer/three/selection-box";
   interface Props {
     selection: HorizontalSelection | undefined;
     tool: SelectionTool;

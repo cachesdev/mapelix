@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { WorldViewer, WorldInfo } from "../src/lib/viewer/world-viewer";
-import type { CameraRig, Terrain } from "../src/lib/viewer/camera-rig";
+import type { WorldViewer, WorldInfo } from "@mapelix/viewer/three";
+import type { CameraRig, Terrain } from "@mapelix/viewer/three/camera-rig";
 
 declare global {
   interface Window {
@@ -127,7 +127,7 @@ test("caves bypass wall trapping and cancel a late automatic slice when returnin
   await page.goto("/navigation-harness");
   const result = await page.evaluate(
     async ({ caves, surface }) => {
-      const path = "/src/lib/viewer/world-viewer.ts";
+      const path = "/src/lib/world-viewer.ts";
       const { WorldViewer } = await import(path);
       const pending: {
         signal: AbortSignal;

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import type { WorldInfo, WorldViewer } from "../src/lib/viewer/world-viewer";
-import type { CloudLayer } from "../src/lib/viewer/cloud-layer";
+import type { WorldInfo, WorldViewer } from "@mapelix/viewer/three";
+import type { CloudLayer } from "@mapelix/viewer/three/cloud-layer";
 import type { Group } from "three/webgpu";
-import type { CameraRig } from "../src/lib/viewer/camera-rig";
+import type { CameraRig } from "@mapelix/viewer/three/camera-rig";
 
 declare global {
   interface Window {
@@ -40,7 +40,7 @@ test("block clouds render, drift, retain their option through all contexts and d
   );
   await page.goto("/cloud-harness");
   await page.evaluate(async (world) => {
-    const path = "/src/lib/viewer/world-viewer.ts",
+    const path = "/src/lib/world-viewer.ts",
       { WorldViewer } = await import(path);
     window.__cloudViewer = await WorldViewer.create(
       document.getElementById("viewer")!,

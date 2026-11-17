@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { WorldViewer, WorldInfo, WorldViewerOptions } from "../src/lib/viewer/world-viewer";
+import type { WorldViewer, WorldInfo, WorldViewerOptions } from "@mapelix/viewer/three";
 import type { DiscoveryGroup } from "@mapelix/scene-prototype/discoveries";
 import type { SceneContext } from "@mapelix/scene-prototype/dimensions";
 import type { PerspectiveCamera } from "three/webgpu";
@@ -34,7 +34,7 @@ async function harness(
   await page.goto("/focus-harness");
   await page.evaluate(
     async ({ world, customCard, oreOnly, distance }) => {
-      const path = "/src/lib/viewer/world-viewer.ts",
+      const path = "/src/lib/world-viewer.ts",
         { WorldViewer } = await import(path);
       window.__focusContexts = [];
       window.__focusEvents = [];

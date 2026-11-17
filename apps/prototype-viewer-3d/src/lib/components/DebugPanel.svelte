@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ViewerSnapshot } from "$lib/viewer/world-viewer";
+  import type { ViewerSnapshot } from "@mapelix/viewer/three";
 
   interface Props {
     snapshot: ViewerSnapshot;

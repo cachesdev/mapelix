@@ -1,10 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import type {
-  CameraView,
-  WorldInfo,
-  WorldViewer,
-  WorldViewerOptions,
-} from "../src/lib/viewer/world-viewer";
+import type { CameraView, WorldInfo, WorldViewer, WorldViewerOptions } from "@mapelix/viewer/three";
 
 declare global {
   interface Window {
@@ -41,7 +36,7 @@ async function open(page: Page, world: WorldInfo, view: CameraView): Promise<voi
   await page.evaluate(
     async ({ world, view, options }) => {
       window.__projectionViewer?.dispose();
-      const path = "/src/lib/viewer/world-viewer.ts",
+      const path = "/src/lib/world-viewer.ts",
         { WorldViewer } = await import(path);
       const element = document.getElementById("viewer")!;
       element.replaceChildren();

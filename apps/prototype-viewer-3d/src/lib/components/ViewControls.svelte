@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ViewProjection } from "$lib/viewer/world-viewer";
+  import type { ViewProjection } from "@mapelix/viewer/three";
 
   interface Props {
     /** Camera heading in radians clockwise from north. */

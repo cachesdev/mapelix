@@ -7,7 +7,7 @@
     type DiscoveryFilters,
     type DiscoveryGroup,
   } from "@mapelix/scene-prototype/discoveries";
-  import type { DiscoveryStats } from "$lib/viewer/discovery-streamer";
+  import type { DiscoveryStats } from "@mapelix/viewer/three/discovery-streamer";
   interface Props {
     filters: DiscoveryFilters;
     stats: DiscoveryStats;

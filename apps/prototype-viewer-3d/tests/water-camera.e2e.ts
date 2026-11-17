@@ -1,13 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import type {
-  WorldViewer,
-  WorldInfo,
-  CameraView,
-  WorldViewerOptions,
-} from "../src/lib/viewer/world-viewer";
-import type { SceneMaterials } from "../src/lib/viewer/shaders/materials";
-import type { CloudLayer } from "../src/lib/viewer/cloud-layer";
-import type { WeatherLayer } from "../src/lib/viewer/weather-layer";
+import type { WorldViewer, WorldInfo, CameraView, WorldViewerOptions } from "@mapelix/viewer/three";
+import type { SceneMaterials } from "@mapelix/viewer/three/shaders/materials";
+import type { CloudLayer } from "@mapelix/viewer/three/cloud-layer";
+import type { WeatherLayer } from "@mapelix/viewer/three/weather-layer";
 import type { Scene, Mesh, WebGPURenderer } from "three/webgpu";
 
 declare global {
@@ -37,7 +32,7 @@ async function harness(
   await page.goto("/surface-regression");
   await page.evaluate(
     async ({ world, view, options }) => {
-      const path = "/src/lib/viewer/world-viewer.ts",
+      const path = "/src/lib/world-viewer.ts",
         { WorldViewer } = await import(path);
       window.__waterViewer = await WorldViewer.create(
         document.getElementById("viewer")!,

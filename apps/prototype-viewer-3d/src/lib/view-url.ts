@@ -1,7 +1,7 @@
 import { replaceState } from "$app/navigation";
 import { page } from "$app/state";
 
-import type { CameraView, ViewProjection } from "$lib/viewer/world-viewer";
+import type { CameraView, ViewProjection } from "@mapelix/viewer/three";
 import { selectionFromSearch, type HorizontalSelection } from "@mapelix/scene-prototype/selection";
 import {
   discoveryFiltersFromSearch,

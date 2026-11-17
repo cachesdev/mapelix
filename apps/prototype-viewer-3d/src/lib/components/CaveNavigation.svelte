@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import type { VerticalMovement } from "$lib/viewer/camera-rig";
-  import type { DepthNavigation } from "$lib/viewer/depth-follow";
+  import type { VerticalMovement } from "@mapelix/viewer/three/camera-rig";
+  import type { DepthNavigation } from "@mapelix/viewer/three/depth-follow";
 
   interface Props {
     navigation: DepthNavigation;

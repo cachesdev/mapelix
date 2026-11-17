@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { PerspectiveCamera } from "three/webgpu";
 import type { DiscoveryGroup } from "@mapelix/scene-prototype/discoveries";
-import type { WorldInfo, WorldViewer, WorldViewerOptions } from "../src/lib/viewer/world-viewer";
+import type { WorldInfo, WorldViewer, WorldViewerOptions } from "@mapelix/viewer/three";
 
 declare global {
   interface Window {
@@ -24,7 +24,7 @@ async function harness(page: Page, world: WorldInfo) {
   );
   await page.goto("/label-harness");
   await page.evaluate(async (world) => {
-    const path = "/src/lib/viewer/world-viewer.ts",
+    const path = "/src/lib/world-viewer.ts",
       { WorldViewer } = await import(path);
     window.__labelClicks = [];
     window.__labelViewer = await WorldViewer.create(

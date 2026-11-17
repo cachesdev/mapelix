@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { PerspectiveCamera } from "three/webgpu";
-import type { WorldViewer, WorldInfo } from "../src/lib/viewer/world-viewer";
-import type { WeatherLayer } from "../src/lib/viewer/weather-layer";
-import type { Atmosphere } from "../src/lib/viewer/atmosphere";
+import type { WorldViewer, WorldInfo } from "@mapelix/viewer/three";
+import type { WeatherLayer } from "@mapelix/viewer/three/weather-layer";
+import type { Atmosphere } from "@mapelix/viewer/three/atmosphere";
 
 declare global {
   interface Window {
@@ -40,7 +40,7 @@ test("cosmetic rain and storm fog render, use bounded buffers, adapt to low FPS 
   );
   await page.goto("/weather-harness");
   await page.evaluate(async (world) => {
-    const path = "/src/lib/viewer/world-viewer.ts",
+    const path = "/src/lib/world-viewer.ts",
       { WorldViewer } = await import(path);
     window.__weatherViewer = await WorldViewer.create(
       document.getElementById("viewer")!,
