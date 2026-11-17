@@ -1,20 +1,19 @@
 # Mapelix
 
+Mapelix turns a Minecraft Bedrock world into a pre-rendered 2D map and a 3D world viewer, both in
+TypeScript. The 3D view, isometric or perspective, opens from the map at the same place and scale
+when you zoom in, and turns back into the map when you zoom out.
+
 Mapelix is the bastard child of
 [Mojang's Minecraft Creator Tools](https://github.com/Mojang/minecraft-creator-tools) and
-[uNmINeD](https://unmined.net/). It takes Mojang's official tooling for reading maps and combines
-it with an almost-clean-room port reverse-engineered from a uNmINeD 0.20.1-dev binary.
+[uNmINeD](https://unmined.net/). It takes Mojang's official tooling for reading worlds and combines
+it with an almost-clean-room port reverse-engineered from a uNmINeD 0.20.1-dev binary, so the look of
+uNmINeD maps becomes a low-level, programmatic TypeScript API with no native image or LevelDB
+dependency and no call into the .NET uNmINeD CLI.
 
-This slop-fork essentially brings the look of uNmINeD maps to TypeScript as a low-level,
-programmatic API. This means you can do some fun stuff, such as running the renderer in the browser
-(TODO), dynamically updating the map, or integrating it into web frameworks without having to call into the .NET uNmINeD CLI.
-
-The first prototype reads a Bedrock world, renders standard 256 by 256 XYZ tiles, and writes PNGs
-that Leaflet can request as `/tiles/{z}/{x}/{y}.png`.
-
-| Mapelix                                                                                                                       | uNmINeD                                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| ![A village rendered by Mapelix](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/mapelix-baseline.png) | ![The same village rendered by uNmINeD](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/unmined.png) |
+| 2D map                                                           | 3D view, perspective                                                                |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| ![A village and its river on the 2D map](docs/images/map-2d.jpg) | ![The same place in the 3D view, in perspective](docs/images/world-perspective.jpg) |
 
 ## Quick start
 
@@ -58,36 +57,99 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
      --dimension overworld,nether --incremental --surface-cache
    ```
 
-See [`apps/render-cli`](apps/render-cli/README.md) for every option and
-[`apps/mapelix-demo`](apps/mapelix-demo/README.md) for the viewer.
+## Features
 
-**Other viewers.** [`apps/prototype-viewer`](apps/prototype-viewer/README.md) renders tiles on
-demand from the world into a Leaflet map, with no render step: handy to look at a world once, slower
-to browse. [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md) is the full 3D explorer
-(caves, discoveries, weather, time of day and the developer panel); use it until the demo offers
-those controls in 3D.
+### 2D map
 
-## What works
+- **Zooms −4..+2** by default: native tiles from 1 to 4 pixels per block, and transparent overview
+  tiles down to 16 blocks per pixel, derived from native zoom zero
+  ([overview contract](docs/2d-overviews.md)). Standard 256 × 256 XYZ PNG tiles.
+- **Dimension profiles** for Overworld, Nether and End. The Nether is cut at Y 90 by default so
+  its caverns show under the roof; `--top-y` sets another cut.
+- **Classic look:** biome colors, elevation shading, water depth and transparency, contours and 3D
+  shadows. Modern flat colors from a catalog shared with the 3D view are the default
+  ([color catalog](docs/2d-block-colors.md)); `--appearance reference` keeps the previous palette,
+  `--biome-blend-radius` smooths biome colors, `--shadows` changes or disables shadows.
+- **Safe publication:** the CLI reads a snapshot, renders within worker, tile, byte, time and
+  memory limits, and publishes a versioned JSON manifest atomically after a verified export.
+- **Incremental updates:** `--incremental` redraws only tiles whose chunks, shadow halo or
+  biome-blend window changed; `--surface-cache` keeps extracted chunk surfaces between runs.
+- **Performance** on a small test world (Overworld, zooms −4..+2, 376 tiles, two workers): a full
+  render takes about 15 s, an unchanged world 3.4 s, and an update after 20 changed chunks about
+  7 s with the surface cache ([measurements](docs/2d-performance.md)).
+- **Viewer:** one-finger or mouse drag with glide, pinch and wheel zoom around the fingers or the
+  pointer, double-tap zoom, arrow and +/− keys, and the view kept in the address bar.
 
-- Bedrock LevelDB table and log files, including sequence ordering and tombstones
-- Modern palette subchunks, negative Y levels, and Data2D and Data3D biomes
-- Native zoom levels from one to eight pixels per block
-- Biome colors, elevation coloring, water depth and transparency, contours, and 3D shadows
-- Transparent, Leaflet-compatible XYZ PNG tiles
-- Configurable worker concurrency for large worlds
-- A byte-oriented API for future live-world and Canopy integrations
+### 3D world
 
-The prototype has been tested with the committed Bedrock fixture, a Stratos world backup, and a
-current Amelix SMP backup.
+- **Streaming:** terrain near the camera is drawn block by block, simpler levels of detail stream
+  out to the horizon. Drawn with three.js on WebGPU, with a WebGL 2 fallback.
+- **Dimensions:** Overworld, Nether (with an adjustable ceiling cut) and End; changing dimension in
+  3D reloads the world at the same place.
+- **Caves:** 16 or 32-block slices, including enclosed negative-Y caverns, with automatic depth
+  that follows the camera and a selectable exploration area
+  ([underground rendering](docs/underground-rendering.md),
+  [cave navigation](docs/cave-navigation.md)).
+- **Discoveries:** ores (exposed or fully buried), spawners, containers, vaults, amethyst, sculk,
+  portals and rails, with filters, a list, a detail card and a flight to each one, shown only
+  when switched on ([discovery labels](docs/discovery-labels.md),
+  [discovery navigation](docs/discovery-navigation.md)).
+- **Sky:** clouds, rain, thunderstorm and time of day on the Overworld surface
+  ([clouds and weather](docs/clouds-weather.md)).
+- **Projection:** isometric or perspective; the switch from the map starts isometric, looking
+  straight down.
+- **Controls:** one set of buttons for 2D and 3D that keep their place across the switch, sized for
+  touch (48 px), light and dark, from `@mapelix/viewer/controls`. Touch: drag to move, two fingers
+  to turn and tilt, pinch to zoom. Mouse: drag, right button to turn, wheel. Keys: WASD or arrows,
+  Q/E, R/F, +/−, and Space/C up and down in caves. Compass, return home, go to coordinates.
 
-## What (probably) doesn't work
+### Gallery
 
-- Dimensions other than Overworld in the 2D prototype remain unvalidated.
+| Isometric                                                                 | Thunderstorm at dusk                                                                    |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| ![The 3D view in isometric projection](docs/images/world-isometric.jpg)   | ![Rain and a darker sky over the same hill](docs/images/world-thunderstorm.jpg)         |
+| **Caves**                                                                 | **Discoveries**                                                                         |
+| ![A cave slice under the same place](docs/images/world-caves.jpg)         | ![Ore and other discovery markers in the cave slice](docs/images/world-discoveries.jpg) |
+| **Nether**                                                                | **Village, golden hour**                                                                |
+| ![The Nether under an adjusted ceiling cut](docs/images/world-nether.jpg) | ![A village at golden hour in the 3D view](apps/prototype-viewer-3d/docs/village.jpg)   |
+
+## Packages and apps
+
+| Path                                                                             | Role                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/mapelix-core`](packages/mapelix-core/README.md)                       | 2D dimension profiles, the shared block-color catalog and the batch export API (`@mapelix/core/node/batch`) used by the CLI.                                                             |
+| [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md)             | Reference 2D renderer: reads Bedrock LevelDB worlds and renders uNmINeD-style tiles. Holds the visual regression suite.                                                                  |
+| [`packages/mapelix-scene-prototype`](packages/mapelix-scene-prototype/README.md) | Builds 3D scene regions from a world in worker threads: meshes, levels of detail, cave slices, discoveries.                                                                              |
+| `packages/mapelix-viewer`                                                        | Browser viewer: the 2D tile map, `MapelixViewer` (one API for the map, the 3D view and the switch between them), the optional DOM controls (`./controls`) and the 3D engine (`./three`). |
+| [`apps/render-cli`](apps/render-cli/README.md)                                   | `mapelix-render`: exports and updates the 2D tiles and their manifest.                                                                                                                   |
+| [`apps/mapelix-demo`](apps/mapelix-demo/README.md)                               | Full-screen SvelteKit host for phones and desktops: serves an export and, optionally, the 3D world.                                                                                      |
+| [`apps/prototype-viewer`](apps/prototype-viewer/README.md)                       | Leaflet map that renders tiles on demand from the world, with no render step: handy to look at a world once, slower to browse.                                                           |
+| [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md)                 | Full 3D explorer with its developer panel (F3) and the automatic-perspective demo.                                                                                                       |
+| `apps/prototype-visual-check`                                                    | Browser smoke test that renders the committed fixture world with the reference renderer.                                                                                                 |
+
+All packages are private and their APIs can still change.
+
+## Known limits
+
+- **Bedrock only**, read from a folder. Updates are not live: render again (with `--incremental`)
+  after the world changes. The 2D renderer runs in Node.js, not in the browser.
+- **The 3D view needs a server** that reads the world; there is no static 3D export.
+- **2D:** no textures and no isometric images. Bed colors stored in block entities are not read yet.
+- **3D:** coarse levels of detail can close narrow caves; the Nether atmosphere does not change with
+  biomes; resource packs, custom dimensions and entities are not drawn, and unknown blocks fall
+  back to a plain solid.
+- **Isometric 3D:** exploration-area handles still pick as in perspective, and discovery markers
+  behind the camera can show.
+- **Discoveries** are limited by a search budget around the view, and exposure is uncertain next to
+  unsaved chunks.
+- Two 3D browser tests sometimes time out in a full run while terrain loads, and pass alone.
 
 ## Similarity to uNmINeD
 
-The committed visual suite compares Mapelix candidate renders with lossless uNmINeD reference
-renders across ten Amelix scenes. It checks structure, block color, shadows, and tile alignment.
+The committed visual suite compares renders of the reference renderer (`@mapelix/prototype`) with
+lossless uNmINeD reference renders across ten scenes from a real world. It checks structure, block
+color, shadows and tile alignment. The production default uses the modern color catalog;
+`--appearance reference` selects the measured look.
 
 | Signal                     |               Baseline |
 | -------------------------- | ---------------------: |
@@ -98,68 +160,15 @@ renders across ten Amelix scenes. It checks structure, block color, shadows, and
 | Block-color similarity     |                 99.37% |
 | Native-tile alignment      | Exact in all 10 scenes |
 
-Run the visual suite with:
+| Mapelix                                                                                                                       | uNmINeD                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| ![A village rendered by Mapelix](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/mapelix-baseline.png) | ![The same village rendered by uNmINeD](packages/mapelix-prototype/test/visual-regression/scenes/village-roofs/unmined.png) |
 
-```sh
-pnpm test:visual
-```
+Run it with `mise exec -- pnpm test:visual`. See the
+[visual regression suite](packages/mapelix-prototype/test/visual-regression/README.md) for the
+input format and the reports, and [`REWRITE.md`](REWRITE.md) for the per-scene scores.
 
-See the [visual regression suite](packages/mapelix-prototype/test/visual-regression/README.md) for
-the reference and candidate input format and the generated reports.
-
-## Package API
-
-The renderer is pure TypeScript and has no native image or LevelDB dependency.
-
-```ts
-import { openBedrockWorld, writeLeafletTile } from "@mapelix/prototype";
-
-const world = await openBedrockWorld({
-  directory: "/path/to/bedrock-world",
-  renderConcurrency: 2,
-});
-
-try {
-  const tile = await world.renderTile({
-    dimension: "overworld",
-    z: 2,
-    x: -32,
-    y: -49,
-  });
-
-  await writeLeafletTile(tile, { root: "generated-tiles" });
-} finally {
-  await world.close();
-}
-```
-
-This writes `generated-tiles/2/-32/-49.png`. Leaflet can request the output with
-`/tiles/{z}/{x}/{y}.png`.
-
-See [`packages/mapelix-prototype`](packages/mapelix-prototype/README.md) for the complete prototype
-API and its current boundaries.
-
-## Classic 2D surface profiles
-
-The production-facing [`@mapelix/core`](packages/mapelix-core/README.md) package adds classic 2D
-profiles for Overworld, Nether and End. Its Node adapter defaults the Nether to an included Y90 cut
-and accepts exact per-render `topY` overrides. The root profile entry has no Node.js runtime imports.
-The archived prototype API and the existing 3D viewer retain their defaults.
-Core also supplies the shared 2D/3D color catalog and top-view ground-cover rules by default. Select
-`appearance: "reference"` to retain its previous appearance; see the
-[2D color catalog](docs/2d-block-colors.md) for coverage and provenance.
-
-The generic [`@mapelix/render-cli`](apps/render-cli/README.md) exports classic tiles from a read-only
-snapshot, with explicit worker, pending-job, tile, byte, time and sampled memory limits. It publishes
-a versioned JSON manifest atomically after a complete verified export. The reusable API is
-`@mapelix/core/node/batch`. Zooms -4..+2 are the default, including transparent overview tiles derived
-from native zoom zero. See the [overview grid and filtering contract](docs/2d-overviews.md).
-Incremental reuse remains a follow-up.
-
-## Run it locally
-
-Mapelix uses [Mise](https://mise.jdx.dev/) to install and select Node.js 24 and pnpm 11. After
-installing Mise, run these commands from the repository root:
+## Development
 
 ```sh
 mise install
@@ -169,60 +178,21 @@ mise exec -- pnpm test:visual
 ```
 
 If Mise asks you to trust the project configuration, review `mise.toml` and run `mise trust`. If
-Mise is already activated in your shell, you can omit `mise exec --` and run the pnpm commands
-directly.
+Mise is already activated in your shell, you can omit `mise exec --`. The real-world tests use the
+system `unzip` command to expand the committed `.mcworld` fixture into a temporary directory.
 
-The real-world tests use the system `unzip` command to expand the committed `.mcworld` fixture
-into a temporary directory.
+## Documentation
 
-## Viewer
-
-The repository also includes a slop SvelteKit viewer. Its current manual test world is Amelix SMP
-(sorry, I can't give you the world, but you can use yours!). It proves that the package can support
-a real interactive Leaflet map. A Canopy integration remains future work.
-
-Run it with a copied Bedrock world:
-
-```sh
-MAPELIX_WORLD_DIRECTORY=/path/to/world \
-MAPELIX_RENDER_WORKERS=2 \
-pnpm --filter @mapelix/prototype-viewer dev
-```
-
-The viewer renders visible tiles on demand and keeps a persistent PNG cache. A warm restart can
-serve explored regions without reopening the world database. Set `MAPELIX_CACHE_DIRECTORY` to
-choose another cache location. Set a higher render worker amount if you have the CPU power.
-
-## 3D viewer
-
-The second prototype draws the world in 3D in the browser, with three.js and WebGPU. Terrain near
-the camera is drawn block by block, and simpler terrain streams in out to the horizon.
-
-![A village at golden hour in the 3D viewer](apps/prototype-viewer-3d/docs/village.jpg)
-
-```sh
-MAPELIX_WORLD_DIRECTORY=/path/to/world \
-pnpm --filter @mapelix/prototype-viewer-3d dev
-```
-
-See [`apps/prototype-viewer-3d`](apps/prototype-viewer-3d/README.md) for its settings and controls,
-and [`packages/mapelix-scene-prototype`](packages/mapelix-scene-prototype/README.md) for the
-region builder.
-
-The 3D engine now supports Overworld, Nether and End profiles, dimension selection, and a
-Nether roof cut that preserves interior geometry through every LOD. See the
-[native-dimension milestone](docs/native-dimensions.md) for validation and integration details.
-
-The local 3D viewer also offers 16/32-block **Caves** slices, including enclosed
-negative-Y caverns. See [underground rendering](docs/underground-rendering.md) for
-the limits, memory lifecycle and integration contract. The subsequent
-[exploration milestones](docs/underground-exploration.md) add a selectable 3D
-volume and independent discovery markers, including fully buried ores.
-
-## More information
-
-- [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md) records successful and failed speed, memory, and accuracy
-  experiments.
-- [`docs/research`](docs/research) contains clean-room notes about Minecraft map rendering and
-  uNmINeD behavior.
-- [`apps/prototype-viewer`](apps/prototype-viewer/README.md) documents the SvelteKit viewer.
+- 2D: [CLI options and manifest](apps/render-cli/README.md),
+  [overviews](docs/2d-overviews.md), [colors](docs/2d-block-colors.md),
+  [performance](docs/2d-performance.md).
+- 3D: [3D explorer](apps/prototype-viewer-3d/README.md),
+  [dimensions](docs/native-dimensions.md), [underground rendering](docs/underground-rendering.md),
+  [underground exploration](docs/underground-exploration.md),
+  [cave navigation](docs/cave-navigation.md), [clouds and weather](docs/clouds-weather.md),
+  [block models and lava](docs/block-models-and-lava.md), [block colors](docs/block-colors.md).
+- Discoveries: [labels](docs/discovery-labels.md), [navigation](docs/discovery-navigation.md).
+- Hosting: [demo](apps/mapelix-demo/README.md), [on-demand viewer](apps/prototype-viewer/README.md).
+- Background: [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md) (speed, memory and accuracy experiments),
+  [`REWRITE.md`](REWRITE.md) (production rewrite ledger and open questions),
+  [`docs/research`](docs/research) (clean-room notes on map rendering and uNmINeD behavior).
