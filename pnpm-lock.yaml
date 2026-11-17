@@ -298,6 +298,9 @@ importers:
 
   packages/mapelix-viewer:
     dependencies:
+      '@mapelix/prototype':
+        specifier: workspace:*
+        version: link:../mapelix-prototype
       '@mapelix/scene-prototype':
         specifier: workspace:*
         version: link:../mapelix-scene-prototype

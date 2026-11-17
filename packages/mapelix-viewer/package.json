@@ -41,6 +41,7 @@
     "transit": "node -e \"\""
   },
   "dependencies": {
+    "@mapelix/prototype": "workspace:*",
     "@mapelix/scene-prototype": "workspace:*",
     "three": "0.186.0"
   },
