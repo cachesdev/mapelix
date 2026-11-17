@@ -298,6 +298,9 @@ importers:
 
   packages/mapelix-viewer:
     dependencies:
+      '@mapelix/core':
+        specifier: workspace:*
+        version: link:../mapelix-core
       '@mapelix/prototype':
         specifier: workspace:*
         version: link:../mapelix-prototype

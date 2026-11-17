@@ -10,14 +10,15 @@ export const REVISION_PATTERN = /^[0-9a-f]{20}$/;
 
 /**
  * Fingerprints the engine code that builds regions. Any change to the mesher,
- * the decoders, or the format makes a new fingerprint, so a server upgrade never
- * serves regions cached by an older engine.
+ * the decoders, the shared block colors, or the format makes a new fingerprint,
+ * so a server upgrade never serves regions cached by an older engine.
  */
 export async function engineFingerprint(): Promise<string> {
   const hash = createHash("sha256");
   const roots = [
     dirname(fileURLToPath(import.meta.resolve("@mapelix/scene-prototype"))),
     dirname(fileURLToPath(import.meta.resolve("@mapelix/prototype"))),
+    dirname(fileURLToPath(import.meta.resolve("@mapelix/core/appearance"))),
   ];
   for (const root of roots) {
     for (const file of await javascriptFiles(root)) {
