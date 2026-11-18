@@ -698,7 +698,10 @@ export class WorldViewer {
     this.textureLoad = { revision, abort };
     this.setTextureState("loading");
     const base = this.options.textureBase ?? "/textures";
-    BlockAtlas.load(`${base}/${revision}/atlas.bin`, abort.signal).then(
+    // While the atlas is missing, the host may have changed stacks: each 404 asks it to check.
+    BlockAtlas.load(`${base}/${revision}/atlas.bin`, abort.signal, () =>
+      this.options.onStaleTextures?.(),
+    ).then(
       (atlas) => {
         if (abort.signal.aborted || this.textureLoad?.abort !== abort) {
           atlas.dispose();

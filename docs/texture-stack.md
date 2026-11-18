@@ -215,6 +215,9 @@ its block colors.
   `world.json` again, at most every 5 seconds, and takes the new revision: the textured regions
   of the previous atlas leave at once and the plain ones show until the new ones arrive. A host
   that has just changed the stack can call `MapelixViewer.refreshWorld()` straight away.
+- An atlas the server has not built yet answers 404: the viewer asks again after 0.5, 1, 2...
+  seconds, at most 30 between tries, about a minute and a half in all, and checks `world.json` at
+  each miss in case the stack changed. No page reload is needed.
 
 ## Checking a stack
 

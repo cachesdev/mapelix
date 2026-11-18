@@ -78,15 +78,48 @@ export class BlockAtlas {
     this.gpuBytes = bytes;
   }
 
-  /** Fetches and decodes `atlas.bin`; the browser caches it under its immutable URL. */
-  static async load(url: string, signal?: AbortSignal): Promise<BlockAtlas> {
-    const response = await fetch(url, signal === undefined ? {} : { signal });
-    if (!response.ok) throw new Error(`Texture atlas: HTTP ${response.status}`);
-    return new BlockAtlas(decodeTextureAtlas(new Uint8Array(await response.arrayBuffer())));
+  /**
+   * Fetches and decodes `atlas.bin`; the browser caches it under its immutable URL. A server
+   * answers 404 while it builds the atlas, so a missing atlas is asked again after 0.5, 1, 2...
+   * seconds, at most 30 between tries, before the load fails. `onMissing` hears each 404, so the
+   * caller can check whether the revision is still current; aborting stops the waits.
+   */
+  static async load(
+    url: string,
+    signal?: AbortSignal,
+    onMissing?: () => void,
+  ): Promise<BlockAtlas> {
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(url, signal === undefined ? {} : { signal });
+      if (response.ok)
+        return new BlockAtlas(decodeTextureAtlas(new Uint8Array(await response.arrayBuffer())));
+      if (response.status !== 404 || attempt >= ATLAS_RETRIES)
+        throw new Error(`Texture atlas: HTTP ${response.status}`);
+      onMissing?.();
+      await wait(Math.min(500 * 2 ** attempt, 30_000), signal);
+    }
   }
 
   dispose(): void {
     this.image.dispose();
     this.animation.dispose();
   }
+}
+
+/** Tries after the first 404, about a minute and a half in all. */
+const ATLAS_RETRIES = 8;
+
+function wait(milliseconds: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", stop);
+      resolve();
+    }, milliseconds);
+    const stop = () => {
+      clearTimeout(timer);
+      reject(signal!.reason);
+    };
+    signal?.addEventListener("abort", stop, { once: true });
+  });
 }
