@@ -241,11 +241,12 @@ function blockFaces(value: unknown): BlockTextureNames | undefined {
 
 /** Blocks whose textures the game assigns in code: the terrain texture each one takes. */
 const CODE_TEXTURED_BLOCKS: Readonly<Record<string, string>> = {
+  red_shrub: "red_shrub",
   shelf_mushroom: "shelf_mushroom_large",
 };
 
 /** The version of the texture pipeline; part of every stack and pack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 8;
+export const TEXTURE_PIPELINE_VERSION = 9;
 
 const PACK_JSON = [
   "manifest.json",

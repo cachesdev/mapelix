@@ -244,3 +244,14 @@ with `{ "ok": false, "errors": [...] }` when the stack cannot be used.
 A high-resolution pack gets the tile size the atlas side and budget allow: with the defaults,
 a full stack of about 2,000 textures fits at 16 pixels; a larger `budgetMiB` does not raise
 it past the 2048-pixel atlas side.
+
+To find the blocks a stack leaves with plain colors, build `@mapelix/scene-prototype` and run
+its coverage script from that package. Without `--world` it checks every known block; with it,
+it counts the blocks of a square of chunks around the spawn, or around `--center`, and lists the
+ones not fully textured, most common first. It reads the world and never writes to it.
+
+```bash
+node scripts/texture-coverage.mjs vanilla.zip
+node scripts/texture-coverage.mjs mine.mcpack vanilla.zip --world /srv/worlds/world-1 --radius 32
+node scripts/texture-coverage.mjs vanilla.zip --world /srv/worlds/world-1 --dimension nether --center 0,0
+```
