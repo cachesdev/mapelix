@@ -28,7 +28,8 @@ describe("Bedrock block models", () => {
         for (let axis = 0; axis < 3; axis++) {
           expect(bounds[axis]).toBeGreaterThanOrEqual(0);
           expect(bounds[axis + 3]).toBeLessThanOrEqual(16);
-          expect(bounds[axis + 3]).toBeGreaterThan(bounds[axis]!);
+          // Flat planes, as a stonecutter blade or campfire flames, have no depth.
+          expect(bounds[axis + 3]).toBeGreaterThanOrEqual(bounds[axis]!);
         }
         expect(unpackModelBounds(packModelBounds(bounds))).toEqual(bounds);
       }

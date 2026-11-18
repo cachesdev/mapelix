@@ -145,6 +145,9 @@ function resolveShape(block: string, states: LittleEndianNbtCompoundValue): Bloc
           model.family === "rod" ||
           model.family === "portal" ||
           (model.family === "wall-torch" && !block.startsWith("unlit_")) ||
+          (model.family === "campfire" &&
+            states.extinguished !== 1 &&
+            states.extinguished !== true) ||
           (model.family === "candle" && states.lit === 1)
         ? QuadMaterial.Emissive
         : QuadMaterial.Solid;

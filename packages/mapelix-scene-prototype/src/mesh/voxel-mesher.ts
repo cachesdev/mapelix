@@ -509,6 +509,9 @@ class VoxelMesher {
               )
                 continue;
               const axis = face >> 1;
+              // Flat parts, as a stonecutter blade, draw only their two broad faces.
+              const b = part.bounds;
+              if ([0, 1, 2].some((other) => other !== axis && b[other] === b[other + 3])) continue;
               const plane = part.bounds[axis + ((face & 1) === 0 ? 3 : 0)]!;
               const boundary = plane === ((face & 1) === 0 ? 16 : 0);
               const neighborY = y + NORMAL_LAYER[face]!;

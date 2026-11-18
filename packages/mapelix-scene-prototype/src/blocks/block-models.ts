@@ -49,7 +49,9 @@ export type ModelFamily =
   | "cauldron"
   | "hopper"
   | "anvil"
-  | "grindstone";
+  | "grindstone"
+  | "stonecutter"
+  | "campfire";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -95,6 +97,7 @@ export const MODEL_STATES = [
   "lit",
   "bite_counter",
   "attachment",
+  "extinguished",
   "liquid_depth",
 ] as const;
 
@@ -139,6 +142,8 @@ export function resolveBlockModel(
   else if (block === "hopper") family = "hopper";
   else if (ANVIL.test(block)) family = "anvil";
   else if (block === "grindstone") family = "grindstone";
+  else if (block === "stonecutter_block") family = "stonecutter";
+  else if (block === "campfire" || block === "soul_campfire") family = "campfire";
   if (family === undefined) return undefined;
   const modelStates = Object.fromEntries(
     MODEL_STATES.flatMap((key) => (states[key] === undefined ? [] : [[key, states[key]]])),
@@ -516,6 +521,21 @@ export function blockModelParts(
     }
     case "grindstone":
       return grindstoneParts(s, facing);
+    case "stonecutter": {
+      // The blade lies across the way the stonecutter faces; `facing_direction` in older worlds.
+      const old = numberState(s, "facing_direction", -1);
+      const across = old >= 2 ? old >= 4 : (facing & 1) === 1;
+      return [
+        { bounds: [0, 0, 0, 16, 9, 16], faces: STONECUTTER_BASE_FACES },
+        {
+          bounds: across ? [8, 9, 1, 8, 16, 15] : [1, 9, 8, 15, 16, 8],
+          faces: ALL_FACES(Face.PositiveX),
+          sheet: { side: [1, 9] },
+        },
+      ];
+    }
+    case "campfire":
+      return campfireParts(s, facing);
     case "hopper":
       return [
         part([0, 10, 0, 2, 16, 16]),
@@ -570,6 +590,52 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+/** A stonecutter's base: its sides all read the south face, as the east and west hold the saw. */
+const STONECUTTER_BASE_FACES: readonly number[] = [
+  Face.PositiveZ,
+  Face.PositiveZ,
+  Face.PositiveY,
+  Face.NegativeY,
+  Face.PositiveZ,
+  Face.NegativeZ,
+];
+
+/**
+ * A campfire: four logs read the bottom texture (bark along its top rows, the 4 by 4 log end
+ * below), the bed of embers the side texture, and two crossed planes the flames on top.
+ * An extinguished one has cold embers and no flames.
+ */
+function campfireParts(s: LittleEndianNbtCompoundValue, facing: number): readonly ModelPart[] {
+  const lit = !isSet(s.extinguished);
+  const turn = facing & 1;
+  const log = (bounds: ModelBounds, axis: "x" | "z"): ModelPart => ({
+    bounds: rotate(bounds, turn),
+    faces: ALL_FACES(Face.NegativeY),
+    sheet: {
+      axis: turn === 1 ? (axis === "x" ? "z" : "x") : axis,
+      side: [0, 0],
+      top: [0, 4],
+      across: true,
+    },
+  });
+  const parts: ModelPart[] = [
+    log([1, 0, 0, 5, 4, 16], "z"),
+    log([11, 0, 0, 15, 4, 16], "z"),
+    log([0, 3, 11, 16, 7, 15], "x"),
+    log([0, 3, 1, 16, 7, 5], "x"),
+    {
+      bounds: rotate([5, 0, 0, 11, 1, 16], turn),
+      faces: ALL_FACES(lit ? Face.PositiveZ : Face.NegativeY),
+      sheet: { axis: turn === 1 ? "x" : "z", side: [0, 8], across: true },
+    },
+  ];
+  if (lit)
+    parts.push(
+      { bounds: [0, 0, 8, 16, 16, 8], faces: ALL_FACES(Face.PositiveY) },
+      { bounds: [8, 0, 0, 8, 16, 16], faces: ALL_FACES(Face.PositiveY) },
+    );
+  return parts;
+}
 const CORNER: PartSheet = { side: [0, 0], top: [0, 0] };
 /** Every face of a part from the block's side and bottom textures, as below an anvil's top. */
 const ANVIL_BASE_FACES: readonly number[] = [
@@ -687,6 +753,11 @@ export function modelCatalog(): readonly BlockModel[] {
   }
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
+  for (const side of ["north", "east"]) {
+    add("stonecutter_block", { "minecraft:cardinal_direction": side });
+    for (const extinguished of [0, 1])
+      add("campfire", { "minecraft:cardinal_direction": side, extinguished });
+  }
   for (let direction = 0; direction < 4; direction++) {
     add("anvil", { direction });
     for (const attachment of ["standing", "hanging", "side"])

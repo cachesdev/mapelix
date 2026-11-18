@@ -16,6 +16,11 @@ export interface PartSheet {
    * part's positive end, as a standing part reads it from its top.
    */
   readonly axis?: "x" | "y" | "z";
+  /**
+   * The side rectangle lies across the sheet instead, from the part's positive end on its
+   * left, as a campfire log's bark does.
+   */
+  readonly across?: boolean;
   readonly side: SheetTexel;
   /** Defaults to `side`. */
   readonly top?: SheetTexel;
@@ -99,6 +104,10 @@ export function sheetFaceWord(
       [u, v] = [v!, negate(u!)];
       turns += 1;
     }
+  if (faceAxis !== axis && sheet.across === true) {
+    [u, v] = [v!, negate(u!)];
+    turns += 1;
+  }
   const across = (((texel[0] - lowest(u!, bounds)) % 16) + 16) % 16;
   const down = (((texel[1] - lowest(v!, bounds)) % 16) + 16) % 16;
   return withTextureOffset(withTextureRotation(word, turns), across, down);

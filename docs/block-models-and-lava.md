@@ -29,7 +29,9 @@ Detailed LOD 0 geometry includes:
   base, and lightning rods (every copper stage) their tip; lying ones keep the
   rod alone. Anvils (intact, chipped, damaged) and grindstones on the floor, the
   ceiling or a wall; the grindstone's legs, pivots and wheel each read their own face
-  of the block's textures. These are cuboid representations:
+  of the block's textures. Stonecutters (base and flat blade) and campfires (four logs, a
+  bed of embers and two crossed planes of flame, none when extinguished). These are cuboid
+  representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.
 

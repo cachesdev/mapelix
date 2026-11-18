@@ -152,6 +152,19 @@ row(59, [
 put(42, FLOOR, 59, b("wooden_door", { direction: 0, upper_block_bit: 0 }));
 put(42, FLOOR + 1, 59, b("wooden_door", { direction: 0, upper_block_bit: 1 }));
 
+// Stonecutters and campfires, lit and out, both ways round.
+row(61, [
+  ...["south", "east"].map((side) =>
+    b("stonecutter_block", { "minecraft:cardinal_direction": side }),
+  ),
+  ...["south", "east"].flatMap((side) =>
+    [0, 1].map((extinguished) =>
+      b("campfire", { "minecraft:cardinal_direction": side, extinguished }),
+    ),
+  ),
+  b("soul_campfire", { "minecraft:cardinal_direction": "south", extinguished: 0 }),
+]);
+
 // Still drawn as cubes: detailed blocks that need their own models.
 row(
   64,
@@ -161,11 +174,8 @@ row(
     "brewing_stand",
     "composter",
     "smithing_table",
-    "campfire",
-    "soul_campfire",
     "bell",
     "end_portal_frame",
-    "stonecutter_block",
     "loom",
     "chiseled_bookshelf",
   ].map((name) => b(name)),

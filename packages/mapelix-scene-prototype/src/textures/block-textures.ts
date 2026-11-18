@@ -96,6 +96,9 @@ function variantIndex(states: LittleEndianNbtCompoundValue, count: number): numb
  * front direction (furnaces, pumpkins). Faces without a texture stay undefined and keep their
  * color; a block unknown to the stack returns undefined.
  */
+/** Model families whose parts pick their faces of the block's textures (`ModelPart.faces`). */
+const OWN_FACES: ReadonlySet<string> = new Set(["grindstone", "stonecutter", "campfire"]);
+
 export function resolveBlockTextures(
   names: TextureNames,
   name: string,
@@ -115,9 +118,8 @@ export function resolveBlockTextures(
     if (terrain === undefined) return undefined;
     return terrain.textures[variantIndex(states, terrain.textures.length)]?.path;
   };
-  // A grindstone's parts pick their own faces of the block's textures (`ModelPart.faces`).
   const front =
-    appearance.shape.kind === "model" && appearance.shape.model.family === "grindstone"
+    appearance.shape.kind === "model" && OWN_FACES.has(appearance.shape.model.family)
       ? undefined
       : facing(states);
   const turn = front === undefined ? 0 : RING.indexOf(front);
