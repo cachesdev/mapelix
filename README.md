@@ -1,10 +1,5 @@
 # Mapelix
 
-> **Credits.** This repository is a fork of
-> [cachesdev/mapelix](https://github.com/cachesdev/mapelix). All credit for Mapelix goes to
-> [cachesdev](https://github.com/cachesdev), who created it. This fork builds on that work and
-> improves it.
-
 Mapelix turns a Minecraft Bedrock world into a pre-rendered 2D map and a 3D world viewer, both in
 TypeScript. The 3D view, isometric or perspective, opens from the map at the same place and scale
 when you zoom in, and turns back into the map when you zoom out.
