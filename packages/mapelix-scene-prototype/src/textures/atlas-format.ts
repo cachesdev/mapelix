@@ -196,15 +196,24 @@ export function decodeTextureAtlas(bytes: Uint8Array): TextureAtlas {
 }
 
 /**
- * The fourth word of a textured quad: atlas tile (14 bits), quarter turns (2 bits) and whether
- * the texture takes the quad's biome color (bit 16). Bit 17 marks a quad with a texture; a quad
- * without one keeps its color. Bit 18 marks a cut-out face, whose transparent texels show what
- * lies behind: thin and shaped blocks such as leaf litter, ladders or trapdoors always, leaves
- * in regions built with their inner faces. Other faces fill those texels.
+ * The fourth word of a textured quad: atlas tile (14 bits), quarter turns (2 bits), whether
+ * the texture takes the quad's biome color (bit 16) and, for parts of small models, an offset
+ * into a sheet of parts (bits 19 to 26, `QUAD_TEXTURE_OFFSET_SHIFT`). Bit 17 marks a quad with
+ * a texture; a quad without one keeps its color. Bit 18 marks a cut-out face, whose transparent
+ * texels show what lies behind: thin and shaped blocks such as leaf litter, ladders or
+ * trapdoors always, leaves in regions built with their inner faces. Other faces fill those
+ * texels.
  */
 export const QUAD_TEXTURED = 1 << 17;
 export const QUAD_CUTOUT = 1 << 18;
 export const QUAD_TEXTURE_TINTED = 1 << 16;
+/**
+ * Bits 19 to 22 and 23 to 26: where a face reads its texture, in texels added to its own
+ * coordinates, across then down, 0 to 15. Packs draw small models (a lantern, a torch, a
+ * candle) as a sheet of parts: each face of a part reads its own rectangle of the sheet.
+ */
+export const QUAD_TEXTURE_OFFSET_SHIFT = 19;
+const OFFSET_MASK = 0xff << QUAD_TEXTURE_OFFSET_SHIFT;
 
 export function packQuadTexture(tile: number, rotation: number, tinted: boolean): number {
   return (
@@ -216,19 +225,36 @@ export function packQuadTexture(tile: number, rotation: number, tinted: boolean)
   );
 }
 
+/** A texture word whose face reads its rectangle `across` and `down` texels further, 0 to 15. */
+export function withTextureOffset(word: number, across: number, down: number): number {
+  if (word === 0) return 0;
+  const offset = (((across & 15) | ((down & 15) << 4)) << QUAD_TEXTURE_OFFSET_SHIFT) >>> 0;
+  return ((word & ~OFFSET_MASK) | offset) >>> 0;
+}
+
+/** A texture word turned by `rotation` quarter turns instead of its own. */
+export function withTextureRotation(word: number, rotation: number): number {
+  if (word === 0) return 0;
+  return ((word & ~(3 << 14)) | ((rotation & 3) << 14)) >>> 0;
+}
+
 export function unpackQuadTexture(word: number):
   | {
       readonly tile: number;
       readonly rotation: number;
       readonly tinted: boolean;
       readonly cutout?: true;
+      /** Texels across and down, when the face reads a rectangle of a sheet. */
+      readonly offset?: readonly [number, number];
     }
   | undefined {
   if ((word & QUAD_TEXTURED) === 0) return undefined;
+  const offset = (word & OFFSET_MASK) >>> QUAD_TEXTURE_OFFSET_SHIFT;
   return {
     tile: word & 0x3fff,
     rotation: (word >>> 14) & 3,
     tinted: (word & QUAD_TEXTURE_TINTED) !== 0,
     ...((word & QUAD_CUTOUT) !== 0 ? { cutout: true as const } : {}),
+    ...(offset !== 0 ? { offset: [offset & 15, offset >>> 4] as const } : {}),
   };
 }

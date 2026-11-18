@@ -1,5 +1,6 @@
 import type { LittleEndianNbtCompoundValue } from "@mapelix/prototype/bedrock";
 import type { ModelBounds } from "../model-boxes.js";
+import type { PartSheet } from "../textures/sheet-faces.js";
 export type { ModelBounds } from "../model-boxes.js";
 
 /** Axis-aligned model bounds, in sixteenths of a block: low xyz, then high xyz. */
@@ -7,6 +8,11 @@ export interface ModelPart {
   readonly bounds: ModelBounds;
   /** An untinted detail, such as a bed leg or pillow; otherwise use the block palette. */
   readonly color?: number;
+  /**
+   * Where the part's faces read the block's texture when it is a sheet of parts, as for
+   * lanterns and candles; otherwise each face reads the texture at its own position.
+   */
+  readonly sheet?: PartSheet;
 }
 
 export type ModelFamily =
@@ -123,6 +129,14 @@ const DIRECTIONS = [
 const CONNECTIONS = ["east", "west", "south", "north"] as const;
 const part = (bounds: ModelBounds, color?: number): ModelPart =>
   color === undefined ? { bounds } : { bounds, color };
+const sheetPart = (bounds: ModelBounds, sheet: PartSheet): ModelPart => ({ bounds, sheet });
+
+/** Rectangles of the game's sheets of parts, as the vanilla pack lays them out. */
+const LANTERN_BODY: PartSheet = { side: [0, 2], top: [0, 9] };
+const LANTERN_CAP: PartSheet = { side: [1, 0], top: [1, 10] };
+const LANTERN_CHAIN: PartSheet = { side: [11, 1] };
+const CANDLE: PartSheet = { side: [0, 8], top: [0, 6], bottom: [0, 14] };
+const POT_FLOOR: PartSheet = { side: [5, 15], top: [5, 10] };
 const isSet = (value: unknown): boolean => value === 1 || value === true;
 const numberState = (s: LittleEndianNbtCompoundValue, key: string, fallback = 0): number =>
   typeof s[key] === "number" ? s[key] : fallback;
@@ -323,12 +337,20 @@ export function blockModelParts(
     case "lantern": {
       const hanging = isSet(s.hanging);
       return hanging
-        ? [part([5, 1, 5, 11, 8, 11]), part([6, 8, 6, 10, 10, 10]), part([7, 10, 7, 9, 16, 9])]
-        : [part([5, 0, 5, 11, 7, 11]), part([6, 7, 6, 10, 9, 10])];
+        ? [
+            sheetPart([5, 1, 5, 11, 8, 11], LANTERN_BODY),
+            sheetPart([6, 8, 6, 10, 10, 10], LANTERN_CAP),
+            sheetPart([7, 10, 7, 9, 16, 9], LANTERN_CHAIN),
+          ]
+        : [
+            sheetPart([5, 0, 5, 11, 7, 11], LANTERN_BODY),
+            sheetPart([6, 7, 6, 10, 9, 10], LANTERN_CAP),
+          ];
     }
     case "pot":
+      // The walls read the sheet where they stand; the floor reads the clay of the sides.
       return [
-        part([5, 0, 5, 11, 1, 11]),
+        sheetPart([5, 0, 5, 11, 1, 11], POT_FLOOR),
         part([5, 1, 5, 6, 6, 11]),
         part([10, 1, 5, 11, 6, 11]),
         part([6, 1, 5, 10, 6, 6]),
@@ -340,13 +362,18 @@ export function blockModelParts(
         family === "chain"
           ? s.pillar_axis
           : ["y", "y", "z", "z", "x", "x"][numberState(s, "facing_direction", 1)];
+      const sheet: PartSheet =
+        family === "chain"
+          ? { axis: axis === "x" ? "x" : axis === "z" ? "z" : "y", side: [0, 0] }
+          : { axis: axis === "x" ? "x" : axis === "z" ? "z" : "y", side: [0, 0], top: [2, 0] };
       return [
-        part(
+        sheetPart(
           axis === "x"
             ? [0, 7, 7, 16, 9, 9]
             : axis === "z"
               ? [7, 7, 0, 9, 9, 16]
               : [7, 0, 7, 9, 16, 9],
+          sheet,
         ),
       ];
     }
@@ -368,7 +395,9 @@ export function blockModelParts(
             ];
       return positions
         .slice(0, count)
-        .map(([x, z], index) => part([x!, 0, z!, x! + 2, 4 + (index % 3) * 2, z! + 2]));
+        .map(([x, z], index) =>
+          sheetPart([x!, 0, z!, x! + 2, 4 + (index % 3) * 2, z! + 2], CANDLE),
+        );
     }
     case "cake":
       return [part([Math.min(13, 1 + numberState(s, "bite_counter") * 2), 0, 1, 15, 8, 15])];

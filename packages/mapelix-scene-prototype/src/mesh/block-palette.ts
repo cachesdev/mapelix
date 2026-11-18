@@ -11,6 +11,7 @@ import {
 import { Face, PlantSprite, QuadMaterial } from "../format.js";
 import { MODEL_STATES, blockModelParts, type BlockModel } from "../blocks/block-models.js";
 import { QUAD_CUTOUT, packQuadTexture } from "../textures/atlas-format.js";
+import { sheetFaceWord, type PartSheet } from "../textures/sheet-faces.js";
 import {
   TEXTURE_STATES,
   resolveBlockTextures,
@@ -73,12 +74,16 @@ export const TintCode = {
 const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter"]);
 
 /**
- * Blocks whose pack texture is a sheet of small parts the game maps piece by piece, such as a
- * lantern's body, top and handle. Drawn from block coordinates they would show stray fragments,
- * so they keep their block color until models carry their own texture rectangles.
+ * Blocks whose pack texture is a sheet of small parts that no shape here matches yet. Drawn
+ * from block coordinates they would show stray fragments, so they keep their block color.
+ * Lanterns, chains, candles, end rods and flower pots are models whose parts read their own
+ * rectangles of the sheet (see `ModelPart.sheet`); torches are below.
  */
-const SPRITE_SHEET =
-  /(?:^|_)(?:lantern|torch|chain|candle|lightning_rod)$|^(?:end_rod|flower_pot)$/;
+const SPRITE_SHEET = /(?:^|_)lightning_rod$/;
+
+/** A torch's stick: its sides as the sheet holds them, its top and bottom from the stick. */
+const TORCH: PartSheet = { side: [7, 6], top: [7, 6], bottom: [7, 13] };
+const TORCH_BLOCK = /(?:^|_)torch$/;
 
 const TINT_CODES: Readonly<Record<BiomeTint, number>> = {
   none: TintCode.None,
@@ -231,6 +236,14 @@ export class BlockPalette {
       textures.cross,
       this.tints[id * 6 + Face.PositiveY] !== TintCode.None,
     );
+    if (TORCH_BLOCK.test(base) && appearance.shape.kind === "box") {
+      const { size, inset } = appearance.shape.box;
+      const bounds = [inset, 0, inset, 16 - inset, size, 16 - inset] as const;
+      for (let face = 0; face < 6; face += 1) {
+        const index = id * 6 + face;
+        this.textureWords[index] = sheetFaceWord(this.textureWords[index]!, bounds, face, TORCH);
+      }
+    }
     // Thin and shaped blocks always show what lies behind their holes; leaves and other cubes
     // only in regions built with the faces between them (`VoxelMesher` marks those).
     const shaped = this.shape[id] === Shape.Box || this.shape[id] === Shape.Model;

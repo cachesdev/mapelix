@@ -1,5 +1,6 @@
 import {
   Fn,
+  If,
   attribute,
   cameraProjectionMatrix,
   cameraViewMatrix,
@@ -30,7 +31,7 @@ import {
 import { Vector2, type Node } from "three/webgpu";
 
 import type { BlockAtlas } from "../block-atlas";
-import { quadColor, quadLavaFlow, quadPosition, quadUV } from "./quad";
+import { quadColor, quadLavaFlow, quadPosition, quadSprite, quadUV } from "./quad";
 
 /**
  * Block textures for textured regions. Each quad carries a fourth word (see
@@ -51,11 +52,22 @@ const textureWord = quadLavaFlow;
 const bit = (word: Node<"uint">, shift: number, mask: number) =>
   float(word.shiftRight(uint(shift)).bitAnd(uint(mask)));
 
+/**
+ * The offset of a face drawn from a sheet of parts, as for lanterns and candles: its byte
+ * (bits 19 to 26 of the texture word) rides in the plant sprite varying, which only crossed
+ * plant quads read. A float holds it exactly; rounding removes interpolation error.
+ */
+const textureOffset = quadSprite;
+
 /** `quadPosition`, with the quad's texture word for the fragment stage. */
 export const texturedQuadPosition = Fn(() => {
-  // A variable, so `quadPosition` and its own lava flow assignment come first.
+  // A variable, so `quadPosition` and its own lava flow and sprite assignments come first.
   const position = quadPosition().toVar();
-  textureWord.assign(bit(uint(attribute("texture", "uint")), 0, 0x7ffff));
+  const texture = uint(attribute("texture", "uint"));
+  textureWord.assign(bit(texture, 0, 0x7ffff));
+  If(bit(uint(attribute("quad", "uvec3").x), 23, 7).lessThan(6), () => {
+    textureOffset.assign(bit(texture, 19, 0xff));
+  });
   return position;
 });
 
@@ -65,6 +77,9 @@ const textureTurn = bit(word, 14, 3);
 const textureTint = bit(word, 16, 1);
 const textured = bit(word, 17, 1);
 const cutoutQuad = bit(word, 18, 1);
+const offset = uint(textureOffset.round());
+const offsetAcross = bit(offset, 0, 15);
+const offsetDown = bit(offset, 4, 15);
 
 /** Screen sizes, in CSS pixels per block, where textures start to show and are complete. */
 export interface TextureFade {
@@ -178,7 +193,8 @@ export class TextureLook {
     const c = cos(angle).round();
     const s = sin(angle).round();
     const turned = vec2(coords.x.mul(c).add(coords.y.mul(s)), coords.y.mul(c).sub(coords.x.mul(s)));
-    return this.sample(turned);
+    // Faces drawn from a sheet of parts move onto their rectangle, in sixteenths of a block.
+    return this.sample(turned.add(vec2(offsetAcross, offsetDown).div(16)));
   }
 
   /**

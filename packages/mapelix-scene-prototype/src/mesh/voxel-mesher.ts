@@ -24,6 +24,7 @@ import { blendColumnTints } from "./biome-tints.js";
 import type { GeometryMode } from "../dimensions.js";
 import { BlockPalette, PALETTE_ID_MASK, Shape, TintCode, WATERLOGGED } from "./block-palette.js";
 import { QUAD_CUTOUT } from "../textures/atlas-format.js";
+import { sheetFaceWord } from "../textures/sheet-faces.js";
 import {
   NO_BLOCK,
   VOLUME_LAYER,
@@ -535,7 +536,14 @@ class VoxelMesher {
                 packQuadWord2(color, occlusion),
                 this.textureWords === undefined || part.color !== undefined
                   ? 0
-                  : this.textureWords[id * 6 + face]!,
+                  : part.sheet === undefined
+                    ? this.textureWords[id * 6 + face]!
+                    : sheetFaceWord(
+                        this.textureWords[id * 6 + face]!,
+                        part.bounds,
+                        face,
+                        part.sheet,
+                      ),
               );
 
               this.minY = Math.min(this.minY, y);

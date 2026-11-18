@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Face, unpackQuad } from "../format.js";
 import { BlockPalette, lavaFill } from "./block-palette.js";
+import { unpackQuadTexture } from "../textures/atlas-format.js";
 import {
   VOLUME_HEIGHT,
   VOLUME_LAYER,
@@ -105,5 +106,44 @@ describe("detail model visibility and liquid levels", () => {
       );
       expect(bottomSides.every((q) => q.box.size === 16)).toBe(true);
     }
+  });
+
+  it("draws each part of a textured lantern from its rectangle of the sheet", () => {
+    const palette = new BlockPalette({
+      fingerprint: "lantern-sheet",
+      tiles: { "textures/blocks/lantern": 0 },
+      blocks: {
+        lantern: {
+          up: "lantern",
+          down: "lantern",
+          north: "lantern",
+          south: "lantern",
+          east: "lantern",
+          west: "lantern",
+        },
+      },
+      terrain: { lantern: { textures: [{ path: "textures/blocks/lantern" }] } },
+    });
+    const cells = new Uint16Array(VOLUME_LAYER * VOLUME_HEIGHT);
+    cells[cellIndex(VOLUME_MARGIN + 4, 61, VOLUME_MARGIN + 4)] = palette.idFor(
+      "minecraft:lantern",
+      { hanging: 0 },
+    );
+    const region = meshRegionVolume(
+      describeVolume({ originX: -16, originZ: -16, cells }, palette, () => 1),
+      palette,
+      0,
+      0,
+    );
+    const words = Array.from(region.textures!.opaque);
+    const faces = Array.from({ length: words.length }, (_, i) => unpackQuad(region.opaque, i));
+    // The body (6 wide, 7 high from y 0) and the cap (4 wide, 2 high from y 7); the body hides
+    // the cap's underside.
+    expect(faces.length).toBe(11);
+    const offsets = words.map((word) => unpackQuadTexture(word)?.offset?.join(","));
+    // Body sides from (0, 2) and cap sides from (1, 0) are both 11 across and 9 down from where
+    // they stand; the body's top and bottom from (0, 9) and the cap's top from (1, 10), 11 and 4.
+    expect(offsets.filter((offset) => offset === "11,9").length).toBe(8);
+    expect(offsets.filter((offset) => offset === "11,4").length).toBe(3);
   });
 });
