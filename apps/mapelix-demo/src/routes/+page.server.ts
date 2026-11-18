@@ -1,3 +1,3 @@
-import { hasWorld } from "$lib/server/world";
+import { hasWorld, textureUploads } from "$lib/server/world";
 
-export const load = () => ({ world: hasWorld });
+export const load = () => ({ world: hasWorld, texturePacks: hasWorld && textureUploads });

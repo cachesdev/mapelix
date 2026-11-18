@@ -51,12 +51,23 @@ export const RATIO_FLOOR_BYTES = 1024 * 1024;
 export class ResourcePackError extends Error {
   readonly pack: string;
   readonly file: string | undefined;
+  /** What is wrong, without the pack and file. */
+  readonly reason: string;
 
   constructor(pack: string, message: string, file?: string) {
     super(`Resource pack ${pack}${file === undefined ? "" : ` (${file})`}: ${message}`);
     this.name = "ResourcePackError";
     this.pack = pack;
     this.file = file;
+    this.reason = message;
+  }
+}
+
+/** A pack whose files changed while it was open: nothing read from it can be trusted. */
+export class ResourcePackChangedError extends ResourcePackError {
+  constructor(pack: string, message: string, file?: string) {
+    super(pack, message, file);
+    this.name = "ResourcePackChangedError";
   }
 }
 

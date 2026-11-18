@@ -174,6 +174,72 @@ describe("texture atlas", () => {
     });
   });
 
+  it("takes images it cannot use from the next pack and lists them", async () => {
+    const bottom = join(root, "bottom.zip");
+    const files = (name: string, uuid: string, images: Record<string, Uint8Array>) =>
+      makeZip(
+        packFiles({
+          name,
+          uuid,
+          terrain: {
+            stone: { textures: "textures/blocks/stone" },
+            water: { textures: "textures/blocks/water" },
+            lava: { textures: "textures/blocks/lava" },
+          },
+          blocks: {
+            stone: { textures: "stone" },
+            water: { textures: "water" },
+            lava: { textures: "lava" },
+          },
+          flipbooks: [{ flipbook_texture: "textures/blocks/water", atlas_tile: "water" }],
+          images,
+        }),
+      );
+    await writeFile(
+      bottom,
+      files("Bottom", "00000000-0000-4000-8000-0000000000b2", {
+        "textures/blocks/stone.png": makePng(16, [100, 110, 120, 255]),
+        "textures/blocks/water.png": makePng(16, [0, 0, 200, 255]),
+        "textures/blocks/lava.png": makePng(16, [200, 80, 0, 255]),
+      }),
+    );
+    // Water: a header that passes, but data cut short. Lava: taller than the limits allow.
+    const top = join(root, "top.zip");
+    await writeFile(
+      top,
+      files("Top", "00000000-0000-4000-8000-0000000000b3", {
+        "textures/blocks/stone.png": makePng(16, [10, 20, 30, 255]),
+        "textures/blocks/water.png": strip().slice(0, 60),
+        "textures/blocks/lava.png": encodePng(new Uint8Array(16 * 128 * 4).fill(255), 16, 128),
+      }),
+    );
+    const stack = await openResourcePackStack([top, bottom], { maxImageSide: 64 });
+    const built = await buildTextureAtlas(stack);
+    const [topInfo, bottomInfo] = stack.packs.map((pack) => pack.info);
+    expect(built.skipped).toEqual([
+      {
+        pack: topInfo,
+        file: "textures/blocks/lava.png",
+        reason: "image is wider or taller than 64 pixels",
+      },
+      {
+        pack: topInfo,
+        file: "textures/blocks/water.png",
+        reason: expect.stringMatching(/damaged PNG/),
+      },
+    ]);
+    expect(built.notices).toEqual([
+      { pack: topInfo, files: ["textures/blocks/stone.png"] },
+      { pack: bottomInfo, files: ["textures/blocks/lava.png", "textures/blocks/water.png"] },
+    ]);
+    // The water layout counted the four frames of the cut strip; the bottom pack's single
+    // frame fills them all.
+    const water = built.index.tiles["textures/blocks/water"]!;
+    expect(built.atlas.tiles[water]!.frames).toBe(4);
+    const colors = built.atlas.tiles.slice(water, water + 4).map((tile) => tile.average);
+    expect(new Set(colors).size).toBe(1);
+  });
+
   it("encodes and decodes the same atlas, and builds the same bytes again", async () => {
     const stack = await stackOf();
     const first = await buildTextureAtlas(stack);

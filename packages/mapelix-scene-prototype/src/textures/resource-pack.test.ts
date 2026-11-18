@@ -205,7 +205,7 @@ describe("resource pack stack", () => {
     ).toBeInstanceOf(ResourcePackError);
   });
 
-  it("refuses a file whose content lies about its size or checksum when it is read", async () => {
+  it("skips a file whose content lies about its size or checksum when it is read", async () => {
     const lies: [ZipFileSpec, RegExp][] = [
       [{ name: "textures/blocks/stone.png", data: red, declaredSize: 10 }, /declared size/],
       [
@@ -222,9 +222,14 @@ describe("resource pack stack", () => {
     for (const [spec, message] of lies) {
       const others = packFiles(base).filter((file) => file.name !== spec.name);
       const stack = await openResourcePackStack([await file("lie.zip", [...others, spec])]);
-      await expect(stack.readImage("textures/blocks/stone"), String(message)).rejects.toThrow(
-        message,
-      );
+      expect(await stack.readImage("textures/blocks/stone"), String(message)).toBeUndefined();
+      expect(stack.skippedImages(), String(message)).toEqual([
+        {
+          pack: stack.packs[0]!.info,
+          file: "textures/blocks/stone.png",
+          reason: expect.stringMatching(message),
+        },
+      ]);
     }
     const noise = new Uint8Array(128 * 128 * 4).map((_, index) => (index * 2_654_435_761) >>> 24);
     const big = await openResourcePackStack(
@@ -236,10 +241,13 @@ describe("resource pack stack", () => {
       ],
       { maxFileBytes: 20_000 },
     );
-    await expect(big.readImage("textures/blocks/stone")).rejects.toThrow(/larger than 20000 bytes/);
+    expect(await big.readImageSize("textures/blocks/stone")).toBeUndefined();
+    expect(big.skippedImages().map((image) => image.reason)).toEqual([
+      "is larger than 20000 bytes",
+    ]);
   });
 
-  it("refuses damaged or oversized images with the pack and file named", async () => {
+  it("skips damaged or oversized images with the pack and file named", async () => {
     const huge = new Uint8Array(red);
     new DataView(huge.buffer).setUint32(16, 100_000);
     const truncated = red.slice(0, 40);
@@ -256,13 +264,54 @@ describe("resource pack stack", () => {
           packFiles({ ...base, images: { [`textures/blocks/stone.${extension}`]: bytes } }),
         ),
       ]);
-      const error = await stack
-        .readImage("textures/blocks/stone")
-        .catch((caught: unknown) => caught);
-      expect(error).toBeInstanceOf(ResourcePackError);
-      expect((error as Error).message).toMatch(`image.zip (textures/blocks/stone.${extension})`);
-      expect((error as Error).message).toMatch(message);
+      expect(await stack.readImage("textures/blocks/stone")).toBeUndefined();
+      expect(await stack.locateImage("textures/blocks/stone")).toBeUndefined();
+      const [skipped, ...others] = stack.skippedImages();
+      expect(others).toEqual([]);
+      expect(skipped!.pack).toEqual(stack.packs[0]!.info);
+      expect(skipped!.file).toBe(`textures/blocks/stone.${extension}`);
+      expect(skipped!.reason).toMatch(message);
     }
+  });
+
+  it("takes a skipped image from the next pack, and names the stack by every candidate", async () => {
+    // A tall animation strip over the side limit, as high resolution packs ship lava and water.
+    const strip = new Uint8Array(red);
+    new DataView(strip.buffer).setUint32(20, 16_384);
+    const top = await file(
+      "top.zip",
+      packFiles({
+        ...base,
+        name: "Top",
+        uuid: "a0000000-0000-4000-8000-000000000001",
+        images: { "textures/blocks/stone.png": strip },
+      }),
+    );
+    const bottom = await file(
+      "bottom.zip",
+      packFiles({ ...base, images: { "textures/blocks/stone.png": blue } }),
+    );
+    const stack = await openResourcePackStack([top, bottom]);
+    const image = await stack.readImage("textures/blocks/stone");
+    expect([...image!.rgba.slice(0, 4)]).toEqual([0, 0, 255, 255]);
+    expect((await stack.locateImage("textures/blocks/stone"))?.pack).toBe(stack.packs[1]);
+    expect(stack.skippedImages()).toEqual([
+      {
+        pack: stack.packs[0]!.info,
+        file: "textures/blocks/stone.png",
+        reason: "image is wider or taller than 8192 pixels",
+      },
+    ]);
+    // Asked again, the skipped image is not read or listed twice.
+    await stack.readImage("textures/blocks/stone");
+    expect(stack.skippedImages()).toHaveLength(1);
+    // Larger limits keep the strip, so they name another stack.
+    const larger = await openResourcePackStack([top, bottom], {
+      maxImageSide: 16_384,
+      maxImagePixels: 16 * 1024 * 1024,
+    });
+    expect(larger.fingerprint).not.toBe(stack.fingerprint);
+    expect((await larger.locateImage("textures/blocks/stone"))?.pack).toBe(larger.packs[0]);
   });
 
   it("refuses a folder pack holding a link, and a pack that is a link", async () => {

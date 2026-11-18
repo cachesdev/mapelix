@@ -484,6 +484,37 @@ describe("scene server", () => {
     ]);
     expect(await server.getTextureRevision()).toBe(last.revision);
 
+    // An image too large for the limits is skipped alone: the next pack's takes its place.
+    const huge = makePng(16, [5, 5, 5, 255]);
+    new DataView(huge.buffer, huge.byteOffset).setUint32(20, 100_000);
+    const oversized = join(root, "oversized.zip");
+    await writeFile(
+      oversized,
+      makeZip(
+        packFiles({
+          name: "Oversized",
+          uuid: "00000000-0000-4000-8000-0000000000c1",
+          terrain: { stone: { textures: "textures/blocks/stone" } },
+          blocks: { stone: { textures: "stone" } },
+          images: { "textures/blocks/stone.png": huge },
+        }),
+      ),
+    );
+    const over = await server.setTextures({ packs: [oversized, second] });
+    expect(over).toMatchObject({
+      ok: true,
+      skipped: [
+        {
+          pack: { name: "Oversized" },
+          file: "textures/blocks/stone.png",
+          reason: "image is wider or taller than 8192 pixels",
+        },
+      ],
+      notices: [{ pack: { name: "Synthetic pack" }, files: ["textures/blocks/stone.png"] }],
+    });
+    expect(await server.getTextureRevision()).toBe(over.revision);
+    expect(events).toContain("textures.images-skipped");
+
     expect(await server.setTextures(null)).toEqual({ ok: true, errors: [] });
     expect(await server.getWorldMetadata()).not.toHaveProperty("textures");
     expect(await server.stats()).not.toHaveProperty("textured");

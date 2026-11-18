@@ -33,5 +33,6 @@ export {
   STACK_FILE_FORMAT,
   STACK_FILE_VERSION,
   type ResourcePackInfo,
+  type SkippedImage,
   type TextureNotice,
 } from "@mapelix/scene-prototype/textures";

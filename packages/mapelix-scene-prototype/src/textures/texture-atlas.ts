@@ -23,6 +23,7 @@ import type {
   ResourcePack,
   ResourcePackInfo,
   ResourcePackStack,
+  SkippedImage,
   TerrainEntry,
 } from "./resource-pack.js";
 
@@ -62,6 +63,8 @@ export interface BuiltTextureAtlas {
   /** GPU bytes of the atlas with its mipmaps. */
   readonly gpuBytes: number;
   readonly notices: readonly TextureNotice[];
+  /** Images the packs hold but the atlas could not use, replaced by the next pack's if any. */
+  readonly skipped: readonly SkippedImage[];
 }
 
 export const DEFAULT_ATLAS_OPTIONS = {
@@ -218,24 +221,19 @@ export async function buildTextureAtlas(
   for (const source of sources) {
     const image = await stack.readImage(source.path);
     if (image === undefined) continue;
-    const found = stack.locateImage(source.path)!;
+    const found = (await stack.locateImage(source.path))!;
     used.set(found.pack, [...(used.get(found.pack) ?? []), found.file]);
     tileOf[source.path] = tiles.length;
-    for (const [order, frame] of source.frames.entries()) {
+    // An image that failed to decode was replaced by the next pack's, which may hold fewer
+    // frames than the layout counted: its frames repeat.
+    const side = Math.min(image.width, image.height);
+    const available = Math.max(1, Math.floor(image.height / side));
+    for (const [order, wanted] of source.frames.entries()) {
+      const frame = wanted % available;
       const tile = tiles.length;
       const x0 = (tile % columns) * cell + gutter;
       const y0 = Math.floor(tile / columns) * cell + gutter;
-      const average = resample(
-        image,
-        source.side,
-        frame,
-        tileSize,
-        base,
-        width,
-        x0,
-        y0,
-        !source.overlay,
-      );
+      const average = resample(image, side, frame, tileSize, base, width, x0, y0, !source.overlay);
       wrapGutter(base, width, x0, y0, tileSize, gutter);
       tiles.push({
         ...average,
@@ -277,6 +275,7 @@ export async function buildTextureAtlas(
     notices: stack.packs
       .filter((pack) => used.has(pack))
       .map((pack) => ({ pack: pack.info, files: used.get(pack)!.sort() })),
+    skipped: [...stack.skippedImages()],
   };
 }
 

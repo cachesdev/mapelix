@@ -23,6 +23,11 @@ export interface ViewerControlsOptions {
    * let people add, change and delete markers (the host saves them), or `false` for no card.
    */
   readonly markers?: MarkerEditorOptions | false;
+  /**
+   * A link shown under the textures switch, for a host that lets people choose the texture
+   * pack on a page of its own.
+   */
+  readonly texturesLink?: { readonly href: string; readonly label: string };
 }
 
 /** Below this width the panel and the discovery card share the space and take it all. */
@@ -80,6 +85,7 @@ export class ViewerControls {
   readonly root: HTMLDivElement;
   private readonly viewer: MapelixViewer;
   private readonly t: ControlTexts;
+  private readonly texturesLink: ViewerControlsOptions["texturesLink"];
   private readonly unsubscribe: () => void;
   private readonly resize: ResizeObserver;
   private openPanel: "settings" | "dimensions" | "marker" | undefined;
@@ -121,6 +127,7 @@ export class ViewerControls {
   constructor(viewer: MapelixViewer, container: HTMLElement, options: ViewerControlsOptions = {}) {
     this.viewer = viewer;
     this.t = { ...DEFAULT_CONTROL_TEXTS, ...options.texts };
+    this.texturesLink = options.texturesLink;
     // A host whose policy forbids inline styles links `mapelix-viewer.css` with this marker.
     if (!styleInstalled && !document.querySelector("link[data-mapelix-styles]")) {
       const style = document.createElement("style");
@@ -687,6 +694,14 @@ export class ViewerControls {
       wrapperOf(leaves),
       texturesNote,
     );
+    if (this.texturesLink !== undefined) {
+      const link = make("a", "mx-link", this.texturesLink.label);
+      link.href = this.texturesLink.href;
+      link.dataset.part = "textures-link";
+      const line = make("p");
+      line.append(link);
+      view.append(line);
+    }
 
     // Sky: clouds, rain, thunderstorm, time of day (Overworld surface).
     const sky = this.section("sky", t.atmosphere);

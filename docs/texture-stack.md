@@ -110,7 +110,24 @@ is itself a link, refuses the stack. Archives are read entry by entry, never who
 | `maxStackEntries` / `maxStackBytes`         | 262,144 / 4 GiB |
 
 Zip entries must be stored or deflated, unencrypted, without ZIP64, with names that stay in
-the pack. A size, CRC or compression method that lies refuses the file when it is read.
+the pack.
+
+### Images that break a limit
+
+An image that cannot be used is skipped alone; the rest of its pack is used. That covers an
+image over `maxImageSide`, `maxImagePixels` or `maxFileBytes` (a high-resolution animation strip,
+for example 512 × 16,384 pixels), a damaged PNG or TGA, and an archive entry whose size, CRC or
+compression method lies. The same image of the next pack takes its place, so a pack stacked
+over the vanilla pack loses nothing; with no usable image left, the block keeps its color.
+
+Each skipped image is listed with its pack, file and reason in the report's `skipped` (from
+`setTextures`, `validateTextureStack` or `mapelix-textures`), and the server logs
+`textures.images-skipped` when it builds the atlas. The limits are part of the revision, as
+they decide which file each image comes from.
+
+A whole pack is still refused for: a link, an unsafe or repeated entry name, an archive over
+its size, entry or ratio limits, a missing or damaged manifest or block JSON file, and a pack
+that changes while it is read.
 
 Memory stays bounded: one decoded image at a time, plus the atlas (about 6 MiB for the vanilla
 pack at 16-pixel tiles). The atlas side never exceeds 2048 pixels, the size every WebGL 2
@@ -199,10 +216,20 @@ its block colors.
 
 `validateTextureStack(source, options)` from `@mapelix/viewer/node`, or the release's
 `mapelix-textures` command, opens the stack, builds the atlas in memory and reports the
-revision, each pack's fingerprint, the atlas sizes and the notices. It writes nothing.
+revision, each pack's fingerprint, the atlas sizes, the notices and the skipped images. It
+writes nothing.
 
 ```bash
 node mapelix-textures.js /srv/packs/world-1
+node mapelix-textures.js --packs mine.mcpack vanilla.zip
+node mapelix-textures.js --packs mine.mcpack vanilla.zip --max-tile-size 32 --budget-mib 64
 ```
 
-It exits 1 with `{ "ok": false, "errors": [...] }` when the stack cannot be used.
+`--packs` takes packs highest priority first, like the `packs` option. `--max-tile-size` and
+`--budget-mib` are the atlas options of the server. In a checkout, the command is
+`node packages/mapelix-viewer/dist/node/texture-cli.js` once the package is built. It exits 1
+with `{ "ok": false, "errors": [...] }` when the stack cannot be used.
+
+A high-resolution pack gets the tile size the atlas side and budget allow: with the defaults,
+a full stack of about 2,000 textures fits at 16 pixels; a larger `budgetMiB` does not raise
+it past the 2048-pixel atlas side.

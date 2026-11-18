@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { createSceneHandler, createSceneServer } from "@mapelix/viewer/node";
-import { createTexturePacks, DEFAULT_VANILLA_PACK_URL, storedTexturePack } from "./texture-packs";
+import { createTexturePacks, DEFAULT_VANILLA_PACK_URL, storedTextureStack } from "./texture-packs";
 
 function positive(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -16,9 +16,9 @@ const cacheDirectory =
   process.env.MAPELIX_CACHE_DIRECTORY ?? join(tmpdir(), "mapelix-demo-scene-cache");
 
 /**
- * Packs the demo may change while it runs (`MAPELIX_TEXTURE_UPLOADS=1`): uploaded or downloaded
- * at `/demo/textures`, kept in `MAPELIX_TEXTURE_PACK_DIRECTORY`. `MAPELIX_TEXTURE_VANILLA=1`
- * downloads the vanilla pack when the demo starts without one.
+ * The pack stack the demo may change while it runs (`MAPELIX_TEXTURE_UPLOADS=1`): packs uploaded
+ * or downloaded at `/textures`, kept in `MAPELIX_TEXTURE_PACK_DIRECTORY`.
+ * `MAPELIX_TEXTURE_VANILLA=1` downloads the vanilla pack when the demo starts without a stack.
  */
 const uploads = process.env.MAPELIX_TEXTURE_UPLOADS === "1";
 const vanillaOnStart = process.env.MAPELIX_TEXTURE_VANILLA === "1";
@@ -29,18 +29,18 @@ const packDirectory =
 /**
  * Block textures: a stack folder with its `mapelix-stack.json`, or a list of packs separated
  * by the platform path delimiter, highest priority first. Without either the world keeps its
- * block colors, or the pack chosen last at `/demo/textures`.
+ * block colors, or the stack chosen last at `/textures`.
  */
 const textureStack = process.env.MAPELIX_TEXTURE_STACK;
 const texturePacks = process.env.MAPELIX_TEXTURE_PACKS?.split(delimiter).filter((path) => path);
-const storedPack = managed ? storedTexturePack(packDirectory) : undefined;
+const storedPacks = managed ? storedTextureStack(packDirectory) : [];
 const textures =
   textureStack !== undefined && textureStack !== ""
     ? { textures: { stack: textureStack } }
     : texturePacks !== undefined && texturePacks.length > 0
       ? { textures: { packs: texturePacks } }
-      : storedPack !== undefined
-        ? { textures: { packs: [storedPack] } }
+      : storedPacks.length > 0
+        ? { textures: { packs: storedPacks.map((entry) => join(packDirectory, entry.file)) } }
         : {};
 
 /** True when a world folder is configured: the map then turns into the 3D world when zoomed in. */
@@ -70,7 +70,7 @@ const packs =
       })
     : undefined;
 
-/** True when `/demo/textures` lets visitors change the pack. */
+/** True when `/textures` lets visitors change the pack stack. */
 export const textureUploads = uploads && packs !== undefined;
 
 /** The demo's pack page API at `/demo/textures`, with `MAPELIX_TEXTURE_UPLOADS=1` only. */

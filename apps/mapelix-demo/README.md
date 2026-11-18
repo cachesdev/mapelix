@@ -54,22 +54,99 @@ browser's local storage only, adds a "Public" field, and leaves the spawn read-o
 
 ## Texture packs
 
-`MAPELIX_TEXTURE_STACK` (a stack folder) or `MAPELIX_TEXTURE_PACKS` (packs separated by the path
-delimiter, highest priority first) give the 3D world its block textures at start; see
-[`docs/texture-stack.md`](../../docs/texture-stack.md). Textures are off until turned on in the
-settings panel.
+The 3D world can draw blocks with the textures of Bedrock resource packs near the camera. They
+are off until **Textures** is turned on in the settings panel. Engine details:
+[`docs/texture-stack.md`](../../docs/texture-stack.md).
 
-With `MAPELIX_TEXTURE_UPLOADS=1`, the page `/textures` changes the pack while the server runs:
-upload a `.zip` or `.mcpack`, use the vanilla pack, or remove the textures. Open maps pick up the
-change by themselves. The vanilla pack is the resource pack of Mojang's Bedrock samples,
-downloaded once from `MAPELIX_VANILLA_PACK_URL` (by default the v1.26.60.5 release on GitHub,
-about 162 MiB); `MAPELIX_TEXTURE_VANILLA=1` downloads and uses it when the demo starts without a
-pack. Packs are kept in `MAPELIX_TEXTURE_PACK_DIRECTORY` (default `texture-packs` in the cache
-folder), up to `MAPELIX_TEXTURE_PACK_MIB` (256) each, and the last one chosen is used again after
-a restart. The scene server refuses a pack it cannot read and keeps the current one. A built
-server limits request bodies to 512 KiB by default: start it with `BODY_SIZE_LIMIT=256M` to
-upload packs. This page is for the demo only; it has no access control beyond a header that
-other sites cannot send, so do not enable it on a public server.
+### How a stack works
+
+Packs form a stack, highest priority first. A block takes each texture from the first pack that
+has it; the packs below fill in what it lacks. So a pack that changes only a few blocks goes on
+top of the vanilla pack, which keeps every other block textured. An image the server cannot use
+(too large, such as a 512-pixel animation strip, or damaged) is skipped alone and taken from
+the next pack; the rest of its pack is used.
+
+### Packs fixed at start
+
+```sh
+MAPELIX_TEXTURE_PACKS="/packs/mine.mcpack:/packs/vanilla.zip" \
+MAPELIX_WORLD_DIRECTORY=/path/to/world MAPELIX_TILES_DIRECTORY=/path/to/export \
+node apps/mapelix-demo/build/index.js
+```
+
+`MAPELIX_TEXTURE_PACKS` lists packs separated by the path delimiter (`:`, or `;` on Windows),
+highest priority first. `MAPELIX_TEXTURE_STACK` names a stack folder with its
+`mapelix-stack.json` instead. Either one wins over the stack chosen on the page.
+
+### Choosing packs on a page
+
+```sh
+BODY_SIZE_LIMIT=256M MAPELIX_TEXTURE_UPLOADS=1 MAPELIX_TEXTURE_VANILLA=1 \
+MAPELIX_WORLD_DIRECTORY=/path/to/world MAPELIX_TILES_DIRECTORY=/path/to/export \
+node apps/mapelix-demo/build/index.js
+```
+
+For development: `MAPELIX_TEXTURE_UPLOADS=1 ... pnpm --filter @mapelix/demo dev:lan` (no body
+limit there).
+
+With `MAPELIX_TEXTURE_UPLOADS=1`, the settings panel links to the page `/textures`, which shows
+the stack and changes it while the server runs:
+
+- **Add this pack**: uploads a `.zip` or `.mcpack`; it goes on top and wins.
+- **Add the vanilla pack**: downloads it the first time, then puts it at the bottom.
+- **↑ ↓**: move a pack; **✕**: take it out of the stack; **Remove every pack**: no textures.
+- **Skipped images**: each image the server could not use, with its pack and the reason.
+- **← Back to the map**: returns to the map at the view it had. Changes apply at once; there
+  is nothing to save.
+
+Open maps pick up each change by themselves. A stack the server cannot use is refused and the
+current one stays. The stack is kept in `current.json` and used again after a restart.
+
+| Variable                         | Default                    | Meaning                                         |
+| -------------------------------- | -------------------------- | ----------------------------------------------- |
+| `MAPELIX_TEXTURE_UPLOADS`        | off                        | `1` enables `/textures` and its API.            |
+| `MAPELIX_TEXTURE_VANILLA`        | off                        | `1` adds the vanilla pack at start if no stack. |
+| `MAPELIX_TEXTURE_PACK_DIRECTORY` | `<cache>/texture-packs`    | Where uploaded and downloaded packs are kept.   |
+| `MAPELIX_TEXTURE_PACK_MIB`       | 256                        | Largest pack, uploaded or downloaded.           |
+| `MAPELIX_VANILLA_PACK_URL`       | Bedrock samples v1.26.60.5 | Where the vanilla pack comes from (~162 MiB).   |
+| `BODY_SIZE_LIMIT`                | 512K (built server)        | Set it to `256M` to upload packs.               |
+
+The vanilla pack is the resource pack of Mojang's Bedrock samples, downloaded from GitHub.
+
+### The same from a terminal
+
+The page uses this API at `/demo/textures`; changes need the `x-mapelix-demo: 1` header.
+
+```sh
+# The stack, the served revision and the skipped images
+curl http://localhost:3000/demo/textures
+# Add a pack on top
+curl -X POST -H "x-mapelix-demo: 1" -H "x-mapelix-pack-name: mine.mcpack" \
+  --data-binary @mine.mcpack http://localhost:3000/demo/textures
+# Add the vanilla pack at the bottom
+curl -X POST -H "x-mapelix-demo: 1" "http://localhost:3000/demo/textures?source=vanilla"
+# Reorder or drop packs: the files listed by GET, highest priority first
+curl -X PUT -H "x-mapelix-demo: 1" -H "content-type: application/json" \
+  -d '{"packs":["upload-<id>.zip","vanilla-<id>.zip"]}' http://localhost:3000/demo/textures
+# Remove every pack
+curl -X DELETE -H "x-mapelix-demo: 1" http://localhost:3000/demo/textures
+```
+
+Changes answer the server's report: 200 when used, 422 when refused (`errors` says why), 413
+for a pack over the size limit.
+
+### Checking a pack without the demo
+
+```sh
+pnpm exec turbo run build --filter=@mapelix/viewer...
+node packages/mapelix-viewer/dist/node/texture-cli.js --packs mine.mcpack vanilla.zip
+```
+
+It prints the report the page would get (revision, packs, atlas size, skipped images) and
+writes nothing.
+
+This page is for the demo only. It has no access control beyond a header that other sites
+cannot send, so do not enable it on a public server.
 
 ## Tests
 

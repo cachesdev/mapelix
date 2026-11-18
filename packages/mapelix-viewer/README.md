@@ -78,6 +78,10 @@ working unchanged, with textures off, and with a server that has no texture stac
   `WorldViewer.setWorldTextures()` and the `onStaleTextures` option for hosts that drive a
   `WorldViewer` directly.
 - Also later in version 5: block textures in the Caves view, with the same setting and switch.
+- Also later in version 5: an image a pack holds but the server cannot use (over the limits or
+  damaged) is skipped alone and taken from the next pack, instead of refusing the stack; texture
+  reports list it in `skipped`. `createViewerControls` takes `texturesLink` (`{ href, label }`),
+  a link under the textures switch for a host that lets people choose the pack.
 
 ### API version 4 (changes from 3)
 

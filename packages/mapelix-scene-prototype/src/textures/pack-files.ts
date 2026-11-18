@@ -3,7 +3,13 @@ import { lstat, open, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { crc32, inflateRawSync } from "node:zlib";
 
-import { RATIO_FLOOR_BYTES, ResourcePackError, packPath, type PackLimits } from "./pack-limits.js";
+import {
+  RATIO_FLOOR_BYTES,
+  ResourcePackChangedError,
+  ResourcePackError,
+  packPath,
+  type PackLimits,
+} from "./pack-limits.js";
 
 /** The files of one pack, from a folder or an archive, under normalized relative paths. */
 export interface PackFiles {
@@ -39,7 +45,7 @@ function fileAccess(path: string, size: number, label: string): RandomAccess {
       const handle = await open(path, "r");
       try {
         if ((await handle.stat()).size !== size) {
-          throw new ResourcePackError(label, "changed while the pack was open");
+          throw new ResourcePackChangedError(label, "changed while the pack was open");
         }
         const bytes = new Uint8Array(Math.max(0, Math.min(length, size - offset)));
         const { bytesRead } = await handle.read(bytes, 0, bytes.byteLength, offset);
@@ -130,13 +136,13 @@ async function openFolder(root: string, label: string, limits: PackLimits): Prom
     const file = join(root, ...path.split("/"));
     const details = await lstat(file);
     if (details.isSymbolicLink() || !details.isFile() || details.size !== size) {
-      throw new ResourcePackError(label, "changed while the pack was open", path);
+      throw new ResourcePackChangedError(label, "changed while the pack was open", path);
     }
     const handle = await open(file, "r");
     try {
       const bytes = new Uint8Array(size);
       const { bytesRead } = await handle.read(bytes, 0, size, 0);
-      if (bytesRead !== size) throw new ResourcePackError(label, "changed while read", path);
+      if (bytesRead !== size) throw new ResourcePackChangedError(label, "changed while read", path);
       return bytes;
     } finally {
       await handle.close();

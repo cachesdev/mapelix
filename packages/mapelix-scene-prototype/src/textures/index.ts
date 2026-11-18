@@ -1,5 +1,6 @@
 export {
   DEFAULT_PACK_LIMITS,
+  ResourcePackChangedError,
   ResourcePackError,
   packLimits,
   packPath,
@@ -27,6 +28,7 @@ export {
   type ResourcePack,
   type ResourcePackInfo,
   type ResourcePackStack,
+  type SkippedImage,
   type TerrainEntry,
   type TextureRef,
 } from "./resource-pack.js";

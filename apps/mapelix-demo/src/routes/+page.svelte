@@ -14,7 +14,7 @@
   import { sampleMarkers } from "$lib/sample-markers";
   import { DemoMarkerStore } from "$lib/marker-store";
 
-  let { data }: { data: { world: boolean } } = $props();
+  let { data }: { data: { world: boolean; texturePacks: boolean } } = $props();
 
   /** Preferences kept on this device; the address keeps the view itself. */
   const PREFERENCES = "mapelix-demo-preferences-v1";
@@ -105,6 +105,9 @@
         controls = createViewerControls(viewer, container, {
           texts,
           markers: store.editor(readOnly),
+          ...(data.texturePacks
+            ? { texturesLink: { href: "/textures", label: "Choose the texture packs" } }
+            : {}),
         });
         // Example markers around the world spawn, else around the start view.
         const shown = viewer;

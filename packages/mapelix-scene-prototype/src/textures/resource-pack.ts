@@ -8,7 +8,12 @@ import {
   parsePackJson,
   type PackImage,
 } from "./pack-image.js";
-import { ResourcePackError, packLimits, type PackLimits } from "./pack-limits.js";
+import {
+  ResourcePackChangedError,
+  ResourcePackError,
+  packLimits,
+  type PackLimits,
+} from "./pack-limits.js";
 import { readStackFile } from "./stack-file.js";
 
 /** What a pack says about itself in `manifest.json`, for the host to show. */
@@ -271,14 +276,29 @@ export interface ResourcePackStack {
   terrainEntry(name: string): TerrainEntry | undefined;
   blockTextures(block: string): BlockTextureNames | undefined;
   flipbook(name: string): Flipbook | undefined;
-  /** The pack and file an image path (no extension) resolves to. */
-  locateImage(path: string): { readonly pack: ResourcePack; readonly file: string } | undefined;
+  /** The pack and file an image path (no extension) resolves to, skipping refused images. */
+  locateImage(
+    path: string,
+  ): Promise<{ readonly pack: ResourcePack; readonly file: string } | undefined>;
   /** Reads only the header of the image at `path`. */
   readImageSize(
     path: string,
   ): Promise<{ readonly width: number; readonly height: number } | undefined>;
-  /** Decodes the image at `path` (no extension) from the first pack holding it. */
+  /**
+   * Decodes the image at `path` (no extension) from the first pack holding a usable one. An
+   * image over the limits or damaged is skipped: the next pack's image takes its place.
+   */
   readImage(path: string): Promise<PackImage | undefined>;
+  /** The images skipped so far, in the order they were met. */
+  skippedImages(): readonly SkippedImage[];
+}
+
+/** An image a pack holds but the stack could not use; the next pack's image, if any, is used. */
+export interface SkippedImage {
+  readonly pack: ResourcePackInfo;
+  readonly file: string;
+  /** Why, for example its size over the limits or a damaged file. */
+  readonly reason: string;
 }
 
 export async function openResourcePackStack(
@@ -343,17 +363,19 @@ export async function openResourcePackStack(
     }
     return undefined;
   };
-  const locate = (path: string): { pack: ResourcePack; file: string } | undefined =>
-    first((pack) => {
-      for (const extension of IMAGE_EXTENSIONS) {
+  /** Every file an image path may come from, in priority order. */
+  const candidates = (path: string): { pack: ResourcePack; file: string }[] =>
+    packs.flatMap((pack) =>
+      IMAGE_EXTENSIONS.flatMap((extension) => {
         const file = `${path}${extension}`;
-        if (pack.files.sizes.has(file)) return { pack, file };
-      }
-      return undefined;
-    });
+        return pack.files.sizes.has(file) ? [{ pack, file }] : [];
+      }),
+    );
 
   const hash = createHash("sha256");
   hash.update(`mapelix-texture-stack-v${TEXTURE_PIPELINE_VERSION}\n`);
+  // The limits decide which images are skipped, so which file each path comes from.
+  hash.update(`limits\0${limits.maxFileBytes}\0${limits.maxImageSide}\0${limits.maxImagePixels}\n`);
   for (const pack of packs) {
     hash.update(`pack\0${pack.info.uuid}\0${pack.info.version}\0${pack.info.name}\n`);
     for (const path of PACK_JSON) {
@@ -370,19 +392,55 @@ export async function openResourcePackStack(
   }
   const flipbookNames = new Set(packs.flatMap((pack) => [...pack.flipbooks.keys()]));
   for (const name of flipbookNames) images.add(first((pack) => pack.flipbooks.get(name))!.path);
+  // Every file each path may come from: a skipped image falls back to the next one, so all of
+  // them name what the atlas is made of.
   for (const path of [...images].sort()) {
-    const found = locate(path);
-    hash.update(
-      found === undefined
-        ? `${path}\0missing\n`
-        : `${path}\0${found.pack.info.uuid}\0${found.file}\0${await found.pack.files.digest(found.file)}\n`,
-    );
+    const found = candidates(path);
+    if (found.length === 0) hash.update(`${path}\0missing\n`);
+    for (const { pack, file } of found) {
+      hash.update(`${path}\0${pack.info.uuid}\0${file}\0${await pack.files.digest(file)}\n`);
+    }
   }
   const fingerprint = hash.digest("hex").slice(0, 20);
 
-  const imageError = (found: { pack: ResourcePack; file: string }, error: unknown): never => {
-    if (error instanceof ResourcePackError) throw error;
-    throw new ResourcePackError(found.pack.files.label, (error as Error).message, found.file);
+  type Usable = { pack: ResourcePack; file: string; width: number; height: number };
+  const skipped: SkippedImage[] = [];
+  const refused = new Set<string>();
+  const key = (found: { pack: ResourcePack; file: string }): string =>
+    `${packs.indexOf(found.pack)}\0${found.file}`;
+  /** Records an image the stack cannot use; a pack that changed while open stops everything. */
+  const skip = (found: { pack: ResourcePack; file: string }, error: unknown): void => {
+    if (error instanceof ResourcePackChangedError) throw error;
+    if (refused.has(key(found))) return;
+    refused.add(key(found));
+    skipped.push({
+      pack: found.pack.info,
+      file: found.file,
+      reason: error instanceof ResourcePackError ? error.reason : (error as Error).message,
+    });
+  };
+  // The first file of a path whose size and header pass the limits, found once.
+  const usable = new Map<string, Promise<Usable | undefined>>();
+  const resolve = (path: string): Promise<Usable | undefined> => {
+    let found = usable.get(path);
+    if (found === undefined) {
+      found = (async () => {
+        for (const candidate of candidates(path)) {
+          if (refused.has(key(candidate))) continue;
+          try {
+            const bytes = await candidate.pack.files.read(candidate.file);
+            return { ...candidate, ...packImageSize(bytes, candidate.file, limits) };
+          } catch (error) {
+            skip(candidate, error);
+          }
+        }
+        return undefined;
+      })();
+      usable.set(path, found);
+      // A failure leaves the cache, so a later call tries again.
+      found.catch(() => usable.delete(path));
+    }
+    return found;
   };
   return {
     packs,
@@ -390,24 +448,27 @@ export async function openResourcePackStack(
     terrainEntry: (name) => first((pack) => pack.terrain.get(name)),
     blockTextures: (block) => first((pack) => pack.blocks.get(block.replace(/^minecraft:/, ""))),
     flipbook: (name) => first((pack) => pack.flipbooks.get(name)),
-    locateImage: locate,
+    locateImage: async (path) => {
+      const found = await resolve(path);
+      return found === undefined ? undefined : { pack: found.pack, file: found.file };
+    },
     readImageSize: async (path) => {
-      const found = locate(path);
-      if (found === undefined) return undefined;
-      try {
-        return packImageSize(await found.pack.files.read(found.file), found.file, limits);
-      } catch (error) {
-        return imageError(found, error);
-      }
+      const found = await resolve(path);
+      return found === undefined ? undefined : { width: found.width, height: found.height };
     },
     readImage: async (path) => {
-      const found = locate(path);
-      if (found === undefined) return undefined;
-      try {
-        return decodePackImage(await found.pack.files.read(found.file), found.file, limits);
-      } catch (error) {
-        return imageError(found, error);
+      for (;;) {
+        const found = await resolve(path);
+        if (found === undefined) return undefined;
+        try {
+          return decodePackImage(await found.pack.files.read(found.file), found.file, limits);
+        } catch (error) {
+          // A header that passed but an image that does not decode: try the next pack's.
+          skip(found, error);
+          usable.delete(path);
+        }
       }
     },
+    skippedImages: () => skipped,
   };
 }

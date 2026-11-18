@@ -15,6 +15,7 @@ import {
   type PackLimits,
   type ResourcePackInfo,
   type ResourcePackStack,
+  type SkippedImage,
   type TextureIndex,
   type TextureNotice,
   type TextureStackSource,
@@ -36,6 +37,8 @@ export interface SceneAtlas {
   readonly brotli: Uint8Array;
   readonly index: TextureIndex;
   readonly notices: readonly TextureNotice[];
+  /** Images the packs hold but the atlas could not use; the next pack's took their place. */
+  readonly skipped: readonly SkippedImage[];
 }
 
 export interface SceneTextureOptions {
@@ -46,7 +49,14 @@ export interface SceneTextureOptions {
 
 type Event = (name: string, detail: Record<string, unknown>) => void;
 
-const ATLAS_FILES = ["atlas.bin", "atlas.bin.gz", "atlas.bin.br", "index.json", "notices.json"];
+const ATLAS_FILES = [
+  "atlas.bin",
+  "atlas.bin.gz",
+  "atlas.bin.br",
+  "index.json",
+  "notices.json",
+  "skipped.json",
+];
 
 /**
  * The textures of one resource pack stack. Opening reads the packs' JSON and names the texture
@@ -142,6 +152,7 @@ export class SceneTextures {
       gzipBytes: atlas.gzip.byteLength,
       brotliBytes: atlas.brotli.byteLength,
       notices: atlas.notices,
+      skipped: atlas.skipped,
     });
   }
 
@@ -187,6 +198,7 @@ export class SceneTextures {
         brotli: new Uint8Array(brotli),
         index: built.index,
         notices: built.notices,
+        skipped: built.skipped,
       };
       const contents = [
         atlas.bytes,
@@ -194,6 +206,7 @@ export class SceneTextures {
         atlas.brotli,
         JSON.stringify(atlas.index),
         JSON.stringify(atlas.notices),
+        JSON.stringify(atlas.skipped),
       ];
       if (!this.retired) {
         await mkdir(this.folder, { recursive: true });
@@ -217,6 +230,12 @@ export class SceneTextures {
         gzipBytes: atlas.gzip.byteLength,
         milliseconds: Math.round(performance.now() - startedAt),
       });
+      if (atlas.skipped.length > 0) {
+        this.event("textures.images-skipped", {
+          revision: atlas.revision,
+          images: atlas.skipped.map(({ pack, file, reason }) => `${pack.name} ${file}: ${reason}`),
+        });
+      }
       return atlas;
     } catch (cause) {
       this.failure = cause instanceof Error ? cause.message : String(cause);
@@ -231,7 +250,7 @@ function atlasRoot(cacheDirectory: string): string {
 }
 
 async function readStored(folder: string, revision: string): Promise<SceneAtlas> {
-  const [bytes, gzipped, brotli, indexText, noticesText] = await Promise.all(
+  const [bytes, gzipped, brotli, indexText, noticesText, skippedText] = await Promise.all(
     ATLAS_FILES.map((name) => readFile(join(folder, name))),
   );
   const view = new Uint8Array(bytes!.buffer, bytes!.byteOffset, bytes!.byteLength);
@@ -248,6 +267,7 @@ async function readStored(folder: string, revision: string): Promise<SceneAtlas>
     brotli: new Uint8Array(brotli!),
     index,
     notices: JSON.parse(noticesText!.toString("utf8")) as TextureNotice[],
+    skipped: JSON.parse(skippedText!.toString("utf8")) as SkippedImage[],
   };
 }
 
@@ -269,6 +289,11 @@ export interface TextureStackReport {
     readonly brotliBytes: number;
   };
   readonly notices?: readonly TextureNotice[];
+  /**
+   * Images a pack holds but the atlas could not use, too large or damaged: each is replaced by
+   * the same image of the next pack, or left untextured when no pack has a usable one.
+   */
+  readonly skipped?: readonly SkippedImage[];
 }
 
 /**
@@ -300,6 +325,7 @@ export async function validateTextureStack(
       gzipBytes: gzipped.byteLength,
       brotliBytes: brotli.byteLength,
       notices: built.notices,
+      skipped: built.skipped,
     });
   } catch (cause) {
     return failedReport(cause);
@@ -316,8 +342,12 @@ async function stackReport(
   revision: string,
   {
     notices,
+    skipped,
     ...atlas
-  }: NonNullable<TextureStackReport["atlas"]> & { readonly notices: readonly TextureNotice[] },
+  }: NonNullable<TextureStackReport["atlas"]> & {
+    readonly notices: readonly TextureNotice[];
+    readonly skipped: readonly SkippedImage[];
+  },
 ): Promise<TextureStackReport> {
   const packs = [];
   for (const pack of stack.packs) {
@@ -331,5 +361,6 @@ async function stackReport(
     packs,
     atlas,
     notices,
+    skipped,
   };
 }
