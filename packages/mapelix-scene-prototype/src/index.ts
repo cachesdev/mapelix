@@ -1,4 +1,5 @@
 import { MAX_REGION_LEVEL } from "./format.js";
+import type { BlockRequest } from "./node/worker-protocol.js";
 import type { RegionRequest } from "./node/region-builder.js";
 import { RegionWorkerPool, type BuiltRegion } from "./node/worker-pool.js";
 import type { Dimension } from "./world/chunk-source.js";
@@ -26,6 +27,8 @@ export interface SceneWorld {
   buildRegion(request: RegionRequest, signal?: AbortSignal): Promise<BuiltRegion>;
   /** Encodes all-height source discoveries; adapters namespace by snapshot and detector schema. */
   buildDiscoveries(request: DiscoveryRequest, signal?: AbortSignal): Promise<BuiltRegion>;
+  /** The block at one position as JSON `{ name, states }`; `name` is null where nothing loads. */
+  readBlock(request: BlockRequest, signal?: AbortSignal): Promise<BuiltRegion>;
   close(): Promise<void>;
 }
 
@@ -52,6 +55,12 @@ export async function openSceneWorld(options: SceneWorldOptions): Promise<SceneW
       return pool.build(request, signal);
     },
     close: () => pool.close(),
+    readBlock(request, signal) {
+      const { x, y, z } = request;
+      if (![x, y, z].every(Number.isSafeInteger))
+        throw new RangeError(`Block coordinates must be integers, received ${x}, ${y}, ${z}`);
+      return pool.block(request, signal);
+    },
     buildDiscoveries(request, signal) {
       assertDiscoveryRequest(request);
       return pool.discoveries(request, signal);

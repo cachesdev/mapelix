@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import type { BlockRequest } from "./worker-protocol.js";
 
 import type { RegionBuilderOptions, RegionRequest } from "./region-builder.js";
 import type { WorkerReply, WorkerPayload } from "./worker-protocol.js";
@@ -50,6 +51,10 @@ export class RegionWorkerPool {
 
   discoveries(discoveries: DiscoveryRequest, signal?: AbortSignal): Promise<BuiltRegion> {
     return this.enqueue({ discoveries }, signal);
+  }
+
+  block(block: BlockRequest, signal?: AbortSignal): Promise<BuiltRegion> {
+    return this.enqueue({ block }, signal);
   }
 
   private enqueue(payload: WorkerPayload, signal?: AbortSignal): Promise<BuiltRegion> {

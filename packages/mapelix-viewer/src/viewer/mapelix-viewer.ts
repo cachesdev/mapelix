@@ -680,6 +680,33 @@ export class MapelixViewer {
    * The block under a screen point: on the map its X and Z, in 3D the first drawn block along
    * the pointer ray (with Y). `undefined` in 3D where no terrain is drawn.
    */
+  /**
+   * The name and states of the block at one position of the shown dimension, as the scene
+   * server reads it (`/blocks/<x>/<y>/<z>.json`); undefined without a world or on a failure.
+   */
+  async describeBlock(
+    x: number,
+    y: number,
+    z: number,
+  ): Promise<
+    { readonly name: string | null; readonly states?: Record<string, unknown> } | undefined
+  > {
+    const source = this.options.world;
+    if (source === undefined || !this.hasWorld) return undefined;
+    const dimension = this.worldDimension();
+    if (!isWorldDimension(dimension)) return undefined;
+    const url = new URL(
+      `${source.base}/blocks/${x}/${y}/${z}.json?dimension=${encodeURIComponent(dimension)}`,
+      location.href,
+    );
+    try {
+      const response = await fetch(url);
+      return response.ok ? await response.json() : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   pickBlock(clientX: number, clientY: number): { x: number; y?: number; z: number } | undefined {
     if (this.modeNow === "3d" && this.worldViewer !== undefined)
       return this.worldViewer.pick(clientX, clientY);

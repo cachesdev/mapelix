@@ -71,6 +71,15 @@ export class DimensionPools {
     return this.run(dimension, signal, background, (world) => world.buildDiscoveries(tile, signal));
   }
 
+  /** The block at one position, as JSON `{ name, states }`. */
+  block(
+    dimension: Dimension,
+    position: { readonly x: number; readonly y: number; readonly z: number },
+    signal: AbortSignal,
+  ): Promise<BuiltRegion> {
+    return this.run(dimension, signal, false, (world) => world.readBlock(position, signal));
+  }
+
   private async run(
     dimension: Dimension,
     signal: AbortSignal,

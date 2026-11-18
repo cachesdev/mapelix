@@ -4,7 +4,15 @@ import type { DiscoveryRequest } from "../discoveries.js";
 
 export type WorkerPayload =
   | { readonly region: RegionRequest }
-  | { readonly discoveries: DiscoveryRequest };
+  | { readonly discoveries: DiscoveryRequest }
+  | { readonly block: BlockRequest };
+
+/** One block of the world, in block coordinates. */
+export interface BlockRequest {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
 export type WorkerRequest = WorkerPayload & { readonly id: number };
 
 export type WorkerReply =

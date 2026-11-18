@@ -16,6 +16,7 @@ function fakeWorlds(): { open: (dimension: Dimension) => Promise<SceneWorld>; op
     opened.push(entry);
     return {
       info: {} as SceneWorld["info"],
+      readBlock: () => Promise.resolve({ bytes: new Uint8Array(0), milliseconds: 0 }),
       buildRegion: (request: RegionRequest) =>
         new Promise<BuiltRegion>((resolve) => {
           entry.builds.push({

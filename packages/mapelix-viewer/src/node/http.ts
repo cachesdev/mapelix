@@ -144,6 +144,8 @@ export function createSceneHandler(
     if (texture !== null) return textureResponse(server, request, texture, options);
     const region = /^\/regions\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(path);
     if (region !== null) return regionResponse(server, request, url, region, admit, options);
+    const block = /^\/blocks\/(-?\d+)\/(-?\d+)\/(-?\d+)\.json$/.exec(path);
+    if (block !== null) return blockResponse(server, request, url, block);
     const discovery = /^\/discoveries\/([^/]+)\/([^/]+)\.bin$/.exec(path);
     if (discovery !== null) return discoveryResponse(server, request, url, discovery, admit);
     return undefined;
@@ -325,6 +327,33 @@ async function discoveryResponse(
       "discoveries",
     ),
   );
+}
+
+/**
+ * `/blocks/<x>/<y>/<z>.json?dimension=…`: the name and states of one block, for a viewer that
+ * says what was clicked. It reads the world as served now, so it is never cached.
+ */
+async function blockResponse(
+  server: SceneServer,
+  request: Request,
+  url: URL,
+  [, rawX, rawY, rawZ]: RegExpExecArray,
+): Promise<Response> {
+  let dimension;
+  const position = { x: Number(rawX), y: Number(rawY), z: Number(rawZ) };
+  try {
+    dimension = parseDimension(url.searchParams.get("dimension"));
+    if (![position.x, position.y, position.z].every(Number.isSafeInteger))
+      throw new RangeError("Block coordinates must be integers");
+  } catch (cause) {
+    return failure(400, cause instanceof Error ? cause.message : "Invalid block request");
+  }
+  try {
+    const block = await server.readBlock(dimension, position, request.signal);
+    return Response.json(block, { headers: NO_STORE });
+  } catch (cause) {
+    return refusal(request, cause);
+  }
 }
 
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;

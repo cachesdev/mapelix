@@ -1,4 +1,5 @@
 import { EMPTY_HEIGHT, encodeSceneRegion, regionGridSize, type SceneRegion } from "../format.js";
+import type { BlockRequest } from "./worker-protocol.js";
 import { WorldDatabase } from "../leveldb/world-database.js";
 import { BlockPalette, type PaletteTextures } from "../mesh/block-palette.js";
 import { ChunkVoxelReader } from "../mesh/chunk-voxels.js";
@@ -59,6 +60,30 @@ export class RegionBuilder {
   /** Snapshot-based source indexing shares the worker/reader, independently of terrain meshing. */
   discoveries(request: DiscoveryRequest): Uint8Array {
     return buildDiscoveryIndex(this.chunks, request);
+  }
+
+  /**
+   * The block at one position, as JSON: `{ name, states }` from the chunk's palette, or
+   * `{ name: null }` where the world holds no chunk or section.
+   */
+  block({ x, y, z }: BlockRequest): Uint8Array {
+    const section = this.chunks
+      .chunk(Math.floor(x / 16), Math.floor(z / 16))
+      ?.sections.find((candidate) => candidate.y === Math.floor(y / 16));
+    let found: { name: string | null; states?: unknown } = { name: null };
+    if (section !== undefined) {
+      const local = (n: number) => ((n % 16) + 16) % 16;
+      const index = section.primary.indexes[(local(x) << 8) | (local(z) << 4) | local(y)]!;
+      found = {
+        name: section.primary.palette[index] ?? null,
+        states: section.primary.states?.[index],
+      };
+    }
+    return new TextEncoder().encode(
+      JSON.stringify(found, (_key, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ),
+    );
   }
 
   close(): void {

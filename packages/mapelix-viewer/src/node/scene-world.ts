@@ -726,6 +726,20 @@ export function createSceneServer(options: SceneServerOptions) {
     );
   }
 
+  /** The name and states of the block at one position, read from the world as it is served. */
+  async function readBlock(
+    dimension: Dimension,
+    position: { readonly x: number; readonly y: number; readonly z: number },
+    signal: AbortSignal,
+  ): Promise<{ readonly name: string | null; readonly states?: Record<string, unknown> }> {
+    const world = await ready();
+    const built = await world.pools.block(dimension, position, signal);
+    return JSON.parse(new TextDecoder().decode(built.bytes)) as {
+      name: string | null;
+      states?: Record<string, unknown>;
+    };
+  }
+
   async function getRevision(): Promise<string> {
     return (await ready()).revision;
   }
@@ -835,6 +849,7 @@ export function createSceneServer(options: SceneServerOptions) {
     getWorldMetadata,
     loadRegion,
     loadDiscoveries,
+    readBlock,
     loadTextureAtlas,
     loadTextureNotices,
     getTextureRevision,

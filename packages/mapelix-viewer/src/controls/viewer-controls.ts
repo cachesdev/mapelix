@@ -107,6 +107,10 @@ export class ViewerControls {
   // Elements updated on every change.
   private readonly readoutPosition = make("span");
   private readonly readoutScale = make("span", "mx-scale");
+  /** The name of the last block clicked in 3D, shown under its position. */
+  private readonly readoutBlock = make("span", "mx-scale");
+  private clicked: { x: number; y: number; z: number; name: string } | undefined;
+  private pressedAt: { x: number; y: number } | undefined;
   private readonly readoutNote = make("span", "mx-note");
   private readonly progress = make("div", "mx-progress");
   private readonly compass: HTMLButtonElement;
@@ -146,7 +150,7 @@ export class ViewerControls {
     const readout = make("p", "mx-readout mx-glass");
     readout.setAttribute("aria-live", "off");
     this.readoutNote.setAttribute("role", "status");
-    readout.append(this.readoutPosition, this.readoutScale, this.readoutNote);
+    readout.append(this.readoutPosition, this.readoutBlock, this.readoutScale, this.readoutNote);
     this.compassIcon = document.createElementNS(SVG, "svg");
     this.compassIcon.setAttribute("viewBox", "0 0 24 24");
     this.compassIcon.setAttribute("aria-hidden", "true");
@@ -247,6 +251,19 @@ export class ViewerControls {
     // Buttons pressed with a finger or the mouse hand the keys back to the view.
     root.addEventListener("click", this.release);
     document.addEventListener("keydown", this.onKey);
+    // A click on a block in 3D, without dragging, names the block.
+    container.addEventListener("pointerdown", (event) => {
+      this.pressedAt = { x: event.clientX, y: event.clientY };
+    });
+    container.addEventListener("pointerup", (event) => {
+      const from = this.pressedAt;
+      this.pressedAt = undefined;
+      if (from === undefined || Math.hypot(event.clientX - from.x, event.clientY - from.y) > 6)
+        return;
+      if (event.target instanceof Element && event.target.closest(".mx-glass, .mx-btn, .mx-panel"))
+        return;
+      void this.nameBlock(event.clientX, event.clientY);
+    });
     // A press on the view closes the panel.
     container.addEventListener("pointerdown", this.onOutside, { capture: true });
     // The hint goes at the first gesture on the view.
@@ -901,6 +918,16 @@ export class ViewerControls {
     return area;
   }
 
+  private async nameBlock(clientX: number, clientY: number): Promise<void> {
+    if (this.viewer.view.mode !== "3d") return;
+    const at = this.viewer.pickBlock(clientX, clientY);
+    if (at?.y === undefined) return;
+    const block = await this.viewer.describeBlock(at.x, at.y, at.z);
+    if (block?.name == null) return;
+    this.clicked = { x: at.x, y: at.y, z: at.z, name: block.name.replace(/^minecraft:/, "") };
+    this.render();
+  }
+
   private part<T extends HTMLElement>(name: string): T | undefined {
     return this.panelBody.querySelector<T>(`[data-part="${name}"]`) ?? undefined;
   }
@@ -917,6 +944,16 @@ export class ViewerControls {
     const at = status.pointed ?? { x: Math.floor(view.x), z: Math.floor(view.z) };
     this.readoutPosition.textContent = t.position(at.x, at.z, at.y);
     this.readoutScale.textContent = t.scale(view.pixelsPerBlock);
+    const clicked = this.clicked;
+    const named =
+      is3d &&
+      clicked !== undefined &&
+      (status.pointed === undefined ||
+        (status.pointed.x === clicked.x &&
+          status.pointed.y === clicked.y &&
+          status.pointed.z === clicked.z));
+    this.readoutBlock.textContent = named ? clicked.name : "";
+    this.readoutBlock.hidden = !named;
     const note = status.failure
       ? status.failure
       : this.prompt !== undefined
