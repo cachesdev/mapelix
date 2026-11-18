@@ -534,7 +534,8 @@ class VoxelMesher {
                 packQuadWord0(x, y, z, faceOf(face), material) | QUAD_MODEL_FLAG,
                 packModelWord1(modelBoxId(part.bounds)),
                 packQuadWord2(color, occlusion),
-                this.textureWords === undefined || part.color !== undefined
+                this.textureWords === undefined ||
+                  (part.color !== undefined && part.textured !== true)
                   ? 0
                   : part.sheet === undefined
                     ? this.textureWords[id * 6 + face]!

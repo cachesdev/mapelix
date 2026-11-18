@@ -12,6 +12,7 @@ import { Face, PlantSprite, QuadMaterial } from "../format.js";
 import { MODEL_STATES, blockModelParts, type BlockModel } from "../blocks/block-models.js";
 import { QUAD_CUTOUT, packQuadTexture } from "../textures/atlas-format.js";
 import { sheetFaceWord, type PartSheet } from "../textures/sheet-faces.js";
+import { BED_COLORS, bedTilePath, type BedTile } from "../textures/bed-tiles.js";
 import {
   TEXTURE_STATES,
   resolveBlockTextures,
@@ -218,6 +219,7 @@ export class BlockPalette {
     appearance: BlockAppearance,
   ): void {
     const base = name.replace(/^minecraft:/, "");
+    if (base === "bed") return this.writeBedTextures(id, states);
     const textures = resolveBlockTextures(this.names!, name, states, appearance);
     if (textures === undefined) return;
     const ownColor = SELF_TINTED.has(base);
@@ -250,6 +252,33 @@ export class BlockPalette {
       if (shaped) this.textureWords[id * 6 + face] = (word | QUAD_CUTOUT) >>> 0;
     }
     this.cutout[id] = !cutout ? 0 : shaped ? 2 : this.shape[id] === Shape.Cube ? 1 : 0;
+  }
+
+  /**
+   * Beds read the tiles cut from their color's entity texture (see `cutBedTile`): the mattress
+   * top turned so its headboard row lies at the head, the sides along the bed, the ends across.
+   */
+  private writeBedTextures(id: number, states: LittleEndianNbtCompoundValue): void {
+    const color = BED_COLORS[typeof states.color === "number" ? states.color & 15 : 0]!;
+    const head = states.head_piece_bit === 1;
+    // Direction 0 puts the head toward +z, 1 toward -x, 2 toward -z, 3 toward +x.
+    const direction = typeof states.direction === "number" ? states.direction & 3 : 0;
+    const word = (tile: BedTile, rotation = 0): number => {
+      const index = this.textures!.tiles[bedTilePath(color, tile)];
+      return index === undefined ? 0 : packQuadTexture(index, rotation, false);
+    };
+    const side = word(head ? "head_side" : "foot_side");
+    const end = word(head ? "head_end" : "foot_end");
+    const alongZ = direction % 2 === 0;
+    const words = [
+      alongZ ? side : end,
+      alongZ ? side : end,
+      word(head ? "head_top" : "foot_top", [2, 3, 0, 1][direction]),
+      word("foot_top"),
+      alongZ ? end : side,
+      alongZ ? end : side,
+    ];
+    this.textureWords.set(words, id * 6);
   }
 
   /** The texture word of a face, tinted as its color is; 0 when the atlas lacks the image. */

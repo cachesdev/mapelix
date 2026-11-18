@@ -169,8 +169,8 @@ curl -X POST -H "x-mapelix-demo: 1" -H "x-mapelix-pack-name: mine.mcpack" \
 ```
 
 Lanterns, torches, chains, candles, end rods, lightning rods and flower pots read their pieces
-from their texture's sheet of parts, as the vanilla pack lays it out. Not textured yet: beds,
-signs, mobs and other entities, and the 2D map.
+from their texture's sheet of parts, as the vanilla pack lays it out. Beds take their colored
+entity texture. Not textured yet: signs, mobs and other entities, and the 2D map.
 
 ### Markers
 

@@ -13,6 +13,8 @@ export interface ModelPart {
    * lanterns and candles; otherwise each face reads the texture at its own position.
    */
   readonly sheet?: PartSheet;
+  /** A colored part that still takes the block's texture where textures show, as a pillow. */
+  readonly textured?: true;
 }
 
 export type ModelFamily =
@@ -314,7 +316,7 @@ export function blockModelParts(
       if (head) {
         // A texture-colored pillow on the existing mattress top, without increasing bed height.
         parts[1] = part([0, 6, 0, 16, 9, 12]);
-        parts.push(part([0, 6, 12, 16, 9, 16], 0xe8e7e2));
+        parts.push({ ...part([0, 6, 12, 16, 9, 16], 0xe8e7e2), textured: true });
       }
       return oriented(parts, facing);
     }

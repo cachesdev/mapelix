@@ -17,6 +17,14 @@ import {
 } from "./atlas-format.js";
 import type { TextureNames } from "./block-textures.js";
 import type { PackImage } from "./pack-image.js";
+import {
+  BED_COLORS,
+  BED_TILES,
+  bedTexturePath,
+  bedTilePath,
+  cutBedTile,
+  type BedTile,
+} from "./bed-tiles.js";
 import type {
   BlockTextureNames,
   Flipbook,
@@ -88,6 +96,8 @@ interface Source {
   readonly ticksPerFrame: number;
   /** The image's alpha is an overlay mask, see `AtlasTileInfo.overlay`. */
   readonly overlay: boolean;
+  /** A tile cut from a bed's entity texture (see `cutBedTile`), read from `image`. */
+  readonly bed?: { readonly image: string; readonly tile: BedTile };
 }
 
 function atlasOptions(options: TextureAtlasOptions): Required<TextureAtlasOptions> {
@@ -182,6 +192,21 @@ export async function buildTextureAtlas(
       overlay: overlays.has(path),
     });
   }
+  // Beds are entities in the game; their block tiles are cut from the entity textures.
+  for (const color of BED_COLORS) {
+    const image = bedTexturePath(color);
+    const size = await stack.readImageSize(image);
+    if (size === undefined || size.width !== size.height || size.width % 64 !== 0) continue;
+    for (const tile of BED_TILES)
+      sources.push({
+        path: bedTilePath(color, tile),
+        side: size.width / 4,
+        frames: [0],
+        ticksPerFrame: 1,
+        overlay: false,
+        bed: { image, tile },
+      });
+  }
   const count = sources.reduce((sum, source) => sum + source.frames.length, 0);
   if (count === 0) throw new RangeError("The resource packs hold no block texture");
   if (count > MAX_ATLAS_TILES) {
@@ -218,11 +243,20 @@ export async function buildTextureAtlas(
   const tiles: AtlasTileInfo[] = [];
   const tileOf: Record<string, number> = {};
   const used = new Map<ResourcePack, string[]>();
+  const bedImages = new Map<string, PackImage | undefined>();
   for (const source of sources) {
-    const image = await stack.readImage(source.path);
+    const file = source.bed?.image ?? source.path;
+    let image: PackImage | undefined;
+    if (source.bed === undefined) image = await stack.readImage(file);
+    else {
+      if (!bedImages.has(file)) bedImages.set(file, await stack.readImage(file));
+      const sheet = bedImages.get(file);
+      image = sheet === undefined ? undefined : cutBedTile(sheet, source.bed.tile);
+    }
     if (image === undefined) continue;
-    const found = (await stack.locateImage(source.path))!;
-    used.set(found.pack, [...(used.get(found.pack) ?? []), found.file]);
+    const found = (await stack.locateImage(file))!;
+    const files = used.get(found.pack) ?? [];
+    if (!files.includes(found.file)) used.set(found.pack, [...files, found.file]);
     tileOf[source.path] = tiles.length;
     // An image that failed to decode was replaced by the next pack's, which may hold fewer
     // frames than the layout counted: its frames repeat.

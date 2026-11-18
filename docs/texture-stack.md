@@ -208,6 +208,10 @@ its block colors.
   offset to them (bits 19 to 26), so a part costs no more than before. The sides of a rod read
   its column from the rod's positive end, whatever its axis. A pack that lays a sheet out
   differently shows other pieces of it.
+- Beds are entities in the game: the atlas cuts six block tiles from each
+  `textures/entity/bed/<color>.png` (64 by 64 texels, or a multiple): the mattress top of each
+  half, its sides and its ends. A bed takes its color's tiles, the top turned so the pillow lies
+  at the head; its wooden frame and legs keep their color.
 - Turning textures off draws the same pixels as a server without textures, checked frame by
   frame in the browser tests.
 - A changed stack shows without reloading the page. When the server answers 409 for a textured
