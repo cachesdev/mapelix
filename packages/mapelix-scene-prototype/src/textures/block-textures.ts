@@ -36,7 +36,13 @@ const ALIASES: Readonly<Record<string, string>> = {
 };
 
 /** States that turn a block's textures, beyond those that already change its appearance. */
-export const TEXTURE_STATES = ["facing_direction", "growth", "age", "huge_mushroom_bits"] as const;
+export const TEXTURE_STATES = [
+  "facing_direction",
+  "growth",
+  "age",
+  "huge_mushroom_bits",
+  "hanging",
+] as const;
 
 /** `blocks.json` face of each mesh face before any turn: east +X, south +Z, up +Y. */
 const FACE_NAMES: readonly BlockFace[] = ["east", "west", "up", "down", "south", "north"];
@@ -127,6 +133,11 @@ export function resolveBlockTextures(
     appearance.tint !== "none" && (!appearance.tintTopOnly || face === Face.PositiveY);
 
   const lying = appearance.axis !== "y";
+  // The pack draws pointed dripstone hanging; a standing one reads it upside down.
+  const upsideDown =
+    modern.replace(/^minecraft:/, "") === "pointed_dripstone" &&
+    states.hanging !== 1 &&
+    states.hanging !== true;
   const faces = FACE_NAMES.map((blockFace, face): FaceTexture | undefined => {
     // Along a pillar's axis the faces show its ends. Its other faces show its sides, turned
     // so that the grain runs along the axis.
@@ -135,8 +146,11 @@ export function resolveBlockTextures(
     if (lying) source = axis === appearance.axis ? (face % 2 === 0 ? "up" : "down") : "north";
     else if (axis === "y") source = blockFace;
     else source = RING[(RING.indexOf(blockFace) - turn + 4) % 4]!;
-    const rotation =
-      lying && axis !== appearance.axis && faceTextureAxes(face)[0] === appearance.axis ? 1 : 0;
+    const rotation = upsideDown
+      ? 2
+      : lying && axis !== appearance.axis && faceTextureAxes(face)[0] === appearance.axis
+        ? 1
+        : 0;
     const path = lookup(source);
     return path === undefined ? undefined : { path, rotation, tinted: tintedFace(face) };
   });
