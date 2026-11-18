@@ -727,7 +727,11 @@ function leverParts(s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
     : direction.startsWith("down")
       ? 0
       : ({ north: 2, south: 3, west: 4, east: 5 }[direction] ?? 1);
-  return attached(parts, side);
+  // The handle reads the stick of the texture along its own axis, whichever way it points.
+  const axis = side < 2 ? "y" : side < 4 ? "z" : "x";
+  return attached(parts, side).map((p, i) =>
+    i === 1 ? { ...p, sheet: { axis, side: [7, 6], top: [7, 6] } } : p,
+  );
 }
 
 /**

@@ -141,7 +141,7 @@ row(59, [
   b("cobblestone_wall"),
   b("glass_pane"),
   b("trapdoor", { direction: 0, open_bit: 0, upside_down_bit: 0 }),
-  b("oak_fence_gate", { direction: 0, open_bit: 0 }),
+  b("fence_gate", { direction: 0, open_bit: 0 }),
   b("cake", { bite_counter: 2 }),
   b("cauldron"),
   b("hopper"),
