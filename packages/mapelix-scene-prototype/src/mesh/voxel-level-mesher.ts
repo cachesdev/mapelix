@@ -304,8 +304,9 @@ class VoxelLevelMesher {
           12);
     }
     const frontLayer = inner ? layer : neighborLayer;
+    // Glow and procedural lava ignore local fill, but still emit into the shared light field.
     const light =
-      frontLayer < 0 || frontLayer >= this.box.layers
+      MATERIALS[kind] === QuadMaterial.Emissive || frontLayer < 0 || frontLayer >= this.box.layers
         ? 0
         : (this.light?.[inner ? index : neighbor] ?? 0);
     keys[mask] =

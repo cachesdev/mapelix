@@ -1,0 +1,190 @@
+{
+  "before": "dca84a6",
+  "after": "self-lit faces omit unused local fill",
+  "node": "v24.14.1",
+  "method": "same read-only copied snapshot; alternate seven in-process builds per version, discard first two, median of five",
+  "rows": [
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        6687,
+        6687
+      ],
+      "bytes": [
+        95163,
+        95163
+      ],
+      "lavaQuads": [
+        0,
+        0
+      ],
+      "warmMedianMs": [
+        38.91,
+        36.08
+      ],
+      "baselineBytes": 81588,
+      "baselineQuads": 6113,
+      "byteChangeFromBaselinePercent": 16.64,
+      "optimizationByteReductionPercent": 0
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": true,
+      "quads": [
+        6687,
+        6687
+      ],
+      "bytes": [
+        121911,
+        121911
+      ],
+      "lavaQuads": [
+        0,
+        0
+      ],
+      "warmMedianMs": [
+        37.3,
+        37.54
+      ],
+      "baselineBytes": 106040,
+      "baselineQuads": 6113,
+      "byteChangeFromBaselinePercent": 14.97,
+      "optimizationByteReductionPercent": 0
+    },
+    {
+      "dimension": "overworld",
+      "level": 1,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        31123,
+        31123
+      ],
+      "bytes": [
+        437407,
+        437407
+      ],
+      "lavaQuads": [
+        0,
+        0
+      ],
+      "warmMedianMs": [
+        250.23,
+        251.78
+      ],
+      "baselineBytes": 384996,
+      "baselineQuads": 29349,
+      "byteChangeFromBaselinePercent": 13.61,
+      "optimizationByteReductionPercent": 0
+    },
+    {
+      "dimension": "nether",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        10143,
+        10116
+      ],
+      "bytes": [
+        140091,
+        139740
+      ],
+      "lavaQuads": [
+        205,
+        205
+      ],
+      "warmMedianMs": [
+        56.51,
+        55.43
+      ],
+      "baselineBytes": 107340,
+      "baselineQuads": 8259,
+      "byteChangeFromBaselinePercent": 30.18,
+      "optimizationByteReductionPercent": 0.251
+    },
+    {
+      "dimension": "nether",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": true,
+      "quads": [
+        10159,
+        10132
+      ],
+      "bytes": [
+        180935,
+        180476
+      ],
+      "lavaQuads": [
+        205,
+        205
+      ],
+      "warmMedianMs": [
+        57.33,
+        55.6
+      ],
+      "baselineBytes": 140664,
+      "baselineQuads": 8277,
+      "byteChangeFromBaselinePercent": 28.3,
+      "optimizationByteReductionPercent": 0.254
+    },
+    {
+      "dimension": "nether",
+      "level": 1,
+      "x": 0,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        27877,
+        27809
+      ],
+      "bytes": [
+        395209,
+        394325
+      ],
+      "lavaQuads": [
+        447,
+        445
+      ],
+      "warmMedianMs": [
+        181.88,
+        181.3
+      ],
+      "baselineBytes": 285444,
+      "baselineQuads": 21053,
+      "byteChangeFromBaselinePercent": 38.14,
+      "optimizationByteReductionPercent": 0.224
+    }
+  ],
+  "validation": {
+    "targetedUnitTests": 34,
+    "targetedBrowserTests": 4,
+    "appearance": "six original color swatches, maximum block light, four corner-occlusion levels at fixed positions, plain and textured shaders",
+    "portal": "level 11, attenuation and opaque frame at LOD 0/1; receiving light preserved",
+    "checks": [
+      "engine/viewer builds and TypeScript",
+      "Svelte check",
+      "changed-source typed lint"
+    ],
+    "physicalPhoneFps": "pending device access"
+  },
+  "storageExperiments": {
+    "source": "unoptimized Nether LOD 1 lighting payload",
+    "rawBytes": 395209,
+    "packedNibblesBytes": 381271,
+    "shortRunBytes": 390760,
+    "enabled": false,
+    "limitation": "hypothetical byte-plane encoding only; changes the binary contract and zero-copy decoding, does not reduce quad count"
+  }
+}

@@ -10,6 +10,8 @@ it.each([
   ["unlit_redstone_torch", {}, 0],
   ["lava", {}, 15],
   ["magma", {}, 3],
+  ["portal", { portal_axis: "z" }, 11],
+  ["nether_portal", { portal_axis: "x" }, 11],
   ["lightning_rod", {}, 0],
   ["campfire", { extinguished: 1 }, 0],
   ["soul_campfire", { extinguished: 0 }, 10],

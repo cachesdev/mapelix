@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sectionRecord, writeFixtureWorld } from "../../test/dimension-fixture.js";
-import { Face, decodeSceneRegion, unpackQuad, type DecodedSceneRegion } from "../format.js";
+import {
+  Face,
+  QuadMaterial,
+  decodeSceneRegion,
+  unpackQuad,
+  type DecodedSceneRegion,
+} from "../format.js";
 import { RegionBuilder } from "./region-builder.js";
 
 let directory: string;
@@ -17,9 +23,15 @@ beforeAll(async () => {
         sectionRecord(dimension, chunkX, 0, 3, (_x, y) =>
           y === 63 ? "minecraft:stone" : "minecraft:air",
         ),
-        sectionRecord(dimension, chunkX, 0, 4, (x, y, z) =>
-          y === 64 && z === 8 && (x === -1 || x === 63) ? "minecraft:lantern" : "minecraft:air",
-        ),
+        sectionRecord(dimension, chunkX, 0, 4, (x, y, z) => {
+          if (y === 64 && z === 8 && (x === -1 || x === 63)) return "minecraft:lantern";
+          // A portal inside an obsidian frame, away from the other sources.
+          if (x === 40 && z >= 7 && z <= 10 && y <= 67) {
+            if (z === 7 || z === 10 || y === 67) return "minecraft:obsidian";
+            return { name: "minecraft:portal", states: { portal_axis: "z" } };
+          }
+          return "minecraft:air";
+        }),
         ...(dimension !== 0
           ? []
           : [
@@ -94,5 +106,30 @@ it("keeps sources just outside a cave slice in its vertical light margin", () =>
     // LOD 1 represents the lantern itself as an opaque voxel, hiding the floor below it.
     if (level === 0) expect(topLight(region, 8, -1, 8)).toBe(15);
     expect(topLight(region, 9, -1, 8)).toBe(14);
+  }
+});
+
+it.each([0, 1])("retains level-11 portal illumination at LOD %i in both modes", (level) => {
+  // Only LOD 0 has texture words; LOD 1 is shared by both display modes.
+  for (const textured of level === 0 ? [false, true] : [false]) {
+    const region = decodeSceneRegion(
+      builders[0]!.build({
+        level,
+        x: 0,
+        z: 0,
+        ...(textured
+          ? { textures: { fingerprint: "empty", blocks: {}, tiles: {}, terrain: {} } }
+          : {}),
+      }),
+    );
+    for (const step of [1, 2, 3, 4, 5]) {
+      expect(topLight(region, 40 - step, 63, 8)).toBe(11 - step);
+      expect(topLight(region, 40 + step, 63, 8)).toBe(11 - step);
+    }
+    // The frame blocks the direct path; light reaches its outer end by going around it.
+    expect(topLight(region, 40, 63, 6)).toBe(7);
+    for (let i = 0; i < region.opaque.length / 3; i++)
+      if (unpackQuad(region.opaque, i).material === QuadMaterial.Emissive)
+        expect(region.blockLight!.opaque[i]).toBe(0);
   }
 });

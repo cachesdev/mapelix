@@ -320,12 +320,14 @@ class VoxelMesher {
     // Grass sides carry the tinted top color; the shader draws soil below its strip.
     const covered = this.palette.covered[id] === 1 && !isFlatFace(face);
     const color = this.colorOf(id, covered ? Face.PositiveY : face, column, y);
-    const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
-    keys[mask] =
-      ((covered ? key | KEY_COVERED : key) |
-        (this.lightAt(boundary ? neighbor : index, boundary ? neighborY : y) <<
-          KEY_BLOCK_LIGHT_SHIFT)) >>>
-      0;
+    const material = this.palette.material[id]!;
+    const key = mergeKey(material, size, inset, anchoredTop, face);
+    // Self-lit materials do not read local fill; its variation must not split their faces.
+    const light =
+      material === QuadMaterial.Emissive
+        ? 0
+        : this.lightAt(boundary ? neighbor : index, boundary ? neighborY : y);
+    keys[mask] = ((covered ? key | KEY_COVERED : key) | (light << KEY_BLOCK_LIGHT_SHIFT)) >>> 0;
     colors[mask] = packQuadWord2(color, occlusion);
     if (this.maskTextures !== undefined) {
       const word = this.textureWords![id * 6 + face]!;
@@ -419,11 +421,7 @@ class VoxelMesher {
       this.lavaHeight(index - VOLUME_SIZE, fill),
     );
     keys[mask] =
-      (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) |
-        KEY_LAVA |
-        (flow << 12) |
-        (this.lightAt(index, y) << KEY_BLOCK_LIGHT_SHIFT)) >>>
-      0;
+      (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) | KEY_LAVA | (flow << 12)) >>> 0;
     colors[mask] = packQuadWord2(this.colorOf(id, face, column, y), FULLY_LIT);
     if (this.maskTextures !== undefined)
       this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
@@ -580,10 +578,12 @@ class VoxelMesher {
                         face,
                         part.sheet,
                       ),
-                this.lightAt(
-                  boundary ? index + STEPS.normal[face]! : index,
-                  boundary ? neighborY : y,
-                ),
+                material === QuadMaterial.Emissive
+                  ? 0
+                  : this.lightAt(
+                      boundary ? index + STEPS.normal[face]! : index,
+                      boundary ? neighborY : y,
+                    ),
               );
 
               this.minY = Math.min(this.minY, y);

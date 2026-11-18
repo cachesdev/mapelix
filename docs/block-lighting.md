@@ -43,6 +43,11 @@ At the same quad count, a lit region costs one extra byte per quad: at most
 including the fixed height grid/header. Different light levels split merged
 faces, so the measured total increase also includes additional quads.
 
+Self-lit terrain and lava store zero local fill on their own faces: those shaders
+use their existing glow rather than the block-light plane. This avoids splitting
+otherwise identical emissive faces by an unused value. Their emission and the
+light on every receiving face remain unchanged at both near LODs.
+
 Before choosing this layout, one real detailed region at the version-3 baseline
 had 6,113 quads, 81,588 bytes plain and 106,040 bytes textured. An extra byte would
 cost 6,113 bytes (+7.49% / +5.76%); an extra word would cost 24,452 bytes
@@ -86,7 +91,11 @@ inter-stage variable. Integer transport prevents interpolation from changing
 texture flags at high light levels, including faces with texture word zero.
 
 The shader combines a warm local fill with existing illumination and contact
-occlusion. Its contribution is weaker in surface daylight. Sun and sky lights,
+occlusion. Local fill also takes the interpolated corner occlusion, because an
+emissive material output bypasses the renderer's ambient-occlusion input. This
+keeps recesses readable under strong block light without changing the warm tint
+or the brightness of unoccluded faces. Its contribution is weaker in surface
+daylight. Sun and sky lights,
 shadows, weather, lightning, wet roughness, reflections and source bloom remain
 dynamic. The existing cave exploration fill remains. There are no dynamic point
 lights and no per-frame light propagation or region rebuilds.
@@ -98,11 +107,35 @@ walls, row/layer bounds, positive/negative region boundaries, all three
 dimensions, LOD 1, cave source margins, serialization, lava ordering and GPU
 buffer ownership. A browser regression removes only the uploaded light bits and
 compares neighboring floor pixels, in plain/textured modes on WebGPU and WebGL 2.
+Another renders original color swatches through the real terrain shaders at
+maximum light. It changes only occlusion at fixed world positions and checks
+that all four occlusion levels stay ordered, the darkest remains visibly darker,
+colors remain distinct, and even white terrain stays below display clipping.
+
+Nether portals emit level 11. A framed portal regression checks levels 10 through
+6 on both sides at LOD 0/1, including zero texture words, and the longer light path
+around opaque obsidian. The quadratic response makes this light weaker than
+level-15 lanterns; this version uses the same warm fill for every source, without
+a separate violet halo.
 
 [Measurements](benchmarks/block-lighting-2026-11-18.json) compare the same read-only
 copied snapshot against `f3ab898`, alternating seven builds per version, discarding
 the first two and reporting the median of five. These are targeted regional
 measurements, not a full-world prewarm or peak-memory guarantee.
+
+A [follow-up measurement](benchmarks/block-lighting-review-2026-11-18.json) isolates
+the self-lit-face optimization. The Nether LOD-1 sample drops from 27,877 to
+27,809 quads and 395,209 to 394,325 bytes: 0.224% less than the first lighting
+version, still 38.14% above the no-light baseline. Lava itself drops from 447
+to its original 445 quads. Most added quads belong to the surrounding terrain's
+different light levels. Warm median construction stays approximately 181 ms in
+this paired run; timing comparisons across separate runs are not equivalent.
+
+Lossless storage experiments on the first lighting payload estimated 381,271
+bytes with two levels per byte and 390,760 bytes with short run encoding. These
+would change the v4 byte-plane contract and its zero-copy decoding for a modest
+reduction; neither is enabled. No light levels are quantized or removed from
+receiving terrain to reduce geometry.
 
 One value per face deliberately retains visible steps. Corner smoothing is
 deferred until geometry, transfer, construction and physical-phone performance

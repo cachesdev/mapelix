@@ -213,7 +213,10 @@ function createTerrainMaterial(
   material.emissiveNode = select(
     glowing,
     (look === undefined ? quadColor : look.terrain(quadColor)).mul(glow),
-    material.colorNode.mul(max(vec3(atmosphere.caveLight), blockLight(atmosphere))),
+    // Local fill follows sky occlusion; emissive output otherwise bypasses material.aoNode.
+    material.colorNode.mul(
+      max(vec3(atmosphere.caveLight), blockLight(atmosphere).mul(quadOcclusion)),
+    ),
   );
   return material;
 }
