@@ -35,6 +35,7 @@ export type ModelFamily =
   | "lightning-rod"
   | "portal"
   | "shelf-mushroom"
+  | "wall-torch"
   | "chain"
   | "ladder"
   | "candle"
@@ -81,6 +82,7 @@ export const MODEL_STATES = [
   "facing_direction",
   "pillar_axis",
   "portal_axis",
+  "torch_facing_direction",
   "candles",
   "lit",
   "bite_counter",
@@ -91,6 +93,8 @@ export const MODEL_STATES = [
 export const COPPER_PREFIX = "(?:waxed_)?(?:exposed_|weathered_|oxidized_)?copper_";
 const LANTERN = new RegExp(`^(?:soul_|${COPPER_PREFIX})?lantern$`);
 const BARS = new RegExp(`^(?:iron_|${COPPER_PREFIX})bars$`);
+/** `torch_facing_direction` values of torches on a wall: the side the wall is on. */
+const WALL_SIDES: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
 const LIGHTNING_ROD = /^(?:waxed_)?(?:exposed_|weathered_|oxidized_)?lightning_rod$/;
 
 export function resolveBlockModel(
@@ -115,6 +119,8 @@ export function resolveBlockModel(
   else if (LIGHTNING_ROD.test(block)) family = "lightning-rod";
   else if (block === "portal") family = "portal";
   else if (block === "shelf_mushroom") family = "shelf-mushroom";
+  else if (/(?:^|_)torch$/.test(block) && WALL_SIDES.has(String(states.torch_facing_direction)))
+    family = "wall-torch";
   else if (block === "chain" || block.endsWith("_chain")) family = "chain";
   else if (block === "ladder") family = "ladder";
   else if (/(?:^|_)candle$/.test(block)) family = "candle";
@@ -404,6 +410,22 @@ export function blockModelParts(
     case "portal":
       // A Nether portal's sheet, four sixteenths thick, across the axis it spans.
       return [part(s.portal_axis === "z" ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10])];
+    case "wall-torch": {
+      // Upright against the wall the state names; the game tilts it, which boxes cannot.
+      const side = s.torch_facing_direction;
+      return [
+        sheetPart(
+          side === "north"
+            ? [7, 5, 0, 9, 16, 2]
+            : side === "south"
+              ? [7, 5, 14, 9, 16, 16]
+              : side === "west"
+                ? [0, 5, 7, 2, 16, 9]
+                : [14, 5, 7, 16, 16, 9],
+          { side: [7, 6], top: [7, 6], bottom: [7, 13] },
+        ),
+      ];
+    }
     case "shelf-mushroom": {
       // A shelf jutting from the log behind it toward `minecraft:cardinal_direction`.
       const side = s["minecraft:cardinal_direction"];
@@ -563,8 +585,10 @@ export function modelCatalog(): readonly BlockModel[] {
   }
   for (const pillar_axis of ["x", "y", "z"]) add("chain", { pillar_axis });
   for (const portal_axis of ["x", "z"]) add("portal", { portal_axis });
-  for (const side of ["north", "south", "east", "west"])
+  for (const side of ["north", "south", "east", "west"]) {
     add("shelf_mushroom", { "minecraft:cardinal_direction": side });
+    add("torch", { torch_facing_direction: side });
+  }
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   return samples;
