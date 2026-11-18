@@ -143,6 +143,7 @@ function resolveShape(block: string, states: LittleEndianNbtCompoundValue): Bloc
       ? QuadMaterial.Glass
       : model.family === "lantern" ||
           model.family === "rod" ||
+          model.family === "portal" ||
           (model.family === "candle" && states.lit === 1)
         ? QuadMaterial.Emissive
         : QuadMaterial.Solid;

@@ -36,7 +36,7 @@ const ALIASES: Readonly<Record<string, string>> = {
 };
 
 /** States that turn a block's textures, beyond those that already change its appearance. */
-export const TEXTURE_STATES = ["facing_direction", "growth", "age"] as const;
+export const TEXTURE_STATES = ["facing_direction", "growth", "age", "huge_mushroom_bits"] as const;
 
 /** `blocks.json` face of each mesh face before any turn: east +X, south +Z, up +Y. */
 const FACE_NAMES: readonly BlockFace[] = ["east", "west", "up", "down", "south", "north"];
@@ -70,9 +70,15 @@ function facing(states: LittleEndianNbtCompoundValue): BlockFace | undefined {
   return typeof direction === "number" ? RING[direction] : undefined;
 }
 
-/** The legacy variant of a multi-texture terrain entry: growth stages, or the first. */
+/**
+ * The legacy variant of a multi-texture terrain entry: the cap, stem or inside of each face of
+ * a huge mushroom block, growth stages, or the first.
+ */
 function variantIndex(states: LittleEndianNbtCompoundValue, count: number): number {
   if (count <= 1) return 0;
+  const bits = states.huge_mushroom_bits;
+  if (typeof bits === "number" && Number.isSafeInteger(bits) && bits >= 0)
+    return Math.min(count - 1, bits);
   for (const [state, stages] of [
     ["growth", 8],
     ["age", 4],

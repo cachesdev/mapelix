@@ -33,6 +33,7 @@ export type ModelFamily =
   | "pot"
   | "rod"
   | "lightning-rod"
+  | "portal"
   | "chain"
   | "ladder"
   | "candle"
@@ -78,6 +79,7 @@ export const MODEL_STATES = [
   "hanging",
   "facing_direction",
   "pillar_axis",
+  "portal_axis",
   "candles",
   "lit",
   "bite_counter",
@@ -110,6 +112,7 @@ export function resolveBlockModel(
   else if (block === "flower_pot") family = "pot";
   else if (block === "end_rod") family = "rod";
   else if (LIGHTNING_ROD.test(block)) family = "lightning-rod";
+  else if (block === "portal") family = "portal";
   else if (block === "chain" || block.endsWith("_chain")) family = "chain";
   else if (block === "ladder") family = "ladder";
   else if (/(?:^|_)candle$/.test(block)) family = "candle";
@@ -396,6 +399,9 @@ export function blockModelParts(
           : []),
       ];
     }
+    case "portal":
+      // A Nether portal's sheet, four sixteenths thick, across the axis it spans.
+      return [part(s.portal_axis === "z" ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10])];
     case "ladder": {
       const parts: ModelPart[] = [part([2, 0, 0, 4, 16, 2]), part([12, 0, 0, 14, 16, 2])];
       for (const y of [1, 4, 7, 10, 13]) parts.push(part([4, y, 0, 12, y + 1, 2]));
@@ -539,6 +545,7 @@ export function modelCatalog(): readonly BlockModel[] {
     if (facing_direction >= 2) add("ladder", { facing_direction });
   }
   for (const pillar_axis of ["x", "y", "z"]) add("chain", { pillar_axis });
+  for (const portal_axis of ["x", "z"]) add("portal", { portal_axis });
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   return samples;
