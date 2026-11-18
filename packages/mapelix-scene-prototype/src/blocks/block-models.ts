@@ -629,8 +629,8 @@ export function blockModelParts(
       // Base, post, and the desk in two steps sloping down to its front.
       return oriented(
         [
-          part([0, 0, 0, 16, 2, 16]),
-          part([4, 2, 4, 12, 12, 12]),
+          { bounds: [0, 0, 0, 16, 2, 16], faces: LECTERN_WOOD },
+          { bounds: [4, 2, 4, 12, 12, 12], faces: LECTERN_WOOD },
           part([0, 12, 0, 16, 15, 8]),
           part([0, 12, 8, 16, 14, 16]),
         ],
@@ -779,6 +779,19 @@ function coverParts(block: string, s: LittleEndianNbtCompoundValue): readonly Mo
   // A vine without a side hangs under the block above.
   return parts.length > 0 ? parts : [part(block === "vine" ? PLANES.up! : PLANES.down!)];
 }
+
+/**
+ * The lectern's front and base images are sheets whose books and ribbon belong to other parts,
+ * so its base and post read the plain sides image on every side.
+ */
+const LECTERN_WOOD = [
+  Face.PositiveZ,
+  Face.PositiveZ,
+  Face.PositiveY,
+  Face.NegativeY,
+  Face.PositiveZ,
+  Face.PositiveZ,
+];
 
 function attached(parts: readonly ModelPart[], facingDirection: number): readonly ModelPart[] {
   return parts.map((p) => {
