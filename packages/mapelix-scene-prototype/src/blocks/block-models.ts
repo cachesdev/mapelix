@@ -575,7 +575,8 @@ export function blockModelParts(
         part([14, 10, 0, 16, 16, 16]),
         part([2, 10, 0, 14, 16, 2]),
         part([2, 10, 14, 14, 16, 16]),
-        { bounds: [4, 4, 4, 12, 10, 12], faces: COMPOST_FACES },
+        { bounds: [2, 10, 2, 14, 11, 14], faces: COMPOST_FACES },
+        part([4, 4, 4, 12, 10, 12]),
         part([6, 0, 6, 10, 4, 10]),
       ];
   }
