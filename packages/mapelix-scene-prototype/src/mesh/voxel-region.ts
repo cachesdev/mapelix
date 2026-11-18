@@ -66,6 +66,7 @@ export function buildVoxelRegion(
         voxelSize,
         ceilingY,
         window,
+        level === 1,
       );
       if (chunk === undefined) continue;
       regionHasChunks ||=
@@ -80,7 +81,7 @@ export function buildVoxelRegion(
 
   const low = Math.min(...placed.map((chunk) => chunk.low));
   const high = Math.max(...placed.map((chunk) => chunk.low + chunk.box.layers * voxelSize));
-  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize);
+  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize, level === 1);
   const explored = new Uint8Array(box.width * box.width);
   for (const chunk of placed) {
     placeChunk(
@@ -123,7 +124,7 @@ function placeChunk(
     for (let x = 0; x < source.width; x += 1) {
       for (let layer = 0; layer < source.layers; layer += 1) {
         const from = source.index(x, layer, z);
-        if (source.kind[from] === VoxelKind.Air) continue;
+        if (source.kind[from] === VoxelKind.Air && !source.emission?.[from]) continue;
         box.copy(source, from, box.index(chunk.x + x, firstLayer + layer, chunk.z + z));
       }
 
@@ -140,6 +141,9 @@ function placeChunk(
           box.side[to] = DEEP_ROCK;
           box.fill[to] = 16;
         }
+        // The artificial rock below the read window is opaque, never a light source.
+        if (box.emission !== undefined) box.emission[to] = 0;
+        if (box.lightOpaque !== undefined) box.lightOpaque[to] = 1;
       }
     }
   }

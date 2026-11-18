@@ -55,6 +55,7 @@ import { createLavaMaterial } from "./lava";
 import { texturedQuadPosition, type TextureLook } from "./textured";
 import {
   quadColor,
+  quadBlockLight,
   quadCovered,
   quadHeight,
   quadMaterial,
@@ -163,6 +164,14 @@ const blockBevel = Fn(() => {
 /** `color()` converts the sRGB hex to linear, like the decoded quad colors. */
 const soil = color(SOIL_COLOR);
 
+/** Baked local fill, sharing the packed quad varying; sun, shadows and weather stay dynamic. */
+function blockLight(atmosphere: Atmosphere): Node<"vec3"> {
+  const surfaceDay = atmosphere.daylight.mul(select(atmosphere.environment.equal(0), 1, 0));
+  return vec3(1, 0.78, 0.5)
+    .mul(quadBlockLight.pow(2))
+    .mul(mix(1.5, 0.3, surfaceDay));
+}
+
 /**
  * Grass, podzol, and mycelium sides show soil under a ragged strip of their top
  * color, like Minecraft's grass block side, instead of a flat band of dirt.
@@ -204,7 +213,7 @@ function createTerrainMaterial(
   material.emissiveNode = select(
     glowing,
     (look === undefined ? quadColor : look.terrain(quadColor)).mul(glow),
-    material.colorNode.mul(atmosphere.caveLight),
+    material.colorNode.mul(max(vec3(atmosphere.caveLight), blockLight(atmosphere))),
   );
   return material;
 }
@@ -264,8 +273,10 @@ function createPlantMaterial(atmosphere: Atmosphere, look?: TextureLook): MeshLa
   // A fixed view-space up normal, so the back sides of the planes are lit like the front.
   material.normalNode = transformNormalToView(vec3(0, 1, 0));
   // Three 0.186 NodeMaterial supports this for Lambert too; its Lambert typings omit it.
-  (material as MeshLambertNodeMaterial & { emissiveNode: Node<"vec3"> }).emissiveNode =
-    quadColor.mul(atmosphere.caveLight);
+  (material as MeshLambertNodeMaterial & { emissiveNode: Node<"vec3"> }).emissiveNode = max(
+    quadColor.mul(atmosphere.caveLight),
+    material.colorNode.mul(blockLight(atmosphere)),
+  );
   return material;
 }
 
@@ -341,7 +352,9 @@ function createWaterMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
     // Red fades first, then green, like real water.
     const transmitted = exp(vec3(0.42, 0.13, 0.085).mul(thickness).negate());
     // Water has no lighting of its own, so its body color follows the daylight.
-    const deep = quadColor.mul(0.22).mul(mix(float(0.05), float(1), atmosphere.daylight));
+    const deep = quadColor
+      .mul(0.22)
+      .mul(max(vec3(mix(float(0.05), float(1), atmosphere.daylight)), blockLight(atmosphere)));
     const body = mix(deep, behind, transmitted);
 
     const { sky, glint } = reflection(atmosphere, normal, toCamera);
@@ -364,7 +377,11 @@ function createGlassMaterial(atmosphere: Atmosphere): MeshBasicNodeMaterial {
   const toCamera = normalize(cameraPosition.sub(positionWorld));
   const reflectance = fresnel(normalWorld, toCamera);
   const { sky, glint } = reflection(atmosphere, normalWorld, toCamera);
-  material.colorNode = mix(quadColor, sky, reflectance).add(glint);
+  material.colorNode = mix(
+    quadColor.mul(max(vec3(1), blockLight(atmosphere))),
+    sky,
+    reflectance,
+  ).add(glint);
   material.opacityNode = mix(float(0.22), float(0.9), reflectance);
   return material;
 }

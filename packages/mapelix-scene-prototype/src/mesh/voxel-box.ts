@@ -18,10 +18,13 @@ export class VoxelBox {
   readonly fill: Uint8Array;
   /** 1 where the sides are soil under a strip of the side color, like a grass block's. */
   readonly covered: Uint8Array;
+  /** Source data at LOD 1 only; distant reductions allocate neither array. */
+  readonly emission: Uint8Array | undefined;
+  readonly lightOpaque: Uint8Array | undefined;
   /** Layers from the bottom that may hold voxels. Everything above them is air. */
   filled: number;
 
-  constructor(width: number, layers: number) {
+  constructor(width: number, layers: number, lighting = false) {
     const count = width * width * layers;
     this.width = width;
     this.layers = layers;
@@ -30,6 +33,8 @@ export class VoxelBox {
     this.side = new Uint32Array(count);
     this.fill = new Uint8Array(count);
     this.covered = new Uint8Array(count);
+    this.emission = lighting ? new Uint8Array(count) : undefined;
+    this.lightOpaque = lighting ? new Uint8Array(count) : undefined;
     this.filled = layers;
   }
 
@@ -44,6 +49,8 @@ export class VoxelBox {
     this.side.fill(0);
     this.fill.fill(0);
     this.covered.fill(0);
+    this.emission?.fill(0);
+    this.lightOpaque?.fill(0);
     this.filled = this.layers;
   }
 
@@ -54,6 +61,8 @@ export class VoxelBox {
     this.side[to] = source.side[from]!;
     this.fill[to] = source.fill[from]!;
     this.covered[to] = source.covered[from]!;
+    if (this.emission !== undefined) this.emission[to] = source.emission?.[from] ?? 0;
+    if (this.lightOpaque !== undefined) this.lightOpaque[to] = source.lightOpaque?.[from] ?? 0;
   }
 }
 

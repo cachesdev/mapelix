@@ -301,10 +301,10 @@ export class RegionStreamer {
   }
 
   get stats(): StreamingStats {
-    let quadBytes = 0;
+    let quads = 0;
     let textured = 0;
     for (const mesh of this.drawn.values()) {
-      quadBytes += mesh.byteLength;
+      quads += mesh.quadCount;
       if (mesh.region.textures !== undefined) textured += 1;
     }
     return {
@@ -314,8 +314,7 @@ export class RegionStreamer {
       loading: this.requests.size,
       remaining: this.wanted.length,
       megabytes: this.bytes / (1024 * 1024),
-      // Each quad packs into three 32-bit words.
-      quads: quadBytes / 12,
+      quads,
     };
   }
 

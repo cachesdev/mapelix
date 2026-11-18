@@ -31,7 +31,7 @@ import {
 import { Vector2, type Node } from "three/webgpu";
 
 import type { BlockAtlas } from "../block-atlas";
-import { quadColor, quadLavaFlow, quadPosition, quadSprite, quadUV } from "./quad";
+import { quadColor, quadPackedData, quadPosition, quadSprite, quadUV } from "./quad";
 
 /**
  * Block textures for textured regions. Each quad carries a fourth word (see
@@ -42,12 +42,11 @@ import { quadColor, quadLavaFlow, quadPosition, quadSprite, quadUV } from "./qua
  */
 
 /**
- * The quad's texture word, 19 bits, rides in the lava flow varying: plain terrain already uses
+ * The quad's texture word, 19 bits, shares a flat integer with four light bits: plain terrain uses
  * all 16 varyings WebGPU allows, and the textured terrain and plants never read lava flow (lava
- * keeps its plain material). A float holds the word exactly; rounding removes interpolation
- * error.
+ * keeps its plain material). No interpolation can change these per-face flags.
  */
-const textureWord = quadLavaFlow;
+const textureWord = quadPackedData;
 
 const bit = (word: Node<"uint">, shift: number, mask: number) =>
   float(word.shiftRight(uint(shift)).bitAnd(uint(mask)));
@@ -64,14 +63,14 @@ export const texturedQuadPosition = Fn(() => {
   // A variable, so `quadPosition` and its own lava flow and sprite assignments come first.
   const position = quadPosition().toVar();
   const texture = uint(attribute("texture", "uint"));
-  textureWord.assign(bit(texture, 0, 0x7ffff));
+  textureWord.assign(texture.bitAnd(uint(0x7807ffff)));
   If(bit(uint(attribute("quad", "uvec3").x), 23, 7).lessThan(6), () => {
     textureOffset.assign(bit(texture, 19, 0xff));
   });
   return position;
 });
 
-const word = uint(textureWord.round());
+const word = textureWord;
 const textureTile = bit(word, 0, 0x3fff);
 const textureTurn = bit(word, 14, 3);
 const textureTint = bit(word, 16, 1);

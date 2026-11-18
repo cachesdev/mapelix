@@ -1,6 +1,7 @@
 import type { LittleEndianNbtCompoundValue } from "@mapelix/prototype/bedrock";
 
 import { BEDROCK_COLOR_STATES } from "../blocks/bedrock-colors.js";
+import { LIGHT_STATES, blockEmission } from "../blocks/block-light.js";
 import {
   resolveBlockAppearance,
   type BiomeTint,
@@ -107,6 +108,7 @@ const PLANT_HEIGHTS: Readonly<Record<PlantSprite, number>> = {
 /** State keys that change a block's appearance. Other states would only split cache entries. */
 const APPEARANCE_STATES = [
   ...MODEL_STATES,
+  ...LIGHT_STATES,
   "minecraft:vertical_half",
   "top_slot_bit",
   "height",
@@ -152,6 +154,8 @@ export class BlockPalette {
   readonly waterWord: number = 0;
   private readonly names: TextureNames | undefined;
   shape = new Uint8Array(256);
+  /** Block emission, independent of the visual material and of the texture stack. */
+  emission = new Uint8Array(256);
   material = new Uint8Array(256);
   boxSize = new Uint8Array(256);
   boxInset = new Uint8Array(256);
@@ -207,6 +211,7 @@ export class BlockPalette {
     this.ensureCapacity(this.size);
     const appearance = resolveBlockAppearance(name, states ?? {});
     this.write(id, appearance);
+    this.emission[id] = blockEmission(name, states ?? {});
     if (this.names !== undefined) this.writeTextures(id, name, states ?? {}, appearance);
     this.ids.set(key, id);
     return id;
@@ -367,6 +372,7 @@ export class BlockPalette {
     if (size <= this.shape.length) return;
     const capacity = this.shape.length * 2;
     this.shape = grow(this.shape, capacity);
+    this.emission = grow(this.emission, capacity);
     this.material = grow(this.material, capacity);
     this.boxSize = grow(this.boxSize, capacity);
     this.boxInset = grow(this.boxInset, capacity);
@@ -455,7 +461,8 @@ function appearanceKey(
   if (keys.length > 1) keys.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   for (const state of keys) {
     const value = states[state];
-    if (typeof value === "string" || typeof value === "number") key += `|${state}=${value}`;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+      key += `|${state}=${value}`;
   }
   return key;
 }

@@ -14,11 +14,13 @@ import {
   packQuadWord2,
   packModelWord1,
   partitionLavaQuads,
+  finishBlockLight,
   type PlantSprite,
   type SceneRegion,
 } from "../format.js";
 import { blockModelParts, type ModelBounds } from "../blocks/block-models.js";
 import { lavaFlowDirection } from "./lava-flow.js";
+import { buildBlockLight } from "./block-light.js";
 import { blendColumnTints } from "./biome-tints.js";
 import type { GeometryMode } from "../dimensions.js";
 import { BlockPalette, PALETTE_ID_MASK, Shape, TintCode, WATERLOGGED } from "./block-palette.js";
@@ -36,6 +38,7 @@ import {
   COVER_DEPTH,
   KEY_COVERED,
   KEY_LAVA,
+  KEY_BLOCK_LIGHT_SHIFT,
   NORMAL_LAYER,
   cornerOcclusion,
   faceOf,
@@ -81,6 +84,7 @@ class VoxelMesher {
   private readonly volume: RegionVolume;
   private readonly palette: BlockPalette;
   private readonly cells: Uint16Array;
+  private light: Uint8Array | undefined;
   private readonly baseY: number;
   private readonly limitY: number;
   private readonly caveTints = new Map<number, Uint32Array[]>();
@@ -121,12 +125,12 @@ class VoxelMesher {
     this.palette = palette;
     const textured = palette.textures !== undefined;
     this.textureWords = textured ? palette.textureWords : undefined;
-    this.opaque = new QuadList(textured);
-    this.plants = new QuadList(textured);
-    this.translucent = new QuadList(textured);
     this.cells = volume.cells;
     this.baseY = volume.baseY ?? WORLD_MIN_Y;
     this.limitY = volume.limitY ?? WORLD_MAX_Y;
+    this.opaque = new QuadList(textured);
+    this.plants = new QuadList(textured);
+    this.translucent = new QuadList(textured);
     this.low = this.minY = this.limitY;
     this.maxY = this.baseY;
     this.tints = blendColumnTints(
@@ -141,11 +145,20 @@ class VoxelMesher {
     this.findOpenAir();
     this.findColumnRanges();
     if (this.high >= this.low) {
+      this.light = buildBlockLight({
+        width: VOLUME_SIZE,
+        layers: this.limitY - this.baseY,
+        minLayer: this.low - this.baseY - 15,
+        maxLayer: this.high - this.baseY + 16,
+        emission: (index) => this.palette.emission[this.cells[index]! & PALETTE_ID_MASK]!,
+        opaque: (index) => this.palette.isOpaque(this.cells[index]! & PALETTE_ID_MASK),
+      });
       for (let face = 0; face < 6; face += 1) this.meshFace(face);
       this.meshPlants();
       if (this.hasModels) this.meshModels();
     }
     const opaqueTextures = this.opaque.finishTextures();
+    const blockLight = finishBlockLight(this.opaque, this.plants, this.translucent);
     const region: SceneRegion = {
       level: 0,
       x: regionX,
@@ -153,9 +166,10 @@ class VoxelMesher {
       heights: this.heights(),
       minY: this.minY === this.limitY ? 0 : this.minY,
       maxY: this.minY === this.limitY ? 0 : this.maxY,
-      opaque: partitionLavaQuads(this.opaque.finish(), opaqueTextures),
+      opaque: partitionLavaQuads(this.opaque.finish(), opaqueTextures, blockLight?.opaque),
       plants: this.plants.finish(),
       translucent: this.translucent.finish(),
+      ...(blockLight === undefined ? {} : { blockLight }),
     };
     if (opaqueTextures === undefined) return region;
     return {
@@ -307,7 +321,11 @@ class VoxelMesher {
     const covered = this.palette.covered[id] === 1 && !isFlatFace(face);
     const color = this.colorOf(id, covered ? Face.PositiveY : face, column, y);
     const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
-    keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
+    keys[mask] =
+      ((covered ? key | KEY_COVERED : key) |
+        (this.lightAt(boundary ? neighbor : index, boundary ? neighborY : y) <<
+          KEY_BLOCK_LIGHT_SHIFT)) >>>
+      0;
     colors[mask] = packQuadWord2(color, occlusion);
     if (this.maskTextures !== undefined) {
       const word = this.textureWords![id * 6 + face]!;
@@ -350,7 +368,15 @@ class VoxelMesher {
         if (!this.isOpen(neighbor, neighborY, column + STEPS.column[face]!)) return false;
       }
     }
-    keys[mask] = mergeKey(QuadMaterial.Water, size, 0, false, face);
+    const inner = face === Face.PositiveY && surface;
+    keys[mask] =
+      (mergeKey(QuadMaterial.Water, size, 0, false, face) |
+        (this.lightAt(
+          inner ? index : index + STEPS.normal[face]!,
+          inner ? y : y + NORMAL_LAYER[face]!,
+        ) <<
+          KEY_BLOCK_LIGHT_SHIFT)) >>>
+      0;
     colors[mask] = packQuadWord2(this.tintOf(TintCode.Water, column, y), FULLY_LIT);
     if (this.maskTextures !== undefined) this.maskTextures[mask] = this.palette.waterWord;
     return true;
@@ -393,7 +419,11 @@ class VoxelMesher {
       this.lavaHeight(index - VOLUME_SIZE, fill),
     );
     keys[mask] =
-      (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) | KEY_LAVA | (flow << 12)) >>> 0;
+      (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) |
+        KEY_LAVA |
+        (flow << 12) |
+        (this.lightAt(index, y) << KEY_BLOCK_LIGHT_SHIFT)) >>>
+      0;
     colors[mask] = packQuadWord2(this.colorOf(id, face, column, y), FULLY_LIT);
     if (this.maskTextures !== undefined)
       this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
@@ -431,6 +461,7 @@ class VoxelMesher {
         ((key & KEY_LAVA) !== 0 ? QUAD_LAVA_FLAG | (((key >>> 12) & 15) << 28) : 0),
       color,
       texture,
+      (key >>> KEY_BLOCK_LIGHT_SHIFT) & 15,
     );
     this.minY = Math.min(this.minY, y);
     this.maxY = Math.max(this.maxY, y + (isFlatFace(face) ? 1 : height));
@@ -460,12 +491,14 @@ class VoxelMesher {
             word1,
             word2,
             texture,
+            this.lightAt(index, y),
           );
           this.plants.push(
             packQuadWord0(x, y, z, Face.CrossB, QuadMaterial.Plant),
             word1,
             word2,
             texture,
+            this.lightAt(index, y),
           );
           if (this.geometry !== "surface") {
             this.minY = Math.min(this.minY, y);
@@ -547,6 +580,10 @@ class VoxelMesher {
                         face,
                         part.sheet,
                       ),
+                this.lightAt(
+                  boundary ? index + STEPS.normal[face]! : index,
+                  boundary ? neighborY : y,
+                ),
               );
 
               this.minY = Math.min(this.minY, y);
@@ -565,6 +602,10 @@ class VoxelMesher {
       }
     }
     return heights;
+  }
+
+  private lightAt(index: number, y: number): number {
+    return y < this.baseY || y >= this.limitY ? 0 : (this.light?.[index] ?? 0);
   }
 
   /** Four corner occlusion levels from the opaque cubes around the cell in front of a face. */

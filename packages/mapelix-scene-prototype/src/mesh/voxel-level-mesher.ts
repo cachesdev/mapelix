@@ -9,6 +9,7 @@ import {
   packQuadWord1,
   packQuadWord2,
   partitionLavaQuads,
+  finishBlockLight,
   type SceneRegion,
 } from "../format.js";
 import { VoxelKind } from "./block-palette.js";
@@ -17,6 +18,7 @@ import {
   COVER_DEPTH,
   KEY_COVERED,
   KEY_LAVA,
+  KEY_BLOCK_LIGHT_SHIFT,
   NORMAL_LAYER,
   cornerOcclusion,
   faceOf,
@@ -36,6 +38,7 @@ import {
 import { isOpaqueKind, type VoxelBox } from "./voxel-box.js";
 import type { VoxelRegion } from "./voxel-region.js";
 import { lavaFlowDirection } from "./lava-flow.js";
+import { buildBlockLight } from "./block-light.js";
 
 /**
  * Border faces stay when a neighbor hides them this many layers below its top. A
@@ -85,8 +88,9 @@ class VoxelLevelMesher {
   private readonly columnLow: Int16Array;
   /** Layers of wall below a column's highest block where it faces unexplored land. */
   private readonly edgeLayers: number;
-  private readonly opaque = new QuadList();
-  private readonly translucent = new QuadList();
+  private readonly opaque: QuadList;
+  private readonly translucent: QuadList;
+  private readonly light: Uint8Array | undefined;
   /** World y of layer 0, in voxels. */
   private readonly baseLayer: number;
   private low = Number.POSITIVE_INFINITY;
@@ -100,6 +104,8 @@ class VoxelLevelMesher {
     this.box = region.box;
     this.steps = faceSteps(region.box.width);
     this.area = region.box.width ** 2;
+    this.opaque = new QuadList();
+    this.translucent = new QuadList();
     this.baseLayer = region.low / region.voxelSize;
     this.edgeLayers = Math.max(1, EDGE_DEPTH / region.voxelSize);
     this.roof = new Int16Array(this.area).fill(-1);
@@ -120,6 +126,17 @@ class VoxelLevelMesher {
     this.reached = open.reached;
     this.lowestOpen = open.lowest;
     this.columnLow = this.findColumnRanges();
+    this.light =
+      region.level !== 1 || this.box.emission === undefined || this.high < this.low
+        ? undefined
+        : buildBlockLight({
+            width: this.box.width,
+            layers: this.box.layers,
+            minLayer: this.low - 15,
+            maxLayer: this.high + 16,
+            emission: (index) => this.box.emission![index]!,
+            opaque: (index) => this.box.lightOpaque![index] === 1,
+          });
   }
 
   mesh(): SceneRegion {
@@ -128,6 +145,7 @@ class VoxelLevelMesher {
     }
     const { voxelSize } = this.region;
     const empty = new Uint32Array(0);
+    const blockLight = finishBlockLight(this.opaque, new QuadList(), this.translucent);
     return {
       level: this.region.level,
       x: this.region.x,
@@ -135,9 +153,10 @@ class VoxelLevelMesher {
       heights: this.heights(),
       minY: Number.isFinite(this.minLayer) ? this.minLayer * voxelSize : 0,
       maxY: Number.isFinite(this.maxLayer) ? this.maxLayer * voxelSize : 0,
-      opaque: partitionLavaQuads(this.opaque.finish()),
+      opaque: partitionLavaQuads(this.opaque.finish(), undefined, blockLight?.opaque),
       plants: empty,
       translucent: this.translucent.finish(),
+      ...(blockLight === undefined ? {} : { blockLight }),
     };
   }
 
@@ -284,7 +303,13 @@ class VoxelLevelMesher {
         (lavaFlowDirection(heightAt(1), heightAt(-1), heightAt(box.width), heightAt(-box.width)) <<
           12);
     }
-    keys[mask] = ((covered ? key | KEY_COVERED : key) | lava) >>> 0;
+    const frontLayer = inner ? layer : neighborLayer;
+    const light =
+      frontLayer < 0 || frontLayer >= this.box.layers
+        ? 0
+        : (this.light?.[inner ? index : neighbor] ?? 0);
+    keys[mask] =
+      ((covered ? key | KEY_COVERED : key) | lava | (light << KEY_BLOCK_LIGHT_SHIFT)) >>> 0;
     colors[mask] = packQuadWord2(this.faceColor(index, face), occlusion);
     return true;
   }
@@ -338,6 +363,8 @@ class VoxelLevelMesher {
       packQuadWord1(width, height, keyBox(key), 0) |
         ((key & KEY_LAVA) !== 0 ? QUAD_LAVA_FLAG | (((key >>> 12) & 15) << 28) : 0),
       color,
+      0,
+      (key >>> KEY_BLOCK_LIGHT_SHIFT) & 15,
     );
     this.minLayer = Math.min(this.minLayer, y);
     this.maxLayer = Math.max(this.maxLayer, y + (isFlatFace(face) ? 1 : height));

@@ -11,6 +11,7 @@ vi.mock("./region-mesh", () => ({
   RegionMesh: class {
     readonly isEmpty = false;
     readonly byteLength = 12;
+    readonly quadCount = 1;
     readonly group = new Group();
     constructor(readonly region: unknown) {
       constructed(region);

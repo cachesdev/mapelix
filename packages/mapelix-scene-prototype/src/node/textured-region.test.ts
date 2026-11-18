@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { sectionRecord, writeFixtureWorld } from "../../test/dimension-fixture.js";
-import { Face, decodeSceneRegion, isLavaQuad, unpackQuad, type Quad } from "../format.js";
+import {
+  Face,
+  REGION_FLAG_TEXTURED,
+  decodeSceneRegion,
+  isLavaQuad,
+  unpackQuad,
+  type Quad,
+} from "../format.js";
 import type { PaletteTextures } from "../mesh/block-palette.js";
 import { unpackQuadTexture } from "../textures/atlas-format.js";
 import type { BlockTextureNames } from "../textures/resource-pack.js";
@@ -92,7 +99,7 @@ describe("textured regions", () => {
     expect(mixed.build({ level: 1, x: 0, z: 0 }).byteLength).toBeGreaterThan(0);
     mixed.close();
     expect(decodeSceneRegion(plain).textures).toBeUndefined();
-    expect(plain[7]).toBe(0);
+    expect(plain[7]! & REGION_FLAG_TEXTURED).toBe(0);
   });
 
   it("gives each quad its face texture, tinted as its color is", () => {

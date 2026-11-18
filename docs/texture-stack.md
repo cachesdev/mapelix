@@ -145,8 +145,9 @@ revision.
   attribution on a public map, immutable.
 
 - `regions/0/<x>/<z>?textures=<revision>`: a textured level 0 Surface region, the region format
-  with one more word per quad (header byte 7 set). A stale revision answers 409, like a stale
-  world revision. Plain regions, without `textures`, are unchanged byte for byte.
+  with one more word per quad (header byte 7 bit 0 set). A stale revision answers 409, like a stale
+  world revision. Format 4 adds an optional block-light byte plane in both modes (bit 1),
+  independently of the texture stream; see [block light](block-lighting.md).
 - `regions/0/<x>/<z>?textures=<revision>&cutout=1`: the same region for detailed leaves, with
   the faces between neighbouring cut-out cubes such as leaves. `cutout=1` without `textures`
   answers 400. It is cached apart, under `cutout/` in the textured region cache.

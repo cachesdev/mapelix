@@ -123,6 +123,8 @@ const KEY_NARROW = 1 << 28;
 export const KEY_COVERED = 1 << 27;
 /** Keeps lava from merging with other emissive faces, even when their colors match. */
 export const KEY_LAVA = 1 << 26;
+/** Bits 16..19 are free in merge keys (lava flow uses 12..15, flags start at 26). */
+export const KEY_BLOCK_LIGHT_SHIFT = 16;
 
 /**
  * Everything but position and size, so equal keys can merge into one quad. An inset

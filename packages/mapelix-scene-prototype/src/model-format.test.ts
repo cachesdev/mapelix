@@ -55,10 +55,16 @@ describe("quad extensions", () => {
       3,
     );
     const original = words.buffer;
-    partitionLavaQuads(words);
+    const textures = Uint32Array.of(101, 102, 103);
+    const light = Uint8Array.of(1, 2, 3);
+    partitionLavaQuads(words, textures, light);
     expect(words.buffer).toBe(original);
     expect([words[2]!, words[5]!].sort((a, b) => a - b)).toEqual([2, 3]);
     expect(words[8]).toBe(1);
     expect(isLavaQuad(words[6]!, words[7]!)).toBe(true);
+    for (let i = 0; i < 3; i++) {
+      expect(textures[i]).toBe(100 + words[i * 3 + 2]!);
+      expect(light[i]).toBe(words[i * 3 + 2]);
+    }
   });
 });

@@ -82,6 +82,10 @@ working unchanged, with textures off, and with a server that has no texture stac
   damaged) is skipped alone and taken from the next pack, instead of refusing the stack; texture
   reports list it in `skipped`. `createViewerControls` takes `texturesLink` (`{ href, label }`),
   a link under the textures switch for a host that lets people choose the pack.
+- Block light works in plain and textured views at LOD 0/1 without a new host option.
+  Its binary region format is version 4: upgrade the server and browser bundle together.
+  Embed API version 5 and request URLs remain unchanged; direct binary readers must support
+  the optional light plane. See [block light](../../docs/block-lighting.md).
 
 ### API version 4 (changes from 3)
 
@@ -206,4 +210,5 @@ machine path.
 
 A release never holds block textures: the host gives its own packs to `createSceneServer`.
 Version 5 of the embed API only adds options; a host written for version 4 runs it unchanged,
-with textures off, and the region format is the same for every untextured region.
+with textures off. Binary regions use format 4 in both modes; update the scene server and
+browser bundle together. Region format and embed API versions are separate contracts.

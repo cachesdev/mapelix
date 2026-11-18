@@ -115,6 +115,8 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
   [discovery navigation](docs/discovery-navigation.md)).
 - **Sky:** clouds, rain, thunderstorm and time of day on the Overworld surface
   ([clouds and weather](docs/clouds-weather.md)).
+- **Block light:** torches, lanterns, lava and other vanilla sources illuminate nearby blocks
+  with or without textures, on the Surface and in Caves ([block light](docs/block-lighting.md)).
 - **Projection:** isometric or perspective; the switch from the map starts isometric, looking
   straight down.
 - **Controls:** one set of buttons for 2D and 3D that keep their place across the switch, sized for

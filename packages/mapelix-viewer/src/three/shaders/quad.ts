@@ -37,8 +37,13 @@ export const quadSprite = varyingProperty("float", "vQuadSprite");
 export const quadCovered = varyingProperty("float", "vQuadCovered");
 /** Quad size in blocks along its second tangent, which is height for side faces. */
 export const quadHeight = varyingProperty("float", "vQuadHeight");
+/** Per-face integer data: flow/texture in bits 0..18, light in 27..30. Integer varyings
+ * are flat on WebGPU and WebGL 2, so interpolation cannot corrupt texture flags. */
+export const quadPackedData = varyingProperty("uint", "vQuadLavaFlow");
 /** Horizontal lava flow direction (0 = convection, 1..8 = compass octants). */
-export const quadLavaFlow = varyingProperty("float", "vQuadLavaFlow");
+export const quadLavaFlow = float(quadPackedData.bitAnd(uint(15)));
+/** One block-light value per face, normalized to 0..1; shares the existing varying. */
+export const quadBlockLight = float(quadPackedData.shiftRight(uint(27)).bitAnd(uint(15))).div(15);
 
 const bits = (word: Node<"uint">, shift: number, mask: number) =>
   float(word.shiftRight(uint(shift)).bitAnd(uint(mask)));
@@ -46,7 +51,7 @@ const bits = (word: Node<"uint">, shift: number, mask: number) =>
 /** Occlusion levels 0 through 3 mapped to light. Level 0 still keeps some bounce light. */
 const occlusionCurve = (level: Node<"float">) => mix(float(0.5), float(1), level.div(3).pow(0.8));
 
-export const quadPosition = Fn(() => {
+export const quadPosition = Fn((builder) => {
   const words = attribute("quad", "uvec3");
   const word0 = uint(words.x);
   const word1 = uint(words.y);
@@ -127,7 +132,15 @@ export const quadPosition = Fn(() => {
   quadSprite.assign(bits(word1, 24, 7));
   quadCovered.assign(bits(word0, 30, 1));
   quadHeight.assign(height);
-  quadLavaFlow.assign(bits(word1, 28, 15));
+  const data = builder.geometry.hasAttribute("texture")
+    ? uint(attribute("texture", "uint"))
+    : uint(0);
+  quadPackedData.assign(
+    word1
+      .shiftRight(uint(28))
+      .bitAnd(uint(15))
+      .bitOr(data.bitAnd(uint(0x78000000))),
+  );
 
   return select(plant, crossPosition, boxPosition);
 });

@@ -207,6 +207,9 @@ export function decodeTextureAtlas(bytes: Uint8Array): TextureAtlas {
 export const QUAD_TEXTURED = 1 << 17;
 export const QUAD_CUTOUT = 1 << 18;
 export const QUAD_TEXTURE_TINTED = 1 << 16;
+/** GPU-only block light in bits 27..30; atlas, tint, cutout and sheet offsets use bits 0..26. */
+export const QUAD_BLOCK_LIGHT_SHIFT = 27;
+export const QUAD_BLOCK_LIGHT_MASK = 15 << QUAD_BLOCK_LIGHT_SHIFT;
 /**
  * Bits 19 to 22 and 23 to 26: where a face reads its texture, in texels added to its own
  * coordinates, across then down, 0 to 15. Packs draw small models (a lantern, a torch, a

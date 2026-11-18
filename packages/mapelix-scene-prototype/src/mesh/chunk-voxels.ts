@@ -71,6 +71,7 @@ export class ChunkVoxelReader {
     voxelSize: number,
     ceilingY = this.chunks.config.maxY,
     window?: VerticalBounds,
+    lighting = false,
   ): ChunkVoxels | undefined {
     const records = this.chunks.records(chunkX, chunkZ);
     if (records === undefined) return undefined;
@@ -98,7 +99,7 @@ export class ChunkVoxelReader {
         continue;
       }
       const cells = sectionCells(section, this.palette, records.bedColors.get(section.y));
-      const top = this.highestFilled(cells);
+      const top = this.highestFilled(cells, lighting);
       if (top === -1) continue;
       sections.push({ y: section.y, cells, top });
       open -= this.findGround(cells, section.y * 16, ground);
@@ -114,7 +115,7 @@ export class ChunkVoxelReader {
 
     const low = sections.at(-1)!.y * 16;
     const layers = (sections[0]!.y + 1) * 16 - low;
-    let box = this.box(16, layers, voxelSize === 1);
+    let box = this.box(16, layers, voxelSize === 1, lighting);
     const tints = Array.from({ length: 256 }, (_, column) => {
       const surface = ground[column]! < WORLD_MIN_Y ? 64 : ground[column]!;
       return biomeTints(records.biomes.at(column & 15, surface, column >> 4));
@@ -134,8 +135,8 @@ export class ChunkVoxelReader {
   }
 
   /** A new box when the caller keeps it, or an emptied scratch box otherwise. */
-  private box(width: number, layers: number, kept: boolean): VoxelBox {
-    if (kept) return new VoxelBox(width, layers);
+  private box(width: number, layers: number, kept: boolean, lighting = false): VoxelBox {
+    if (kept) return new VoxelBox(width, layers, lighting);
     const key = width * 1024 + layers;
     const reused = this.scratch.get(key);
     if (reused === undefined) {
@@ -207,6 +208,9 @@ export class ChunkVoxelReader {
           // Box columns run z * 16 + x; Bedrock stores blocks as x * 256 + z * 16 + y.
           const cell = cells[((column & 15) << 8) | ((column >> 4) << 4) | y]!;
           const id = cell & PALETTE_ID_MASK;
+          if (box.emission !== undefined) box.emission[index] = this.palette.emission[id]!;
+          if (box.lightOpaque !== undefined)
+            box.lightOpaque[index] = this.palette.isOpaque(id) ? 1 : 0;
           const tint = tintsAt?.(column & 15, section.y * 16 + y, column >> 4) ?? tints[column]!;
           let kind = voxel[id]!;
           // Water fills the gaps of waterlogged plants, fences, and other open blocks.
@@ -245,13 +249,17 @@ export class ChunkVoxelReader {
   }
 
   /** The highest local y of a subchunk that holds anything but air, or -1 when it is empty. */
-  private highestFilled(cells: Uint16Array): number {
+  private highestFilled(cells: Uint16Array, lighting: boolean): number {
     const { voxel } = this.palette;
     let top = -1;
     for (let index = 0; index < 4096; index += 1) {
       const cell = cells[index]!;
       if (cell === 0 || (index & 15) <= top) continue;
-      if ((cell & WATERLOGGED) !== 0 || voxel[cell & PALETTE_ID_MASK] !== VoxelKind.Air) {
+      if (
+        (cell & WATERLOGGED) !== 0 ||
+        voxel[cell & PALETTE_ID_MASK] !== VoxelKind.Air ||
+        (lighting && this.palette.emission[cell & PALETTE_ID_MASK]! > 0)
+      ) {
         top = index & 15;
       }
     }

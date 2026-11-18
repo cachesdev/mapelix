@@ -65,7 +65,7 @@ rebuilds or per-frame requests.
 
 Emission peaks on hot veins and feeds existing bloom. Global bloom, exposure,
 other lights and dimension atmospheres are unchanged. This adds a surface halo,
-without local light propagation or per-block point lights on nearby walls.
+and seeds [baked block light](block-lighting.md) on nearby walls, without per-block point lights.
 Lava adds one shared material pair and at most one draw per lava region.
 The engine groups lava at the opaque stream's end; the viewer uses subarray
 views without duplicating the buffer. Internal lava faces are culled and lava
@@ -73,7 +73,8 @@ retains the Overworld sky barrier for terrain below its surface.
 
 ## Format and integration contract
 
-The header is version **3**, with **12 bytes per quad** and original material
+The model extension was introduced in version **3**; the current header is version **4**
+with an optional [block-light plane](block-lighting.md), **12 geometry bytes per quad** and original material
 IDs:
 
 - Word 0 bit 31 marks a model cuboid. Its word 1 holds the box itself, five bits

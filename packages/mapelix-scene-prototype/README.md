@@ -35,7 +35,7 @@ The ceiling must be a multiple of 16, above the dimension floor and no higher th
 exclusive upper bound. It is applied before mesh generation and voxel reduction, so all
 six LODs agree. Set the Nether ceiling to 128 to retain the roof.
 
-The format remains version 2. Dimension and ceiling belong to the request/cache context,
+The current region format is version 4. Dimension and ceiling belong to the request/cache context,
 not the binary header: adapters must key regions by world revision, dimension, ceiling,
 level, x and z. The `sceneContext`, `contextSearch` and `regionCacheKey` helpers normalize
 these values. `info.spawn` remains the Overworld spawn stored in `level.dat`; consumers
@@ -54,7 +54,7 @@ Surface/Nether/End geometry and default bounds.
 
 The browser-safe context helpers normalize aliases and isolate cave cache keys
 from Surface keys. Adapters must also namespace by snapshot revision. Binary
-format remains 2. See [underground rendering](../../docs/underground-rendering.md)
+format is version 4. See [underground rendering](../../docs/underground-rendering.md)
 for resource ownership, limits and the server contract.
 
 ## Source discoveries
@@ -109,6 +109,11 @@ Each quad is three `uint32` words:
 
 The viewer draws each list as one instanced unit square and rebuilds the corners in the vertex
 shader.
+
+Format 4 optionally appends one block-light byte per quad in both plain and textured regions.
+LOD 0/1 compute local light from saved block states, including sources in neighboring regions
+and outside cave slices; LOD 2–5 keep their previous geometry. See
+[block light](../../docs/block-lighting.md) for the layout, GPU cost and upgrade contract.
 
 ## Benchmark
 

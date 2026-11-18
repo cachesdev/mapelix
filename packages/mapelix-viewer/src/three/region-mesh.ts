@@ -4,6 +4,7 @@ import {
   isLavaQuad,
   type DecodedSceneRegion,
 } from "@mapelix/scene-prototype/format";
+import { QUAD_BLOCK_LIGHT_SHIFT } from "@mapelix/scene-prototype/texture-format";
 import {
   Box3,
   BufferAttribute,
@@ -78,6 +79,8 @@ export class RegionMesh {
   readonly group = new Group();
   /** GPU bytes held by the quad buffers, for the streaming memory budget. */
   readonly byteLength: number;
+  /** Actual geometry count, independent of texture and light buffer sizes. */
+  readonly quadCount: number;
   /** The screen noise range this region draws while fading. See `SceneMaterials`. */
   private readonly fade = new Vector2(0, 1);
   private readonly layers: Layer[] = [];
@@ -87,13 +90,7 @@ export class RegionMesh {
   constructor(region: DecodedSceneRegion, materials: SceneMaterials, pool?: RegionMeshPool) {
     this.region = region;
     this.pool = pool;
-    this.byteLength =
-      region.opaque.byteLength +
-      region.plants.byteLength +
-      region.translucent.byteLength +
-      (region.textures === undefined
-        ? 0
-        : region.textures.opaque.byteLength + region.textures.plants.byteLength);
+    this.quadCount = (region.opaque.length + region.plants.length + region.translucent.length) / 3;
     // Quads count in cells, and cells are cubes, so one scale places every axis.
     this.group.position.set(region.originX, 0, region.originZ);
     this.group.scale.setScalar(region.cellSize);
@@ -113,6 +110,7 @@ export class RegionMesh {
       castShadow: true,
       renderOrder: RENDER_ORDER.terrain,
       textures: textures?.opaque.subarray(0, lavaStart / 3),
+      blockLight: region.blockLight?.opaque.subarray(0, lavaStart / 3),
     });
     this.add(region.opaque.subarray(lavaStart), materials.lava, bounds, {
       castShadow: true,
@@ -123,17 +121,30 @@ export class RegionMesh {
       castShadow: false,
       renderOrder: RENDER_ORDER.plants,
       textures: textures?.plants,
+      blockLight: region.blockLight?.plants,
     });
-    const { water, glass } = splitGlass(region.translucent);
+    const { water, glass, waterLight, glassLight } = splitGlass(
+      region.translucent,
+      region.blockLight?.translucent,
+    );
     this.add(water, materials.water, bounds, {
       castShadow: false,
       renderOrder: RENDER_ORDER.water,
+      blockLight: waterLight,
     });
     // Glass draws after all water, so the water behind it shows through.
     this.add(glass, materials.glass, bounds, {
       castShadow: false,
       renderOrder: RENDER_ORDER.glass,
+      blockLight: glassLight,
     });
+    this.byteLength = this.layers.reduce(
+      (bytes, { mesh }) =>
+        bytes +
+        mesh.geometry.getAttribute("quad").array.byteLength +
+        (mesh.geometry.getAttribute("texture")?.array.byteLength ?? 0),
+      0,
+    );
   }
 
   get isEmpty(): boolean {
@@ -175,6 +186,7 @@ export class RegionMesh {
       readonly castShadow: boolean;
       readonly renderOrder: number;
       readonly textures?: Uint32Array | undefined;
+      readonly blockLight?: Uint8Array | undefined;
     },
   ): void {
     if (quads.length === 0) return;
@@ -183,9 +195,17 @@ export class RegionMesh {
     geometry.setAttribute("position", corners);
     geometry.setAttribute("normal", normals);
     geometry.setAttribute("quad", new InstancedBufferAttribute(quads, 3));
-    if (options.textures !== undefined) {
-      geometry.setAttribute("texture", new InstancedBufferAttribute(options.textures, 1));
+    // The GPU word exists in both modes. Bits 0..26 retain every texture flag and sheet
+    // offset; 27..30 carry light. Distant/unlit plain geometry has no auxiliary buffer.
+    const lit = options.blockLight?.some((level) => level > 0) === true;
+    let data = options.textures;
+    if (lit) {
+      data = new Uint32Array(quads.length / 3);
+      for (let i = 0; i < data.length; i++)
+        data[i] =
+          (options.textures?.[i] ?? 0) | (options.blockLight![i]! << QUAD_BLOCK_LIGHT_SHIFT);
     }
+    if (data !== undefined) geometry.setAttribute("texture", new InstancedBufferAttribute(data, 1));
     geometry.instanceCount = quads.length / 3;
     geometry.boundingBox = bounds;
     geometry.boundingSphere = bounds.getBoundingSphere(new Sphere());
@@ -210,12 +230,29 @@ export function firstLavaQuad(words: Uint32Array): number {
 }
 
 /** Separates the glass quads of a translucent list from its water quads. */
-function splitGlass(quads: Uint32Array): { water: Uint32Array; glass: Uint32Array } {
+function splitGlass(
+  quads: Uint32Array,
+  light?: Uint8Array,
+): {
+  water: Uint32Array;
+  glass: Uint32Array;
+  waterLight: Uint8Array | undefined;
+  glassLight: Uint8Array | undefined;
+} {
   const water: number[] = [];
   const glass: number[] = [];
+  const waterLight: number[] = [],
+    glassLight: number[] = [];
   for (let index = 0; index < quads.length / 3; index += 1) {
-    const target = unpackQuad(quads, index).material === QuadMaterial.Glass ? glass : water;
+    const isGlass = unpackQuad(quads, index).material === QuadMaterial.Glass;
+    const target = isGlass ? glass : water;
     target.push(...quads.subarray(index * 3, index * 3 + 3));
+    if (light !== undefined) (isGlass ? glassLight : waterLight).push(light[index]!);
   }
-  return { water: Uint32Array.from(water), glass: Uint32Array.from(glass) };
+  return {
+    water: Uint32Array.from(water),
+    glass: Uint32Array.from(glass),
+    waterLight: light === undefined ? undefined : Uint8Array.from(waterLight),
+    glassLight: light === undefined ? undefined : Uint8Array.from(glassLight),
+  };
 }
