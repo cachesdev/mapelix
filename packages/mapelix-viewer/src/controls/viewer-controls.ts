@@ -526,7 +526,8 @@ export class ViewerControls {
   private swipeToClose(handle: HTMLElement): void {
     let start: { id: number; y: number } | undefined;
     handle.addEventListener("pointerdown", (event) => {
-      if (event.target instanceof HTMLButtonElement) return;
+      // A press on a button, or on its icon, stays a click on that button.
+      if (event.target instanceof Element && event.target.closest("button")) return;
       start = { id: event.pointerId, y: event.clientY };
       handle.setPointerCapture(event.pointerId);
     });
