@@ -553,15 +553,23 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
       bounds: place(bounds),
       faces: ALL_FACES(Face.NegativeY),
     })),
+    // The pivot, rim and side pictures sit in the top left corner of their textures.
     ...GRINDSTONE_PIVOTS.map((bounds) => ({
       bounds: place(bounds),
       faces: ALL_FACES(Face.NegativeZ),
+      sheet: CORNER,
     })),
-    { bounds: place(GRINDSTONE_WHEEL), faces: wheelFaces },
+    {
+      bounds: place(GRINDSTONE_WHEEL),
+      faces: wheelFaces,
+      // Along the axis the wheel rolls, so the 8 by 12 rim runs down its picture.
+      sheet: { ...CORNER, axis: axle === 0 ? "z" : "x" },
+    },
   ];
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+const CORNER: PartSheet = { side: [0, 0], top: [0, 0] };
 
 function stairParts(model: BlockModel, neighbors: ModelNeighbors): readonly ModelPart[] {
   const { states: s } = model;
