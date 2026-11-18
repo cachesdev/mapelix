@@ -42,6 +42,8 @@ export const TEXTURE_STATES = [
   "age",
   "huge_mushroom_bits",
   "hanging",
+  "rail_direction",
+  "rail_data_bit",
 ] as const;
 
 /** `blocks.json` face of each mesh face before any turn: east +X, south +Z, up +Y. */
@@ -139,6 +141,7 @@ export function resolveBlockTextures(
     appearance.tint !== "none" && (!appearance.tintTopOnly || face === Face.PositiveY);
 
   const lying = appearance.axis !== "y";
+  const rail = railTop(modern.replace(/^minecraft:/, ""), states);
   // The pack draws pointed dripstone hanging; a standing one reads it upside down.
   const upsideDown =
     modern.replace(/^minecraft:/, "") === "pointed_dripstone" &&
@@ -157,6 +160,12 @@ export function resolveBlockTextures(
       : lying && axis !== appearance.axis && faceTextureAxes(face)[0] === appearance.axis
         ? 1
         : 0;
+    if (rail !== undefined && face === Face.PositiveY) {
+      const railPath = lookup(rail.source);
+      return railPath === undefined
+        ? undefined
+        : { path: railPath, rotation: rail.rotation, tinted: false };
+    }
     const path = lookup(source);
     return path === undefined ? undefined : { path, rotation, tinted: tintedFace(face) };
   });
@@ -168,6 +177,24 @@ export function resolveBlockTextures(
         ? undefined
         : { path: crossPath, rotation: 0, tinted: appearance.tint !== "none" },
   };
+}
+
+/**
+ * The top of a rail. Plain rails keep their straight image under `down` and their curve under
+ * `up`; powered, detector and activator rails keep their powered image under `up`. Straight
+ * rails run north to south unturned, curves join south and east unturned.
+ */
+function railTop(
+  block: string,
+  states: LittleEndianNbtCompoundValue,
+): { source: BlockFace; rotation: 0 | 1 | 2 | 3 } | undefined {
+  if (!/(?:^|_)rail$/.test(block)) return undefined;
+  const direction = typeof states.rail_direction === "number" ? states.rail_direction : 0;
+  if (direction >= 6) return { source: "up", rotation: ((direction - 6) & 3) as 0 | 1 | 2 | 3 };
+  // 1 runs east to west, 2 and 3 climb east and west, 4 and 5 north and south.
+  const rotation = direction === 1 || direction === 2 || direction === 3 ? 1 : 0;
+  const powered = block !== "rail" && states.rail_data_bit === 1;
+  return { source: powered ? "up" : "down", rotation };
 }
 
 function faceAxis(face: number): "x" | "y" | "z" {

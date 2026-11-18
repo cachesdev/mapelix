@@ -243,6 +243,12 @@ put(6, FLOOR, 74, b("glow_lichen", { multi_face_direction_bits: 4 }));
 put(9, FLOOR + 2, 74, "minecraft:stone");
 put(9, FLOOR + 1, 74, b("cave_vines_head_with_berries"));
 
+// Rails: straight both ways, the four curves, then powered rails off and on.
+row(78, [
+  ...[0, 1, 6, 7, 8, 9].map((rail_direction) => b("rail", { rail_direction })),
+  ...[0, 1].map((rail_data_bit) => b("golden_rail", { rail_direction: 0, rail_data_bit })),
+]);
+
 // Gold floor under the samples still to do, so the invisible ones can be found.
 const todo = (x: number, z: number) =>
   z === 64 && [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
