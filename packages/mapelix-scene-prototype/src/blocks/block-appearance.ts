@@ -11,7 +11,7 @@ import {
   type BiomeTint,
 } from "@mapelix/core/appearance";
 export type { BiomeTint } from "@mapelix/core/appearance";
-import { resolveBlockModel, type BlockModel } from "./block-models.js";
+import { COPPER_PREFIX, resolveBlockModel, type BlockModel } from "./block-models.js";
 
 /** How a block occupies its cell. Only cubes hide their neighbors and block the sky. */
 export type BlockShape =
@@ -82,10 +82,14 @@ const BOXES: ReadonlyArray<readonly [RegExp, QuadBox, SurfaceMaterial]> = [
   [/_pressure_plate$/, box(1, 1), QuadMaterial.Solid],
   [/^(?:grass_path|dirt_path|farmland)$/, box(15, 0), QuadMaterial.Solid],
   [/(?:^|_)fence(?:_gate)?$/, box(16, 6), QuadMaterial.Solid],
-  [/_wall$|^iron_bars$/, box(16, 4), QuadMaterial.Solid],
-  [/^(?:chest|trapped_chest|ender_chest|copper_chest)$/, box(14, 1), QuadMaterial.Solid],
+  [new RegExp(`_wall$|^(?:iron_|${COPPER_PREFIX})bars$`), box(16, 4), QuadMaterial.Solid],
+  [
+    new RegExp(`^(?:chest|trapped_chest|ender_chest|${COPPER_PREFIX}chest)$`),
+    box(14, 1),
+    QuadMaterial.Solid,
+  ],
   [/^(?:bed|cake|candle_cake)$|_bed$/, box(9, 1), QuadMaterial.Solid],
-  [/^(?:lantern|soul_lantern|copper_lantern)$/, box(9, 5), QuadMaterial.Emissive],
+  [new RegExp(`^(?:soul_|${COPPER_PREFIX})?lantern$`), box(9, 5), QuadMaterial.Emissive],
   [/(?:^|_)torch$/, box(10, 7), QuadMaterial.Emissive],
   [/^(?:campfire|soul_campfire)$/, box(7, 0), QuadMaterial.Emissive],
   [/^flower_pot$/, box(6, 5), QuadMaterial.Solid],

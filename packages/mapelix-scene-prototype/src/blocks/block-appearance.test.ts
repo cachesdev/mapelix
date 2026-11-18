@@ -83,4 +83,25 @@ describe("dimension block appearances", () => {
     expect(Number.isInteger(unknown.top)).toBe(true);
     expect(resolveBlockAppearance("minecraft:air", {}).shape).toEqual({ kind: "empty" });
   });
+  it.each(["", "exposed_", "weathered_", "oxidized_", "waxed_", "waxed_oxidized_"])(
+    "shapes %scopper lanterns, bars and chests like their plain copper forms",
+    (stage) => {
+      const shape = (name: string) => {
+        const resolved = resolveBlockAppearance(`minecraft:${name}`, {}).shape;
+        return resolved.kind === "model"
+          ? { ...resolved, model: { ...resolved.model, block: "" } }
+          : resolved;
+      };
+      expect(shape(`${stage}copper_lantern`)).toEqual(shape("lantern"));
+      expect(shape(`${stage}copper_bars`)).toEqual(shape("iron_bars"));
+      expect(shape(`${stage}copper_chest`)).toEqual(shape("chest"));
+      expect(shape(`${stage}copper_lantern`)).toMatchObject({ kind: "model" });
+    },
+  );
+  it.each(["sea_lantern", "jack_o_lantern", "copper_block", "oxidized_copper"])(
+    "keeps %s a full cube",
+    (name) => {
+      expect(resolveBlockAppearance(`minecraft:${name}`, {}).shape).toMatchObject({ kind: "cube" });
+    },
+  );
 });

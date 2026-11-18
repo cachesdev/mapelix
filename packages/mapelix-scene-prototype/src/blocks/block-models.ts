@@ -75,6 +75,11 @@ export const MODEL_STATES = [
   "liquid_depth",
 ] as const;
 
+/** Copper blocks at any oxidation stage, waxed or not: `copper_`, `waxed_oxidized_copper_`... */
+export const COPPER_PREFIX = "(?:waxed_)?(?:exposed_|weathered_|oxidized_)?copper_";
+const LANTERN = new RegExp(`^(?:soul_|${COPPER_PREFIX})?lantern$`);
+const BARS = new RegExp(`^(?:iron_|${COPPER_PREFIX})bars$`);
+
 export function resolveBlockModel(
   block: string,
   states: LittleEndianNbtCompoundValue,
@@ -86,12 +91,12 @@ export function resolveBlockModel(
   else if (/(?:^|_)fence_gate$/.test(block)) family = "gate";
   else if (/(?:^|_)fence$/.test(block)) family = "fence";
   else if (block.endsWith("_wall")) family = "wall";
-  else if (block.endsWith("glass_pane") || block === "iron_bars") family = "pane";
+  else if (block.endsWith("glass_pane") || BARS.test(block)) family = "pane";
   else if (block === "scaffolding") family = "scaffolding";
   else if (block === "bed" || block.endsWith("_bed")) family = "bed";
   else if (block === "chorus_plant") family = "chorus";
   else if (block === "chorus_flower") family = "chorus-flower";
-  else if (/^(?:soul_|copper_)?lantern$/.test(block)) family = "lantern";
+  else if (LANTERN.test(block)) family = "lantern";
   else if (block === "flower_pot") family = "pot";
   else if (block === "end_rod") family = "rod";
   else if (block === "chain" || block.endsWith("_chain")) family = "chain";
