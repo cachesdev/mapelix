@@ -56,7 +56,13 @@ export type ModelFamily =
   | "composter"
   | "low-box"
   | "brewing-stand"
-  | "bell";
+  | "bell"
+  | "button"
+  | "lever"
+  | "sign"
+  | "banner"
+  | "head"
+  | "frame";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -104,6 +110,9 @@ export const MODEL_STATES = [
   "attachment",
   "extinguished",
   "composter_fill_level",
+  "button_pressed_bit",
+  "lever_direction",
+  "ground_sign_direction",
   "liquid_depth",
 ] as const;
 
@@ -153,6 +162,12 @@ export function resolveBlockModel(
   else if (block === "lectern") family = "lectern";
   else if (block === "brewing_stand") family = "brewing-stand";
   else if (block === "bell") family = "bell";
+  else if (/(?:^|_)button$/.test(block)) family = "button";
+  else if (block === "lever") family = "lever";
+  else if (/(?:^|_)sign$/.test(block)) family = "sign";
+  else if (/(?:^|_)banner$/.test(block)) family = "banner";
+  else if (block === "skull" || /_(?:head|skull)$/.test(block)) family = "head";
+  else if (block === "frame" || block === "glow_frame") family = "frame";
   else if (block === "composter") family = "composter";
   else if (block === "enchanting_table" || block === "end_portal_frame") family = "low-box";
   if (family === undefined) return undefined;
@@ -560,6 +575,26 @@ export function blockModelParts(
       ];
     case "bell":
       return bellParts(s, facing);
+    case "button": {
+      const depth = isSet(s.button_pressed_bit) ? 1 : 2;
+      return attached([part([5, 0, 6, 11, depth, 10])], numberState(s, "facing_direction", 1));
+    }
+    case "lever":
+      return leverParts(s);
+    case "sign":
+      return signParts(model.block, s);
+    case "banner":
+      return model.block === "wall_banner"
+        ? attached([part([1, 0, 0, 15, 1, 14])], numberState(s, "facing_direction", 3))
+        : oriented([part([7, 0, 7, 9, 16, 9]), part([1, 2, 9, 15, 16, 10])], groundTurn(s));
+    case "head": {
+      const side = numberState(s, "facing_direction", 1);
+      return side >= 2
+        ? attached([part([4, 0, 4, 12, 8, 12])], side)
+        : [part([4, 0, 4, 12, 8, 12])];
+    }
+    case "frame":
+      return attached([part([2, 0, 2, 14, 1, 14])], numberState(s, "facing_direction", 1));
     case "lectern":
       // Base, post, and the desk in two steps sloping down to its front.
       return oriented(
@@ -640,6 +675,60 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+
+/**
+ * Parts drawn lying on the floor, turned onto the face `facing_direction` names: 1 the floor,
+ * 0 the ceiling, 2 to 5 facing north, south, west or east from the wall behind them.
+ */
+function attached(parts: readonly ModelPart[], facingDirection: number): readonly ModelPart[] {
+  return parts.map((p) => {
+    const [x0, y0, z0, x1, y1, z1] = p.bounds;
+    if (facingDirection === 1) return p;
+    if (facingDirection === 0) return { ...p, bounds: [x0, 16 - y1, z0, x1, 16 - y0, z1] };
+    // Against the north wall, facing south, then turned like the other models.
+    const south: ModelBounds = [x0, 16 - z1, y0, x1, 16 - z0, y1];
+    const turn = { 3: 0, 4: 1, 2: 2, 5: 3 }[facingDirection] ?? 0;
+    return { ...p, bounds: rotate(south, turn) };
+  });
+}
+
+/** Quarter turns of a block standing on the floor at one of 16 angles, from south. */
+const groundTurn = (s: LittleEndianNbtCompoundValue): number =>
+  Math.round(numberState(s, "ground_sign_direction") / 4) & 3;
+
+/** A sign: a board on a post, against a wall, or hanging from the ceiling. */
+function signParts(block: string, s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
+  if (block.endsWith("hanging_sign")) {
+    const turn =
+      s.ground_sign_direction !== undefined
+        ? groundTurn(s)
+        : ({ 3: 0, 4: 1, 2: 2, 5: 3 }[numberState(s, "facing_direction", 3)] ?? 0);
+    return oriented([part([1, 0, 7, 15, 10, 9])], turn);
+  }
+  if (block.endsWith("wall_sign"))
+    return attached([part([0, 0, 4, 16, 2, 12])], numberState(s, "facing_direction", 3));
+  return oriented([part([7, 0, 7, 9, 8, 9]), part([0, 8, 7, 16, 16, 9])], groundTurn(s));
+}
+
+/**
+ * A lever: its cobblestone base reads the east face, its handle the lever picture.
+ * `lever_direction` names the floor (`up_…`), the ceiling (`down_…`) or the way it faces.
+ */
+function leverParts(s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
+  const direction = String(s.lever_direction ?? "up_north_south");
+  const acrossX = direction.endsWith("east_west");
+  const base: ModelBounds = acrossX ? [4, 0, 5, 12, 3, 11] : [5, 0, 4, 11, 3, 12];
+  const parts: ModelPart[] = [
+    { bounds: base, faces: ALL_FACES(Face.PositiveX) },
+    { bounds: [7, 3, 7, 9, 13, 9], faces: ALL_FACES(Face.NegativeZ) },
+  ];
+  const side = direction.startsWith("up")
+    ? 1
+    : direction.startsWith("down")
+      ? 0
+      : ({ north: 2, south: 3, west: 4, east: 5 }[direction] ?? 1);
+  return attached(parts, side);
+}
 
 /**
  * A bell under a beam: on two stone posts on the floor, from the ceiling, from the wall
@@ -869,6 +958,28 @@ export function modelCatalog(): readonly BlockModel[] {
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   add("enchanting_table");
+  for (let facing_direction = 0; facing_direction < 6; facing_direction++) {
+    add("stone_button", { facing_direction, button_pressed_bit: 0 });
+    add("frame", { facing_direction });
+    if (facing_direction >= 1) add("skull", { facing_direction });
+    if (facing_direction >= 2) {
+      add("wall_sign", { facing_direction });
+      add("wall_banner", { facing_direction });
+    }
+  }
+  for (const lever_direction of [
+    "up_north_south",
+    "up_east_west",
+    "down_east_west",
+    "north",
+    "east",
+  ])
+    add("lever", { lever_direction });
+  for (let ground_sign_direction = 0; ground_sign_direction < 16; ground_sign_direction += 4) {
+    add("standing_sign", { ground_sign_direction });
+    add("standing_banner", { ground_sign_direction });
+    add("oak_hanging_sign", { ground_sign_direction });
+  }
   add("brewing_stand");
   for (const attachment of ["standing", "hanging", "side", "multiple"])
     for (let direction = 0; direction < 4; direction++) add("bell", { attachment, direction });

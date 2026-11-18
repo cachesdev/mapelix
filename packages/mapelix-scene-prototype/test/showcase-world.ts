@@ -186,6 +186,27 @@ put(18, FLOOR, 53, b("bell", { attachment: "multiple", direction: 0 }));
 put(18, FLOOR, 52, "minecraft:stone");
 put(18, FLOOR, 54, "minecraft:stone");
 
+// Buttons, levers, signs, banners, heads and frames: on the floor, then against stone.
+row(67, [
+  b("stone_button", { facing_direction: 1, button_pressed_bit: 0 }),
+  b("lever", { lever_direction: "up_north_south", open_bit: 0 }),
+  b("standing_sign", { ground_sign_direction: 0 }),
+  b("standing_banner", { ground_sign_direction: 4 }),
+  b("skull", { facing_direction: 1 }),
+  b("frame", { facing_direction: 1 }),
+]);
+[
+  b("stone_button", { facing_direction: 3, button_pressed_bit: 0 }),
+  b("lever", { lever_direction: "south", open_bit: 0 }),
+  b("wall_sign", { facing_direction: 3 }),
+  b("wall_banner", { facing_direction: 3 }),
+  b("skull", { facing_direction: 3 }),
+  b("frame", { facing_direction: 3 }),
+].forEach((block, i) => {
+  put(24 + i * 3, FLOOR, 66, "minecraft:stone");
+  put(24 + i * 3, FLOOR, 67, block);
+});
+
 // Full cubes to check the way their textures face.
 
 row(
@@ -195,20 +216,9 @@ row(
 // Still invisible or approximate: thin and wall blocks.
 row(
   70,
-  [
-    "standing_sign",
-    "standing_banner",
-    "skull",
-    "frame",
-    "stone_button",
-    "lever",
-    "web",
-    "amethyst_cluster",
-    "pointed_dripstone",
-    "fire",
-    "end_portal",
-    "sea_pickle",
-  ].map((name) => b(name)),
+  ["web", "amethyst_cluster", "pointed_dripstone", "fire", "end_portal", "sea_pickle"].map((name) =>
+    b(name),
+  ),
 );
 // Plants that hang or cling: vines and lichen against stone, cave vines under it.
 put(3, FLOOR, 75, "minecraft:stone");
@@ -220,7 +230,8 @@ put(9, FLOOR + 1, 74, b("cave_vines_head_with_berries"));
 
 // Gold floor under the samples still to do, so the invisible ones can be found.
 const todo = (x: number, z: number) =>
-  z >= 64 && [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
+  (z === 64 || z >= 70) &&
+  [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
 
 const records: FixtureRecord[] = [];
 for (let cz = 0; cz < CHUNKS_Z; cz++)
