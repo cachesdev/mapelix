@@ -249,7 +249,6 @@ async function regionResponse(
   if (textures !== null) {
     if (!/^[0-9a-f]{20}$/.test(textures)) return failure(400, "Invalid texture revision");
     if (level !== 0) return failure(400, "Textured regions are level 0 only");
-    if (context.mode !== "surface") return failure(400, "Textured regions are Surface only");
   }
   try {
     if (revision !== null && revision !== (await server.getRevision()))
@@ -259,9 +258,9 @@ async function regionResponse(
   } catch (cause) {
     return refusal(request, cause);
   }
-  // Surface regions come from the prewarm; cave slices may be built on demand. A cache-only
-  // handler never builds a textured region.
-  if (textures !== null && options.cacheOnly === true) {
+  // Surface regions come from the prewarm; cave slices, textured or not, may be built on demand.
+  // A cache-only handler never builds a textured Surface region.
+  if (textures !== null && options.cacheOnly === true && context.mode !== "caves") {
     return admitted(
       request,
       () => ({ cacheOnly: true, release: () => undefined }),

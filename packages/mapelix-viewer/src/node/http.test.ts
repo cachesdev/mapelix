@@ -117,7 +117,7 @@ describe("scene handler", () => {
     ]);
   });
 
-  it("serves textured level 0 Surface regions by texture revision, never built when cache-only", async () => {
+  it("serves textured level 0 regions and cave slices by texture revision, Surface ones never built when cache-only", async () => {
     const server = fakeServer();
     const handle = createSceneHandler(server as unknown as SceneServer);
     const current = "a".repeat(20);
@@ -138,7 +138,6 @@ describe("scene handler", () => {
       [`/regions/0/0/0?textures=${current}&cutout=yes`, 400],
       ["/regions/0/0/0?textures=nope", 400],
       [`/regions/1/0/0?textures=${current}`, 400],
-      [`/regions/0/0/0?mode=caves&minY=-64&maxY=-32&textures=${current}`, 400],
       [`/regions/0/0/0?textures=${"b".repeat(20)}`, 409],
     ] as const) {
       expect((await handle(get(path)))?.status, path).toBe(status);
@@ -149,6 +148,16 @@ describe("scene handler", () => {
     });
     await cached(get(`/regions/0/1/2?textures=${current}`));
     expect(server.loadRegion.mock.calls.at(-1)![3]).toEqual({ cacheOnly: true, textures: current });
+
+    // Textured cave slices, like plain ones, may be built on demand even when cache-only.
+    const slice = `/regions/0/1/2?mode=caves&minY=-64&maxY=-32&textures=${current}`;
+    for (const handler of [handle, cached]) {
+      expect((await handler(get(slice)))?.status).toBe(200);
+      const [, , context, load] = server.loadRegion.mock.calls.at(-1)!;
+      expect(context).toMatchObject({ mode: "caves", minY: -64, maxY: -32 });
+      expect(load).toMatchObject({ textures: current });
+      expect(load).not.toMatchObject({ cacheOnly: true });
+    }
   });
 
   it("refuses invalid requests and stale revisions with JSON errors", async () => {

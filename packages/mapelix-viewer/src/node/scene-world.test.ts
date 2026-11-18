@@ -357,14 +357,31 @@ describe("scene server", () => {
     expect(sent.textures.fingerprint).toBe(revision);
     const plain = await server.loadRegion(request, signal);
     expect(plain.bytes[7]).toBe(0);
-    for (const [load, context] of [
-      [{ textures: "0".repeat(20) }, sceneContext()],
-      [{ textures: revision }, sceneContext("overworld", { mode: "caves", minY: -64, maxY: -32 })],
-    ] as const) {
-      await expect(server.loadRegion(request, signal, context, load)).rejects.toBeInstanceOf(
-        InvalidRegionError,
-      );
-    }
+    await expect(
+      server.loadRegion(request, signal, sceneContext(), { textures: "0".repeat(20) }),
+    ).rejects.toBeInstanceOf(InvalidRegionError);
+    // Cave slices have a textured variant too, built on demand and cached apart.
+    const slice = sceneContext("overworld", { mode: "caves", minY: -64, maxY: -32 });
+    const cave = await server.loadRegion(request, signal, slice, { textures: revision });
+    expect(cave.cacheStatus).toBe("build");
+    expect(cave.bytes[7]).toBe(1);
+    expect(mocks.built.mock.calls.at(-1)![1]).toMatchObject({
+      mode: "caves",
+      minY: -64,
+      maxY: -32,
+      textures: { fingerprint: revision },
+    });
+    const detailed = await server.loadRegion(request, signal, slice, {
+      textures: revision,
+      cutout: true,
+    });
+    expect(detailed.cacheStatus).toBe("build");
+    expect(mocks.built.mock.calls.at(-1)![1]).toMatchObject({ mode: "caves", cutout: true });
+    expect(
+      (await server.loadRegion(request, signal, slice, { textures: revision })).cacheStatus,
+    ).toBe("memory");
+    expect((await server.loadRegion(request, signal, slice)).bytes[7]).toBe(0);
+    expect((await server.stats()).texturedCaves?.builds.built).toBe(2);
     await expect(
       server.loadRegion({ level: 1, x: 0, z: 0 }, signal, sceneContext(), { textures: revision }),
     ).rejects.toBeInstanceOf(InvalidRegionError);

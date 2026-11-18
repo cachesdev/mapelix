@@ -671,7 +671,7 @@ export class ViewerControls {
       viewer.setNetherCeiling(Number(ceilingInput.value)),
     );
     ceiling.append(ceilingLabel, ceilingInput);
-    // Block textures near the camera, when the server has them (Surface only).
+    // Block textures near the camera, when the server has them.
     const textures = this.check(t.textures, (on) => viewer.setTextures(on ? "on" : "off"));
     textures.dataset.part = "textures";
     const leaves = this.check(t.detailedLeaves, (on) => viewer.setLeaves(on ? "detailed" : "fast"));
@@ -1043,13 +1043,13 @@ export class ViewerControls {
     const textures = this.part<HTMLInputElement>("textures");
     if (textures) {
       textures.checked = settings.textures === "on";
-      textures.disabled = !status.available || caves || status.textures === "unavailable";
+      textures.disabled = !status.available || status.textures === "unavailable";
     }
     const leaves = this.part<HTMLInputElement>("leaves");
     if (leaves) {
       leaves.checked = settings.leaves === "detailed";
       // Only textured leaves have a detailed look.
-      show(wrapperOf(leaves), settings.textures === "on" && !caves);
+      show(wrapperOf(leaves), settings.textures === "on");
     }
     const texturesNote = this.part("textures-note");
     if (texturesNote) {

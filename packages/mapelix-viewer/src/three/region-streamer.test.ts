@@ -257,6 +257,49 @@ describe("dimension streaming lifecycle", () => {
       warning.mockRestore();
     }
   });
+  it("asks for textured cave slices with the slice in the query", async () => {
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input) => {
+        const url = new URL(String(input), "http://localhost");
+        urls.push(url);
+        return regionResponse(url);
+      }),
+    );
+    const streamer = stream("overworld", {
+      context: sceneContext("overworld", { mode: "caves", minY: 64, maxY: 96 }),
+      viewDistance: 8,
+      voxelPixels: 0.01,
+      blockPixels: 0.01,
+      maxRequests: 4,
+    });
+    const camera = new PerspectiveCamera(50, 1, 1, 1000);
+    camera.position.set(32, 86, 32);
+    camera.lookAt(32, 81, 33);
+    const frame = () => streamer.update(camera, 600);
+    try {
+      streamer.setTextures({
+        revision: "a".repeat(20),
+        materials: {} as SceneMaterials,
+        minPixels: 4,
+      });
+      await vi.waitFor(() => {
+        frame();
+        expect(streamer.stats.textured).toBe(1);
+      });
+      const textured = urls.filter((url) => url.searchParams.has("textures"));
+      expect(textured.length).toBeGreaterThan(0);
+      for (const url of textured) {
+        expect(url.pathname).toMatch(/^\/regions\/0\//);
+        expect(url.searchParams.get("mode")).toBe("caves");
+        expect(url.searchParams.get("minY")).toBe("64");
+        expect(url.searchParams.get("maxY")).toBe("96");
+      }
+    } finally {
+      streamer.dispose();
+    }
+  });
   it("pauses scheduling after a 429 instead of retrying every frame", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(null, {

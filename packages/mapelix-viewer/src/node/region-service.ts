@@ -195,6 +195,7 @@ export class RegionService {
             minY: context.minY,
             maxY: context.maxY,
             ceilingY: context.ceilingY,
+            ...(cutout ? { cutout } : {}),
           };
     return this.flights.join(
       key,

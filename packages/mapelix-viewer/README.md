@@ -77,6 +77,7 @@ working unchanged, with textures off, and with a server that has no texture stac
   which the viewer also does by itself when the server no longer serves its texture revision;
   `WorldViewer.setWorldTextures()` and the `onStaleTextures` option for hosts that drive a
   `WorldViewer` directly.
+- Also later in version 5: block textures in the Caves view, with the same setting and switch.
 
 ### API version 4 (changes from 3)
 

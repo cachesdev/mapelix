@@ -246,7 +246,7 @@ export class RegionStreamer {
    */
   setTextures(textures: StreamedTextures | undefined): void {
     const previous = this.textures;
-    this.textures = this.context.mode === "surface" ? textures : undefined;
+    this.textures = textures;
     if (
       this.textures !== undefined &&
       previous?.revision === this.textures.revision &&

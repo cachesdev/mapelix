@@ -176,6 +176,11 @@ export interface SceneServerStats {
   readonly caves: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
   /** Textured level 0 regions, with a texture stack only. */
   readonly textured?: { readonly builds: RegionServiceStats; readonly cache: DiskCacheStats };
+  /** Textured level 0 cave slices, with a texture stack only. */
+  readonly texturedCaves?: {
+    readonly builds: RegionServiceStats;
+    readonly cache: DiskCacheStats;
+  };
   readonly discoveries: {
     readonly builds: DiscoveryServiceStats;
     readonly cache: DiskCacheStats;
@@ -219,6 +224,8 @@ interface TextureSet {
   readonly stack: SceneTextures;
   /** Textured level 0 Surface regions. */
   readonly surface: { readonly service: RegionService; readonly disk: DiskCache };
+  /** Textured level 0 cave slices, built on demand like plain ones. */
+  readonly caves: { readonly service: RegionService; readonly disk: DiskCache };
 }
 
 /**
@@ -337,7 +344,8 @@ export function createSceneServer(options: SceneServerOptions) {
     if (error === undefined) {
       await SceneTextures.removeOtherRevisions(cacheDirectory, textures?.revision, event);
       if (textures === undefined) {
-        await rm(join(cacheDirectory, "textures", "regions"), { recursive: true, force: true });
+        for (const folder of ["regions", "caves"])
+          await rm(join(cacheDirectory, "textures", folder), { recursive: true, force: true });
       }
     }
     const extent = bounds === undefined ? await loadExtent(revision) : undefined;
@@ -398,40 +406,58 @@ export function createSceneServer(options: SceneServerOptions) {
   }
 
   /**
-   * The services of a stack's textured regions. Their cache depends on the world and the stack;
-   * at start other pairs leave the disk, and while running the set it replaces is retired.
+   * The services of a stack's textured regions and cave slices. Their caches depend on the
+   * world and the stack; at start other pairs leave the disk, and while running the set it
+   * replaces is retired. Textured cave slices take the cave cache sizes.
    */
   async function openTextureSet(
     world: Pick<Opened, "revision" | "bounds" | "build">,
     stack: SceneTextures,
     removeOthers: boolean,
   ): Promise<TextureSet> {
-    const disk = await DiskCache.open(
-      join(cacheDirectory, "textures", "regions"),
-      createHash("sha256")
-        .update(`${world.revision}\0${stack.revision}`)
-        .digest("hex")
-        .slice(0, 20),
-      texturedSizes.disk,
-      { onEvent: event },
-      { removeOthers },
-    );
-    const service = new RegionService({
-      mode: "surface",
-      dimensions: world.bounds,
-      build: world.build,
-      store: disk,
-      memoryBytes: texturedSizes.memory,
-      maxPending: texturedSizes.pending,
-      onEvent: event,
-      textures: async () => (await stack.load())!.index,
-    });
-    return { stack, surface: { service, disk } };
+    const pair = createHash("sha256")
+      .update(`${world.revision}\0${stack.revision}`)
+      .digest("hex")
+      .slice(0, 20);
+    const textures = async () => (await stack.load())!.index;
+    const open = async (
+      mode: "surface" | "caves",
+      folder: string,
+      limits: { readonly memory: number; readonly disk: number; readonly pending: number },
+    ) => {
+      const disk = await DiskCache.open(
+        join(cacheDirectory, "textures", folder),
+        pair,
+        limits.disk,
+        { onEvent: event },
+        { removeOthers },
+      );
+      const service = new RegionService({
+        mode,
+        dimensions: world.bounds,
+        build: world.build,
+        store: disk,
+        memoryBytes: limits.memory,
+        maxPending: limits.pending,
+        onEvent: event,
+        textures,
+      });
+      return { service, disk };
+    };
+    return {
+      stack,
+      surface: await open("surface", "regions", texturedSizes),
+      caves: await open("caves", "caves", {
+        memory: sizes.caveMemory,
+        disk: sizes.caveDisk,
+        pending: sizes.cavePending,
+      }),
+    };
   }
 
   /** Removes a replaced stack's atlas and textured regions from the disk. */
   async function retireTextureSet(set: TextureSet): Promise<void> {
-    await Promise.all([set.stack.retire(), set.surface.disk.retire()]);
+    await Promise.all([set.stack.retire(), set.surface.disk.retire(), set.caves.disk.retire()]);
   }
 
   /**
@@ -615,8 +641,9 @@ export function createSceneServer(options: SceneServerOptions) {
    * A serialized region from memory, the disk cache, a shared build, or an empty one outside
    * the stored area. A build every caller abandoned stops before it starts. Rejects with
    * `InvalidRegionError`, `OverloadedError` or, with `cacheOnly`, `NotCachedError`. With
-   * `textures`, the texture revision served, it is the textured level 0 Surface region, and
-   * with `cutout` too, its variant that draws the faces between leaves and other cut-out blocks.
+   * `textures`, the texture revision served, it is the textured level 0 Surface region or cave
+   * slice, and with `cutout` too, its variant that draws the faces between leaves and other
+   * cut-out blocks.
    */
   async function loadRegion(
     request: RegionRequest,
@@ -634,8 +661,22 @@ export function createSceneServer(options: SceneServerOptions) {
       if (set === undefined || load.textures !== set.stack.revision) {
         throw new InvalidRegionError(`No texture revision ${load.textures} is served`);
       }
-      if (context.mode !== "surface") {
-        throw new InvalidRegionError("Textured regions are Surface regions only");
+      if (context.mode === "caves") {
+        return set.caves.service.load(
+          context.dimension,
+          {
+            level: request.level,
+            x: request.x,
+            z: request.z,
+            mode: "caves",
+            minY: context.minY,
+            maxY: context.maxY,
+            ceilingY: context.ceilingY,
+            ...(load.cutout === true ? { cutout: true } : {}),
+          },
+          signal,
+          load.cacheOnly === true ? { cacheOnly: true } : {},
+        );
       }
       return set.surface.service.load(
         context.dimension,
@@ -758,6 +799,10 @@ export function createSceneServer(options: SceneServerOptions) {
             textured: {
               builds: textureSet.surface.service.stats,
               cache: textureSet.surface.disk.stats,
+            },
+            texturedCaves: {
+              builds: textureSet.caves.service.stats,
+              cache: textureSet.caves.disk.stats,
             },
           }),
       discoveries: { builds: world.discoveries.stats, cache: world.disks.discoveries.stats },

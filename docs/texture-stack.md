@@ -133,11 +133,16 @@ revision.
 - `regions/0/<x>/<z>?textures=<revision>&cutout=1`: the same region for detailed leaves, with
   the faces between neighbouring cut-out cubes such as leaves. `cutout=1` without `textures`
   answers 400. It is cached apart, under `cutout/` in the textured region cache.
+- `regions/0/<x>/<z>?mode=caves&minY=…&maxY=…&textures=<revision>` (and `&cutout=1`): a
+  textured level 0 cave slice. Like plain cave slices it is built on demand, even by a
+  cache-only handler, and never prewarmed.
 
 Textured regions have their own cache, `<cache>/textures/regions/`, bounded by
 `textures.diskCacheMiB` (512 by default) and named after the world and texture revisions
 together; `prewarm()` builds the atlas, then textured level 0 regions after the plain ones, and
-reports them in `stats().prewarm.textures`.
+reports them in `stats().prewarm.textures`. Textured cave slices have their own cache too,
+`<cache>/textures/caves/`, with the sizes of the plain cave cache (`caveMemoryMiB`,
+`caveDiskCacheMiB`, `caveMaxPending`), and `stats().texturedCaves`.
 
 The atlas is built on its first request, or by a prewarm, and stored in
 `<cache>/textures/atlas-v2/<revision>/`. Opening a server with another stack removes the older
@@ -155,8 +160,8 @@ its block colors.
 
 - The atlas loads once from `textures/<revision>/atlas.bin` (about 630 KiB with Brotli for the
   vanilla pack) and takes its GPU size in `snapshot().textures.gpuBytes`.
-- Level 0 Surface regions whose nearest block draws at least `textureFade.none` CSS pixels are
-  asked for again with `?textures=`. The plain region stays until its textured twin arrives,
+- Level 0 Surface regions and cave slices whose nearest block draws at least
+  `textureFade.none` CSS pixels are asked for again with `?textures=`. The plain region stays until its textured twin arrives,
   then they dissolve into each other; at most 160 textured regions stay cached beyond those on
   screen.
 - Each pixel blends from the block color to the texture between `textureFade.none` and
