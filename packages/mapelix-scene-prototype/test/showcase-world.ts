@@ -196,12 +196,20 @@ put(6, FLOOR, 74, b("glow_lichen", { multi_face_direction_bits: 8 }));
 put(9, FLOOR + 2, 74, "minecraft:stone");
 put(9, FLOOR + 1, 74, b("cave_vines_head_with_berries"));
 
+// Gold floor under the samples still to do, so the invisible ones can be found.
+const todo = (x: number, z: number) =>
+  z >= 64 && [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
+
 const records: FixtureRecord[] = [];
 for (let cz = 0; cz < CHUNKS_Z; cz++)
   for (let cx = 0; cx < CHUNKS_X; cx++) {
     records.push(
-      sectionRecord(0, cx, cz, 3, (_x, y) =>
-        y === FLOOR - 1 ? "minecraft:grass_block" : "minecraft:stone",
+      sectionRecord(0, cx, cz, 3, (x, y, z) =>
+        y !== FLOOR - 1
+          ? "minecraft:stone"
+          : todo(x, z)
+            ? "minecraft:gold_block"
+            : "minecraft:grass_block",
       ),
     );
     records.push(
