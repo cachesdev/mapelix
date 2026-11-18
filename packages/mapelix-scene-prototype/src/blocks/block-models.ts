@@ -507,7 +507,8 @@ export function blockModelParts(
       const along = (facing & 1) === 1;
       return ANVIL_PARTS.map((bounds, index) =>
         index < 3
-          ? part(along ? bounds : rotate(bounds, 1))
+          ? // Only the top shows the top texture, which is clear beyond its face.
+            { bounds: along ? bounds : rotate(bounds, 1), faces: ANVIL_BASE_FACES }
           : along
             ? part(bounds)
             : sheetPart(rotate(bounds, 1), { axis: "x", side: [3, 0], top: [3, 0] }),
@@ -570,6 +571,15 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
 const CORNER: PartSheet = { side: [0, 0], top: [0, 0] };
+/** Every face of a part from the block's side and bottom textures, as below an anvil's top. */
+const ANVIL_BASE_FACES: readonly number[] = [
+  Face.PositiveX,
+  Face.NegativeX,
+  Face.NegativeY,
+  Face.NegativeY,
+  Face.PositiveZ,
+  Face.NegativeZ,
+];
 
 function stairParts(model: BlockModel, neighbors: ModelNeighbors): readonly ModelPart[] {
   const { states: s } = model;

@@ -115,7 +115,11 @@ export function resolveBlockTextures(
     if (terrain === undefined) return undefined;
     return terrain.textures[variantIndex(states, terrain.textures.length)]?.path;
   };
-  const front = facing(states);
+  // A grindstone's parts pick their own faces of the block's textures (`ModelPart.faces`).
+  const front =
+    appearance.shape.kind === "model" && appearance.shape.model.family === "grindstone"
+      ? undefined
+      : facing(states);
   const turn = front === undefined ? 0 : RING.indexOf(front);
   const tintedFace = (face: number): boolean =>
     appearance.tint !== "none" && (!appearance.tintTopOnly || face === Face.PositiveY);
