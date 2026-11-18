@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BlockPalette, Shape, VoxelKind } from "../mesh/block-palette.js";
-import { MODEL_BOUND_CODES, modelBoxBounds, modelBoxId } from "../format.js";
+import { packModelBounds, unpackModelBounds } from "../format.js";
 import {
   blockModelParts,
   modelCatalog,
@@ -22,8 +22,7 @@ const volume = (block: BlockModel) =>
   );
 
 describe("Bedrock block models", () => {
-  it("registers every catalog cuboid with valid, stable sixteenth coordinates", () => {
-    expect(MODEL_BOUND_CODES.length).toBeLessThanOrEqual(192);
+  it("gives every catalog cuboid valid sixteenth coordinates", () => {
     for (const entry of modelCatalog())
       for (const { bounds } of blockModelParts(entry)) {
         for (let axis = 0; axis < 3; axis++) {
@@ -31,7 +30,7 @@ describe("Bedrock block models", () => {
           expect(bounds[axis + 3]).toBeLessThanOrEqual(16);
           expect(bounds[axis + 3]).toBeGreaterThan(bounds[axis]!);
         }
-        expect(modelBoxBounds(modelBoxId(bounds))).toEqual(bounds);
+        expect(unpackModelBounds(packModelBounds(bounds))).toEqual(bounds);
       }
   });
   it.each([0, 1, 2, 3])(

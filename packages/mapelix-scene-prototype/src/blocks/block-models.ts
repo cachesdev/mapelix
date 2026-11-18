@@ -1,4 +1,5 @@
 import type { LittleEndianNbtCompoundValue } from "@mapelix/prototype/bedrock";
+import { Face } from "../format.js";
 import type { ModelBounds } from "../model-boxes.js";
 import type { PartSheet } from "../textures/sheet-faces.js";
 export type { ModelBounds } from "../model-boxes.js";
@@ -15,6 +16,11 @@ export interface ModelPart {
   readonly sheet?: PartSheet;
   /** A colored part that still takes the block's texture where textures show, as a pillow. */
   readonly textured?: true;
+  /**
+   * For each face, in `Face` order, the block face whose texture it reads, so that parts of one
+   * block can show different textures, as a grindstone's legs, pivots and wheel do.
+   */
+  readonly faces?: readonly number[];
 }
 
 export type ModelFamily =
@@ -41,7 +47,9 @@ export type ModelFamily =
   | "candle"
   | "cake"
   | "cauldron"
-  | "hopper";
+  | "hopper"
+  | "anvil"
+  | "grindstone";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -86,6 +94,7 @@ export const MODEL_STATES = [
   "candles",
   "lit",
   "bite_counter",
+  "attachment",
   "liquid_depth",
 ] as const;
 
@@ -96,6 +105,7 @@ const BARS = new RegExp(`^(?:iron_|${COPPER_PREFIX})bars$`);
 /** `torch_facing_direction` values of torches on a wall: the side the wall is on. */
 const WALL_SIDES: ReadonlySet<string> = new Set(["north", "south", "east", "west"]);
 const LIGHTNING_ROD = /^(?:waxed_)?(?:exposed_|weathered_|oxidized_)?lightning_rod$/;
+const ANVIL = /^(?:chipped_|damaged_)?anvil$/;
 
 export function resolveBlockModel(
   block: string,
@@ -127,6 +137,8 @@ export function resolveBlockModel(
   else if (block === "cake" || block === "candle_cake") family = "cake";
   else if (block === "cauldron" || block === "lava_cauldron") family = "cauldron";
   else if (block === "hopper") family = "hopper";
+  else if (ANVIL.test(block)) family = "anvil";
+  else if (block === "grindstone") family = "grindstone";
   if (family === undefined) return undefined;
   const modelStates = Object.fromEntries(
     MODEL_STATES.flatMap((key) => (states[key] === undefined ? [] : [[key, states[key]]])),
@@ -161,6 +173,23 @@ const ROD_BOUNDS: Readonly<Record<"x" | "y" | "z", ModelBounds>> = {
   y: [7, 0, 7, 9, 16, 9],
   z: [7, 7, 0, 9, 9, 16],
 };
+/** An anvil with its top along z: base, neck, waist and top. */
+const ANVIL_PARTS: readonly ModelBounds[] = [
+  [2, 0, 2, 14, 4, 14],
+  [4, 4, 3, 12, 5, 13],
+  [6, 5, 4, 10, 10, 12],
+  [3, 10, 0, 13, 16, 16],
+];
+/** A standing grindstone with its axle along x: two legs, two pivots, and the wheel. */
+const GRINDSTONE_LEGS: readonly ModelBounds[] = [
+  [2, 0, 6, 4, 7, 10],
+  [12, 0, 6, 14, 7, 10],
+];
+const GRINDSTONE_PIVOTS: readonly ModelBounds[] = [
+  [2, 7, 5, 4, 13, 11],
+  [12, 7, 5, 14, 13, 11],
+];
+const GRINDSTONE_WHEEL: ModelBounds = [4, 4, 2, 12, 16, 14];
 const isSet = (value: unknown): boolean => value === 1 || value === true;
 const numberState = (s: LittleEndianNbtCompoundValue, key: string, fallback = 0): number =>
   typeof s[key] === "number" ? s[key] : fallback;
@@ -473,6 +502,19 @@ export function blockModelParts(
         part([2, 4, 0, 14, 16, 2]),
         part([2, 4, 14, 14, 16, 16]),
       ];
+    case "anvil": {
+      // The top runs across the way the anvil faces; its texture runs along the top.
+      const along = (facing & 1) === 1;
+      return ANVIL_PARTS.map((bounds, index) =>
+        index < 3
+          ? part(along ? bounds : rotate(bounds, 1))
+          : along
+            ? part(bounds)
+            : sheetPart(rotate(bounds, 1), { axis: "x", side: [3, 0], top: [3, 0] }),
+      );
+    }
+    case "grindstone":
+      return grindstoneParts(s, facing);
     case "hopper":
       return [
         part([0, 10, 0, 2, 16, 16]),
@@ -484,6 +526,42 @@ export function blockModelParts(
       ];
   }
 }
+
+/**
+ * A grindstone stands on the floor, hangs from the ceiling, or sits against the wall behind it.
+ * Its legs read the block's bottom texture, its pivots the north one, and its wheel the east
+ * one on its two flat sides and the top one around its rim.
+ */
+function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): readonly ModelPart[] {
+  const attachment = s.attachment;
+  const place = (bounds: ModelBounds): ModelBounds => {
+    const [x0, y0, z0, x1, y1, z1] = bounds;
+    const placed: ModelBounds =
+      attachment === "hanging"
+        ? [x0, 16 - y1, z0, x1, 16 - y0, z1]
+        : attachment === "side" || attachment === "multiple"
+          ? [x0, 16 - z1, y0, x1, 16 - z0, y1]
+          : bounds;
+    return rotate(placed, facing);
+  };
+  const axle = (facing & 1) === 0 ? 0 : 2;
+  const wheelFaces = [0, 1, 2, 3, 4, 5].map((face) =>
+    face >> 1 === axle ? Face.PositiveX : Face.PositiveY,
+  );
+  return [
+    ...GRINDSTONE_LEGS.map((bounds) => ({
+      bounds: place(bounds),
+      faces: ALL_FACES(Face.NegativeY),
+    })),
+    ...GRINDSTONE_PIVOTS.map((bounds) => ({
+      bounds: place(bounds),
+      faces: ALL_FACES(Face.NegativeZ),
+    })),
+    { bounds: place(GRINDSTONE_WHEEL), faces: wheelFaces },
+  ];
+}
+
+const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
 
 function stairParts(model: BlockModel, neighbors: ModelNeighbors): readonly ModelPart[] {
   const { states: s } = model;
@@ -591,5 +669,10 @@ export function modelCatalog(): readonly BlockModel[] {
   }
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
+  for (let direction = 0; direction < 4; direction++) {
+    add("anvil", { direction });
+    for (const attachment of ["standing", "hanging", "side"])
+      add("grindstone", { direction, attachment });
+  }
   return samples;
 }

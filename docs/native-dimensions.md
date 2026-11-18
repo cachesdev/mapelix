@@ -102,7 +102,7 @@ A host that embeds the viewer with its own routes should keep the following beha
   routing, region builds and every cache layer. Context must survive renderer/streamer
   replacement and URL restoration.
 - Version the host's own embedding interface when exposing dimension switching. This is
-  separate from binary `REGION_FORMAT_VERSION`, which remains 2, and mesh revision 20.
+  separate from binary `REGION_FORMAT_VERSION` (2 then, 3 since boxes moved into the quads) and mesh revision 20.
 - Preserve Overworld defaults and existing transport options. Requests without a dimension
   default to Overworld and ceiling Y 320. Normalize legacy metadata that omits scene context
   to these defaults at the host boundary.

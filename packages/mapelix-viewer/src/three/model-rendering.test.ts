@@ -7,7 +7,6 @@ import {
   QuadMaterial,
   decodeSceneRegion,
   encodeSceneRegion,
-  modelBoxId,
   packModelWord1,
   packQuadWord0,
   type ModelBounds,
@@ -34,7 +33,7 @@ function region(words: Uint32Array) {
 function modelFace(bounds: ModelBounds) {
   return [
     packQuadWord0(0, 60, 0, Face.PositiveY, QuadMaterial.Solid) | QUAD_MODEL_FLAG,
-    packModelWord1(modelBoxId(bounds)),
+    packModelWord1(bounds),
     0xff7d7d7d,
   ];
 }

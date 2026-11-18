@@ -13,7 +13,6 @@ import {
   packQuadWord1,
   packQuadWord2,
   packModelWord1,
-  modelBoxId,
   partitionLavaQuads,
   type PlantSprite,
   type SceneRegion,
@@ -532,15 +531,15 @@ class VoxelMesher {
                     );
               list.push(
                 packQuadWord0(x, y, z, faceOf(face), material) | QUAD_MODEL_FLAG,
-                packModelWord1(modelBoxId(part.bounds)),
+                packModelWord1(part.bounds),
                 packQuadWord2(color, occlusion),
                 this.textureWords === undefined ||
                   (part.color !== undefined && part.textured !== true)
                   ? 0
                   : part.sheet === undefined
-                    ? this.textureWords[id * 6 + face]!
+                    ? this.textureWords[id * 6 + (part.faces?.[face] ?? face)]!
                     : sheetFaceWord(
-                        this.textureWords[id * 6 + face]!,
+                        this.textureWords[id * 6 + (part.faces?.[face] ?? face)]!,
                         part.bounds,
                         face,
                         part.sheet,

@@ -27,14 +27,16 @@ Detailed LOD 0 geometry includes:
 - Lantern bodies, pots, axis-aligned rods/chains, ladders, candle groups, bitten
   cakes, hollow cauldrons and hoppers. Standing and hanging end rods have their
   base, and lightning rods (every copper stage) their tip; lying ones keep the
-  rod alone, as the catalog has room for few more boxes. These are cuboid representations:
+  rod alone. Anvils (intact, chipped, damaged) and grindstones on the floor, the
+  ceiling or a wall; the grindstone's legs, pivots and wheel each read their own face
+  of the block's textures. These are cuboid representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.
 
 Fully covered model faces are culled. The ray collider and vertex shader use
 identical bounds, removing former cube collisions from empty stair halves and
 open gates. Farther LODs retain the cubic voxel policy and material/color
-reduction. This bounded cuboid catalog is not a resource-pack interpreter.
+reduction. These cuboid models are not a resource-pack interpreter.
 
 ## Lava
 
@@ -61,22 +63,20 @@ retains the Overworld sky barrier for terrain below its surface.
 
 ## Format and integration contract
 
-The header remains version **2**, with **12 bytes per quad** and original
-material IDs. Optional extensions use reserved/non-plant bits:
+The header is version **3**, with **12 bytes per quad** and original material
+IDs:
 
-- Word 0 bit 31 marks a model cuboid. Word 1 bits 24-31 encode the bounds ID as
-  `(floor(id / 6) << 3) | (id % 6)`, retaining legal legacy sprite values 0-5.
-  Other fields provide a full-box fallback for old readers.
+- Word 0 bit 31 marks a model cuboid. Its word 1 holds the box itself, five bits
+  per coordinate in sixteenths of the cell (`packModelBounds`): low x, y, z, then
+  high x, y, z, 30 bits in all. A model quad covers one cell, so any box fits and
+  no catalog limits the shapes.
 - Non-model word 1 bit 27 marks lava; bits 28-31 encode horizontal flow.
-  The base material stays `Emissive`, giving old readers static emission.
-- The append-only catalog has 183 bounds, stored as shared scalar uniforms.
-  Its encoding permits 192 entries. Never reorder IDs. With Node 24, run
-  `node packages/mapelix-scene-prototype/scripts/generate-model-bounds.mjs`,
-  then format the output with the existing formatter.
+  The base material stays `Emissive`, giving plain readers static emission.
 
-New viewers also read old regions without flags. The actual reader from
-`855d98f` parses new real-world regions during validation. Old viewers approximate
-model parts as boxes and do not animate lava.
+Version 2 stored a 0-191 index into a shared list of boxes in word 1 bits 24-31.
+Readers accept only their own version, so a viewer and its scene server must be
+updated together; the region cache rebuilds on its own, as the version is part of
+the revision.
 
 The prototype mesh revision advances from 22 to **23**. A server that fingerprints
 the compiled engine gets a new revision and cache identity. Keep the cache key

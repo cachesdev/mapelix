@@ -1,4 +1,3 @@
-import { MODEL_BOUND_CODES } from "@mapelix/scene-prototype/format";
 import {
   Fn,
   If,
@@ -11,7 +10,6 @@ import {
   select,
   sRGBTransferEOTF,
   uint,
-  uniformArray,
   varyingProperty,
   vec2,
   vec3,
@@ -48,9 +46,6 @@ const bits = (word: Node<"uint">, shift: number, mask: number) =>
 /** Occlusion levels 0 through 3 mapped to light. Level 0 still keeps some bounce light. */
 const occlusionCurve = (level: Node<"float">) => mix(float(0.5), float(1), level.div(3).pow(0.8));
 
-// One scalar per cuboid, shared by all regions. No per-vertex/per-instance model buffers.
-const modelBounds = uniformArray<"uint">([...MODEL_BOUND_CODES], "uint");
-
 export const quadPosition = Fn(() => {
   const words = attribute("quad", "uvec3");
   const word0 = uint(words.x);
@@ -59,8 +54,10 @@ export const quadPosition = Fn(() => {
 
   const cell = vec3(bits(word0, 0, 127), bits(word0, 14, 511).sub(64), bits(word0, 7, 127));
   const face = bits(word0, 23, 7);
-  const width = bits(word1, 0, 127).add(1);
-  const height = bits(word1, 7, 511).add(1);
+  // A model quad's word 1 is its box in sixteenths of one cell, not sizes.
+  const model = bits(word0, 31, 1).equal(1);
+  const width = select(model, float(1), bits(word1, 0, 127).add(1));
+  const height = select(model, float(1), bits(word1, 7, 511).add(1));
   const size = bits(word1, 16, 15).add(1).div(16);
   const inset = bits(word1, 20, 7).div(16);
   const anchoredTop = bits(word1, 23, 1);
@@ -90,11 +87,8 @@ export const quadPosition = Fn(() => {
   const bottom = anchoredTop.mul(float(1).sub(size));
   const low = vec3(inset, bottom, inset).toVar();
   const high = vec3(float(1).sub(inset), bottom.add(size), float(1).sub(inset)).toVar();
-  If(bits(word0, 31, 1).equal(1), () => {
-    const index = bits(word1, 27, 31)
-      .mul(6)
-      .add(bits(word1, 24, 7));
-    const packed = uint(modelBounds.element(uint(index)));
+  If(model, () => {
+    const packed = word1;
     low.assign(vec3(bits(packed, 0, 31), bits(packed, 5, 31), bits(packed, 10, 31)).div(16));
     high.assign(vec3(bits(packed, 15, 31), bits(packed, 20, 31), bits(packed, 25, 31)).div(16));
   });

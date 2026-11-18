@@ -11,8 +11,9 @@
  *         material (4) << 26 | covered soil (1) << 30 | optional model flag << 31
  * Word 1: width - 1 (7) | height - 1 (9) << 7 | box size - 1 (4) << 16 |
  *         box inset (3) << 20 | box anchored to top (1) << 23 | sprite (3) << 24
- *         Non-plant extensions: model bounds ID in bits 24-31, or lava in bit 27
- *         and its horizontal flow in bits 28-31. See docs/block-models-and-lava.md.
+ *         Non-plant extension: lava in bit 27 and its horizontal flow in bits 28-31.
+ *         Model quads (word 0 bit 31) hold their box instead, as `packModelBounds` packs it:
+ *         one cell, any box in sixteenths. See docs/block-models-and-lava.md.
  * Word 2: sRGB color (24) | corner occlusion (4 × 2) << 24
  *
  * A textured region (header byte 7, bit 0) follows the quads with one more `uint32` per quad,
@@ -25,16 +26,16 @@
  * the quad's color along its top edge.
  */
 
-import { modelBoxBounds, type ModelBounds } from "./model-boxes.js";
-export { MODEL_BOUND_CODES, modelBoxBounds, modelBoxId, type ModelBounds } from "./model-boxes.js";
+import { packModelBounds, unpackModelBounds, type ModelBounds } from "./model-boxes.js";
+export { packModelBounds, unpackModelBounds, type ModelBounds } from "./model-boxes.js";
 
-/** Optional model extension. Legacy readers ignore this formerly reserved bit. */
+/** Model quads: word 1 holds the quad's box in sixteenths of one cell. */
 export const QUAD_MODEL_FLAG = 0x8000_0000;
 /** Non-model emissive quads with this flag use the animated lava material. */
 export const QUAD_LAVA_FLAG = 1 << 27;
 
 export const REGION_MAGIC = 0x3153_584d; // "MXS1" in little-endian byte order.
-export const REGION_FORMAT_VERSION = 2;
+export const REGION_FORMAT_VERSION = 3;
 export const REGION_HEADER_BYTES = 40;
 /** Header byte 7: the region carries a texture word per quad. */
 export const REGION_FLAG_TEXTURED = 1;
@@ -151,16 +152,9 @@ export function packQuadWord2(color: number, occlusion: number): number {
   return ((color & 0xffffff) | (occlusion << 24)) >>> 0;
 }
 
-/** Uses only extension bits and legal legacy sprite values, retaining a full-box fallback. */
-export function packModelWord1(id: number): number {
-  modelBoxBounds(id); // Validate before packing; the catalog has at most 192 entries.
-  const code = (Math.floor(id / 6) << 3) | (id % 6);
-  return (packQuadWord1(1, 1, FULL_BOX, 0) | (code << 24)) >>> 0;
-}
-
-export function quadModelIndex(word1: number): number {
-  const code = word1 >>> 24;
-  return (code >>> 3) * 6 + (code & 7);
+/** Word 1 of a model quad: its box, one cell wide and high. */
+export function packModelWord1(bounds: ModelBounds): number {
+  return packModelBounds(bounds);
 }
 
 export function isLavaQuad(word0: number, word1: number): boolean {
@@ -206,17 +200,24 @@ export function unpackQuad(words: Uint32Array, index: number): Quad {
     face: asFace((word0 >>> 23) & 0x7),
     material: asMaterial((word0 >>> 26) & 0xf),
     coveredSoil: ((word0 >>> 30) & 1) === 1,
-    width: (word1 & 0x7f) + 1,
-    height: ((word1 >>> 7) & 0x1ff) + 1,
-    box: {
-      size: ((word1 >>> 16) & 0xf) + 1,
-      inset: (word1 >>> 20) & 0x7,
-      anchoredTop: ((word1 >>> 23) & 1) === 1,
-    },
-    sprite: asSprite((word1 >>> 24) & 0x7),
     ...((word0 & QUAD_MODEL_FLAG) !== 0
-      ? { modelBounds: modelBoxBounds(quadModelIndex(word1)) }
-      : {}),
+      ? {
+          width: 1,
+          height: 1,
+          box: FULL_BOX,
+          sprite: PlantSprite.Grass,
+          modelBounds: unpackModelBounds(word1),
+        }
+      : {
+          width: (word1 & 0x7f) + 1,
+          height: ((word1 >>> 7) & 0x1ff) + 1,
+          box: {
+            size: ((word1 >>> 16) & 0xf) + 1,
+            inset: (word1 >>> 20) & 0x7,
+            anchoredTop: ((word1 >>> 23) & 1) === 1,
+          },
+          sprite: asSprite((word1 >>> 24) & 0x7),
+        }),
     ...(isLavaQuad(word0, word1) ? { lava: true, lavaFlow: word1 >>> 28 } : {}),
     color: word2 & 0xffffff,
     occlusion: word2 >>> 24,
