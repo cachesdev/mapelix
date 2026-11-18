@@ -54,7 +54,9 @@ export type ModelFamily =
   | "campfire"
   | "lectern"
   | "composter"
-  | "low-box";
+  | "low-box"
+  | "brewing-stand"
+  | "bell";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -149,6 +151,8 @@ export function resolveBlockModel(
   else if (block === "stonecutter_block") family = "stonecutter";
   else if (block === "campfire" || block === "soul_campfire") family = "campfire";
   else if (block === "lectern") family = "lectern";
+  else if (block === "brewing_stand") family = "brewing-stand";
+  else if (block === "bell") family = "bell";
   else if (block === "composter") family = "composter";
   else if (block === "enchanting_table" || block === "end_portal_frame") family = "low-box";
   if (family === undefined) return undefined;
@@ -544,6 +548,18 @@ export function blockModelParts(
     }
     case "campfire":
       return campfireParts(s, facing);
+    case "brewing-stand":
+      // Three base plates, the rod, and the picture of the bottles on two crossed planes.
+      return [
+        { bounds: [9, 0, 5, 15, 2, 11], faces: ALL_FACES(Face.NegativeY) },
+        { bounds: [2, 0, 1, 8, 2, 7], faces: ALL_FACES(Face.NegativeY) },
+        { bounds: [2, 0, 9, 8, 2, 15], faces: ALL_FACES(Face.NegativeY) },
+        part([7, 0, 7, 9, 14, 9]),
+        { bounds: [0, 0, 8, 16, 16, 8], faces: ALL_FACES(Face.PositiveZ) },
+        { bounds: [8, 0, 0, 8, 16, 16], faces: ALL_FACES(Face.PositiveZ) },
+      ];
+    case "bell":
+      return bellParts(s, facing);
     case "lectern":
       // Base, post, and the desk in two steps sloping down to its front.
       return oriented(
@@ -624,6 +640,42 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+
+/**
+ * A bell under a beam: on two stone posts on the floor, from the ceiling, from the wall
+ * behind it, or between two walls. Its body and lip read the corners of their textures.
+ */
+function bellParts(s: LittleEndianNbtCompoundValue, facing: number): readonly ModelPart[] {
+  const wood = ALL_FACES(Face.PositiveX);
+  const body: readonly number[] = [
+    Face.NegativeZ,
+    Face.NegativeZ,
+    Face.PositiveY,
+    Face.NegativeY,
+    Face.NegativeZ,
+    Face.NegativeZ,
+  ];
+  const holder: ModelPart[] =
+    s.attachment === "hanging"
+      ? [{ bounds: [7, 13, 7, 9, 16, 9], faces: wood }]
+      : s.attachment === "side"
+        ? [{ bounds: [7, 13, 0, 9, 15, 9], faces: wood }]
+        : s.attachment === "multiple"
+          ? [{ bounds: [7, 13, 0, 9, 15, 16], faces: wood }]
+          : [
+              { bounds: [0, 0, 6, 2, 16, 10], faces: ALL_FACES(Face.NegativeX) },
+              { bounds: [14, 0, 6, 16, 16, 10], faces: ALL_FACES(Face.NegativeX) },
+              { bounds: [2, 13, 7, 14, 15, 9], faces: wood },
+            ];
+  return oriented(
+    [
+      ...holder,
+      { bounds: [5, 6, 5, 11, 13, 11], faces: body, sheet: { side: [1, 0], top: [1, 1] } },
+      { bounds: [4, 4, 4, 12, 6, 12], faces: body, sheet: { side: [0, 7], top: [0, 0] } },
+    ],
+    facing,
+  );
+}
 /**
  * A cauldron's textures: the side on the north face, the inside on the south one (east and
  * west hold water), and a bottom cut out between its feet.
@@ -817,6 +869,9 @@ export function modelCatalog(): readonly BlockModel[] {
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   add("enchanting_table");
+  add("brewing_stand");
+  for (const attachment of ["standing", "hanging", "side", "multiple"])
+    for (let direction = 0; direction < 4; direction++) add("bell", { attachment, direction });
   add("end_portal_frame");
   for (let composter_fill_level = 0; composter_fill_level <= 8; composter_fill_level++)
     add("composter", { composter_fill_level });

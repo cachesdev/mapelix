@@ -97,7 +97,7 @@ function variantIndex(states: LittleEndianNbtCompoundValue, count: number): numb
  * color; a block unknown to the stack returns undefined.
  */
 /** Model families whose parts pick their faces of the block's textures (`ModelPart.faces`). */
-const OWN_FACES: ReadonlySet<string> = new Set(["grindstone", "stonecutter", "campfire"]);
+const OWN_FACES: ReadonlySet<string> = new Set(["grindstone", "stonecutter", "campfire", "bell"]);
 
 export function resolveBlockTextures(
   names: TextureNames,

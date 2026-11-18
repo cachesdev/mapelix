@@ -173,10 +173,24 @@ row(57, [
   ...[0, 1, 2, 3].map((direction) => b("lectern", { direction, powered_bit: 0 })),
 ]);
 
-// Still drawn as cubes: detailed blocks that need their own models.
+// Brewing stand, and bells on the floor, from the ceiling, on a wall and between walls.
+row(53, [
+  b("brewing_stand"),
+  ...[0, 1].map((direction) => b("bell", { attachment: "standing", direction })),
+]);
+put(12, FLOOR + 3, 53, "minecraft:stone");
+put(12, FLOOR + 2, 53, b("bell", { attachment: "hanging", direction: 0 }));
+put(15, FLOOR, 53, b("bell", { attachment: "side", direction: 0 }));
+put(15, FLOOR, 52, "minecraft:stone");
+put(18, FLOOR, 53, b("bell", { attachment: "multiple", direction: 0 }));
+put(18, FLOOR, 52, "minecraft:stone");
+put(18, FLOOR, 54, "minecraft:stone");
+
+// Full cubes to check the way their textures face.
+
 row(
   64,
-  ["brewing_stand", "smithing_table", "bell", "loom", "chiseled_bookshelf"].map((name) => b(name)),
+  ["smithing_table", "loom", "chiseled_bookshelf"].map((name) => b(name)),
 );
 // Still invisible or approximate: thin and wall blocks.
 row(

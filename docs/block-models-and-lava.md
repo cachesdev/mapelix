@@ -32,7 +32,9 @@ Detailed LOD 0 geometry includes:
   of the block's textures. Stonecutters (base and flat blade) and campfires (four logs, a
   bed of embers and two crossed planes of flame, none when extinguished). Lecterns (base,
   post, a desk in two steps), composters filling with their level, and the lower enchanting
-  table and end portal frame (no eye yet). These are cuboid
+  table and end portal frame (no eye yet). Brewing stands (base plates, rod, the bottles
+  picture on two crossed planes) and bells under their beam, on posts, from the ceiling or
+  a wall. These are cuboid
   representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.
