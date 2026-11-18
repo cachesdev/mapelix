@@ -179,6 +179,13 @@ Lanterns, torches, chains, candles, end rods, lightning rods and flower pots rea
 from their texture's sheet of parts, as the vanilla pack lays it out. Beds take their colored
 entity texture. Not textured yet: signs, mobs and other entities, and the 2D map.
 
+### Dynamic block lighting
+
+![Lanterns lighting a village at night in the 3D view](docs/images/dynamic-block-lighting-2.jpg)
+
+> **New:** shader-based night lighting with glowing blocks, light propagation, and support for
+> both textured and non-textured rendering.
+
 ### Markers
 
 - **Host markers** on the map and in 3D (isometric and perspective) at the same place:
