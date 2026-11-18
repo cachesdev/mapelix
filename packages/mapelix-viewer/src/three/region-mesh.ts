@@ -33,11 +33,14 @@ interface Layer {
 
 /** Renderer-owned, bounded shell reuse. Old region arrays and geometry buffers are released. */
 export class RegionMeshPool {
-  private readonly pools = new Map<MaterialPair, Mesh[]>();
+  // Renderer state is cached by mesh/material. Its vertex layout must survive reuse;
+  // plain unlit geometry lacks the texture/light buffer that lit geometry requires.
+  private readonly pools = new Map<MaterialPair, [Mesh[], Mesh[]]>();
   constructor(private readonly capacity = 64) {}
 
   acquire(materials: MaterialPair, geometry: InstancedBufferGeometry): Mesh {
-    const mesh = this.pools.get(materials)?.pop();
+    const layout = geometry.hasAttribute("texture") ? 1 : 0;
+    const mesh = this.pools.get(materials)?.[layout].pop();
     if (mesh === undefined) return new Mesh(geometry, materials.steady);
     mesh.geometry = geometry;
     mesh.material = materials.steady;
@@ -45,6 +48,7 @@ export class RegionMeshPool {
   }
 
   release(mesh: Mesh, materials: MaterialPair): void {
+    const layout = mesh.geometry.hasAttribute("texture") ? 1 : 0;
     mesh.geometry.dispose();
     // A disposed geometry can still retain its typed array through a cached render object.
     for (const name of ["quad", "texture"]) {
@@ -54,21 +58,22 @@ export class RegionMeshPool {
 
     let pool = this.pools.get(materials);
     if (pool === undefined) {
-      pool = [];
+      pool = [[], []];
       this.pools.set(materials, pool);
     }
-    if (pool.length < this.capacity) pool.push(mesh);
+    if (pool[0].length + pool[1].length < this.capacity) pool[layout].push(mesh);
     else mesh.dispose();
   }
 
   get retained(): number {
     let count = 0;
-    for (const pool of this.pools.values()) count += pool.length;
+    for (const pool of this.pools.values()) count += pool[0].length + pool[1].length;
     return count;
   }
 
   dispose(): void {
-    for (const pool of this.pools.values()) for (const mesh of pool) mesh.dispose();
+    for (const pool of this.pools.values())
+      for (const layout of pool) for (const mesh of layout) mesh.dispose();
     this.pools.clear();
   }
 }

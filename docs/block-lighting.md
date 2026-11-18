@@ -77,6 +77,10 @@ water and glass split into rendering batches. Streaming memory budgets count
 actual GPU buffers; quad statistics count geometry rather than dividing total
 GPU bytes by 12.
 
+Mesh reuse keeps layouts with and without an auxiliary buffer in separate pools,
+under the same combined capacity. A mesh never retains a pipeline that expects a
+missing vertex buffer after textures change or the camera enters an unlit region.
+
 A flat integer varying reuses the existing flow/texture channel, with no extra
 inter-stage variable. Integer transport prevents interpolation from changing
 texture flags at high light levels, including faces with texture word zero.

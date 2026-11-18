@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { Mesh, MeshBasicNodeMaterial } from "three/webgpu";
+import {
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
+  MeshBasicNodeMaterial,
+} from "three/webgpu";
 import {
   Face,
   FULL_BOX,
@@ -17,7 +22,7 @@ import {
   unpackQuadTexture,
   withTextureOffset,
 } from "@mapelix/scene-prototype/texture-format";
-import { RegionMesh } from "./region-mesh";
+import { RegionMesh, RegionMeshPool } from "./region-mesh";
 import type { SceneMaterials } from "./shaders/materials";
 
 const material = new MeshBasicNodeMaterial();
@@ -35,6 +40,46 @@ const quad = (kind: QuadMaterial) =>
     packQuadWord1(1, 1, FULL_BOX, 0),
     packQuadWord2(0x808080, 255),
   );
+
+function pooledGeometry(count: number, auxiliary: boolean): InstancedBufferGeometry {
+  const geometry = new InstancedBufferGeometry();
+  geometry.setAttribute("quad", new InstancedBufferAttribute(new Uint32Array(count * 3), 3));
+  if (auxiliary)
+    geometry.setAttribute("texture", new InstancedBufferAttribute(new Uint32Array(count), 1));
+  geometry.instanceCount = count;
+  return geometry;
+}
+
+it.each([false, true])(
+  "keeps pooled renderer state within one vertex layout, auxiliary=%s",
+  (auxiliary) => {
+    const pool = new RegionMeshPool(2);
+    const first = pool.acquire(pair, pooledGeometry(147, auxiliary));
+    pool.release(first, pair);
+    const changed = pool.acquire(pair, pooledGeometry(161, !auxiliary));
+    expect(changed).not.toBe(first);
+    pool.release(changed, pair);
+    const geometry = pooledGeometry(215, auxiliary);
+    const reused = pool.acquire(pair, geometry);
+    expect(reused).toBe(first);
+    expect(reused.geometry).toBe(geometry);
+    expect(reused.geometry.getAttribute("texture")?.count).toBe(auxiliary ? 215 : undefined);
+    pool.release(reused, pair);
+    expect(pool.retained).toBe(2);
+    pool.dispose();
+    expect(pool.retained).toBe(0);
+  },
+);
+
+it("shares the pool capacity across vertex layouts", () => {
+  const pool = new RegionMeshPool(1);
+  const a = pool.acquire(pair, pooledGeometry(147, false));
+  const b = pool.acquire(pair, pooledGeometry(161, true));
+  pool.release(a, pair);
+  pool.release(b, pair);
+  expect(pool.retained).toBe(1);
+  pool.dispose();
+});
 
 it.each([false, true])(
   "packs GPU light without touching texture flags or source buffers, textured=%s",
