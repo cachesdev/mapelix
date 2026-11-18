@@ -756,7 +756,7 @@ function crossParts(block: string, s: LittleEndianNbtCompoundValue): readonly Mo
 
 /**
  * Flat growth on the faces of its block: vines by `vine_direction_bits` (south, west, north,
- * east), the others by `multi_face_direction_bits` (down, up, north, south, west, east).
+ * east), the others by `multi_face_direction_bits` (down, up, south, west, north, east).
  */
 function coverParts(block: string, s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
   const PLANES: Readonly<Record<string, ModelBounds>> = {
@@ -770,7 +770,7 @@ function coverParts(block: string, s: LittleEndianNbtCompoundValue): readonly Mo
   const sides =
     block === "vine"
       ? ["south", "west", "north", "east"]
-      : ["down", "up", "north", "south", "west", "east"];
+      : ["down", "up", "south", "west", "north", "east"];
   const bits = numberState(
     s,
     block === "vine" ? "vine_direction_bits" : "multi_face_direction_bits",

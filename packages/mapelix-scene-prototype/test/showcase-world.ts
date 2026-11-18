@@ -239,7 +239,7 @@ put(42, FLOOR, 70, b("amethyst_cluster", { facing_direction: 2 }));
 put(3, FLOOR, 75, "minecraft:stone");
 put(3, FLOOR, 74, b("vine", { vine_direction_bits: 1 }));
 put(6, FLOOR, 75, "minecraft:stone");
-put(6, FLOOR, 74, b("glow_lichen", { multi_face_direction_bits: 8 }));
+put(6, FLOOR, 74, b("glow_lichen", { multi_face_direction_bits: 4 }));
 put(9, FLOOR + 2, 74, "minecraft:stone");
 put(9, FLOOR + 1, 74, b("cave_vines_head_with_berries"));
 
