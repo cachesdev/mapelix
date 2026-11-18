@@ -204,6 +204,8 @@ const POLL_MS = 100;
 const WHEEL_REST_MS = 250;
 /** Scale the 3D view zooms to when caves open from the map. */
 const CAVE_SCALE = 10;
+/** Reading the world metadata again for a changed texture stack happens at most this often. */
+const TEXTURE_CHECK_INTERVAL = 5000;
 
 type WorldModule = typeof import("../three/world-viewer.js");
 
@@ -257,6 +259,8 @@ export class MapelixViewer {
   private disposed = false;
   private settingsNow: WorldSettings;
   private info: WorldInfo | undefined;
+  /** When the world metadata was last read again for a changed texture stack. */
+  private texturesCheckedAt = -Infinity;
   private contextGeneration = 0;
   private contextRequest: AbortController | undefined;
   private changing = false;
@@ -290,6 +294,7 @@ export class MapelixViewer {
     element.addEventListener("pointerdown", this.onPointerDown, { capture: true });
     element.addEventListener("pointermove", this.onPointerMove, { passive: true });
     element.addEventListener("pointerleave", this.onPointerLeave, { passive: true });
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.worldLayer.addEventListener("keydown", this.onWorldKey);
     this.map = new TileMap(this.mapLayer, {
       ...options.map,
@@ -541,6 +546,40 @@ export class MapelixViewer {
     this.worldViewer?.setLeaves(mode);
   }
 
+  /**
+   * Reads the world metadata again and takes a changed texture stack without reloading the
+   * page or moving the view: a new revision loads its atlas and textured regions, a removed
+   * stack makes textures unavailable. The viewer does this by itself, at most every few
+   * seconds, when the server no longer serves its texture revision and when the page shows
+   * again; a host that has just changed the stack may call it straight away.
+   */
+  async refreshWorld(): Promise<void> {
+    const source = this.options.world;
+    if (source === undefined || this.disposed) return;
+    this.texturesCheckedAt = performance.now();
+    this.worlds.clear();
+    const info = await this.loadWorldInfo(source.base, this.requestedContext());
+    if (this.disposed) return;
+    if (this.info !== undefined) {
+      const { textures: _previous, ...rest } = this.info;
+      this.info = info.textures === undefined ? rest : { ...rest, textures: info.textures };
+    }
+    this.worldViewer?.setWorldTextures(info.textures);
+    this.publish();
+  }
+
+  /** A textured request or atlas the server refused, or the page showing again. */
+  private checkTextures(): void {
+    if (this.options.world === undefined || this.settingsNow.textures === "off") return;
+    if (performance.now() - this.texturesCheckedAt < TEXTURE_CHECK_INTERVAL) return;
+    this.refreshWorld().catch((cause: unknown) => console.warn(cause));
+  }
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === "visible" && this.worldViewer !== undefined)
+      this.checkTextures();
+  };
+
   setWeather(weather: WeatherMode): void {
     this.updateSettings({ weather });
     this.worldViewer?.setWeather(weather);
@@ -700,6 +739,7 @@ export class MapelixViewer {
     this.element.removeEventListener("pointerdown", this.onPointerDown, { capture: true });
     this.element.removeEventListener("pointermove", this.onPointerMove);
     this.element.removeEventListener("pointerleave", this.onPointerLeave);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.map.dispose();
     this.mapLayer.remove();
     this.worldLayer.remove();
@@ -994,6 +1034,7 @@ export class MapelixViewer {
           leaves: this.settingsNow.leaves,
           textureBase: `${source.base}/textures`,
           onTextureState: () => this.publish(),
+          onStaleTextures: () => this.checkTextures(),
           autoDepth: this.settingsNow.autoDepth,
           discoveryFilters: this.settingsNow.discoveries,
           ...(this.settingsNow.selection ? { selection: this.settingsNow.selection } : {}),

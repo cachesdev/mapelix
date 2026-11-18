@@ -1,8 +1,9 @@
 # Texture stacks
 
 The 3D viewer can draw block textures near the camera. They come from Bedrock resource packs
-that the host provides. Mapelix never downloads a pack, and never ships or caches pack
-textures outside the host's cache folder.
+that the host provides. The Mapelix packages never download a pack, and never ship or cache
+pack textures outside the host's cache folder; only the demo app can download the vanilla pack,
+when asked to.
 
 ## Giving packs to the scene server
 
@@ -25,6 +26,31 @@ createSceneServer({
 
 The server reads no environment variable. A stack that cannot be read is logged
 (`textures.failed`), shown in `stats().textures.error`, and the world is served untextured.
+
+## Changing the stack while the server runs
+
+```ts
+const report = await server.setTextures({ packs: ["/srv/packs/uploaded.mcpack"] });
+if (!report.ok) console.warn(report.errors); // the previous stack is still served
+await server.setTextures(null); // no textures
+```
+
+`setTextures(source)` takes `{ stack }` or `{ packs }` like the option, with the atlas options
+and limits the server was created with. It reads the packs and builds the atlas first, so a
+stack that cannot be read or built changes nothing: it comes back as a failed report, the same
+one `validateTextureStack` gives. Otherwise it answers that report for the new stack and:
+
+- the world metadata names the new revision; textured regions and atlases of the previous one
+  answer 409 and 404, like a changed world;
+- the previous atlas and textured regions leave the disk, even while a build of them finishes;
+- a prewarm that already reached the textured regions starts them again for the new stack.
+
+The same stack again builds nothing. Calls run one after another, and `null` removes the
+textures. Events: `textures.changed` on a switch, `textures.rejected` for a refused stack. The
+server keeps no record of the change: after a restart it uses its `textures` option again, so a
+host that lets people choose a pack keeps their choice itself and passes it at start. Mapelix
+has no upload route; the host checks who may change the pack and where packs come from. The demo
+shows one way (`apps/mapelix-demo`, `MAPELIX_TEXTURE_UPLOADS`).
 
 ## The stack folder
 
@@ -115,9 +141,9 @@ reports them in `stats().prewarm.textures`.
 
 The atlas is built on its first request, or by a prewarm, and stored in
 `<cache>/textures/atlas-v2/<revision>/`. Opening a server with another stack removes the older
-revisions. A `createSceneHandler` with `cacheOnly` never builds an atlas: it answers 404
-`not-cached` until a prewarm stored it, and never builds a textured region either. Changing
-the stack takes a server restart.
+revisions, as does opening one without a stack. A `createSceneHandler` with `cacheOnly` never
+builds an atlas: it answers 404 `not-cached` until a prewarm stored it, and never builds a
+textured region either.
 
 ## In the viewer
 
@@ -158,6 +184,11 @@ its block colors.
   would only show stray fragments of the sheet.
 - Turning textures off draws the same pixels as a server without textures, checked frame by
   frame in the browser tests.
+- A changed stack shows without reloading the page. When the server answers 409 for a textured
+  region, when the atlas fails to load, or when the page shows again, the viewer reads
+  `world.json` again, at most every 5 seconds, and takes the new revision: the textured regions
+  of the previous atlas leave at once and the plain ones show until the new ones arrive. A host
+  that has just changed the stack can call `MapelixViewer.refreshWorld()` straight away.
 
 ## Checking a stack
 

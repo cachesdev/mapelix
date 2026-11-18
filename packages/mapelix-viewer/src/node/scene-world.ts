@@ -33,10 +33,16 @@ import {
   RegionService,
   type LoadOptions,
   type RegionResult,
+  type RegionServiceOptions,
   type RegionServiceStats,
 } from "./region-service.js";
 import { engineFingerprint, worldRevision } from "./revision.js";
-import { SceneTextures, type SceneAtlas } from "./textures.js";
+import {
+  failedReport,
+  SceneTextures,
+  type SceneAtlas,
+  type TextureStackReport,
+} from "./textures.js";
 import type {
   PackLimits,
   ResourcePackInfo,
@@ -205,9 +211,14 @@ interface Opened {
   readonly surface: RegionService;
   readonly caves: RegionService;
   readonly discoveries: DiscoveryService;
-  readonly textures: SceneTextures | undefined;
-  readonly textureError: string | undefined;
-  readonly textured: { readonly service: RegionService; readonly disk: DiskCache } | undefined;
+  readonly build: RegionServiceOptions["build"];
+}
+
+/** A texture stack and the services of its textured regions, replaced as a whole. */
+interface TextureSet {
+  readonly stack: SceneTextures;
+  /** Textured level 0 Surface regions. */
+  readonly surface: { readonly service: RegionService; readonly disk: DiskCache };
 }
 
 /**
@@ -242,12 +253,8 @@ export function createSceneServer(options: SceneServerOptions) {
     discoveryPending: positiveInteger(options.discoveryMaxPending ?? 8, "discoveryMaxPending"),
   };
   const textureOptions = options.textures;
-  const textureSource: TextureStackSource | undefined =
-    textureOptions === undefined
-      ? undefined
-      : "stack" in textureOptions
-        ? { stack: resolve(textureOptions.stack) }
-        : { packs: textureOptions.packs.map((pack) => resolve(pack)) };
+  const textureSource =
+    textureOptions === undefined ? undefined : resolveTextureSource(textureOptions);
   const textureMaxTileSize = textureOptions?.maxTileSize ?? 32;
   if (
     !Number.isInteger(Math.log2(textureMaxTileSize)) ||
@@ -255,8 +262,11 @@ export function createSceneServer(options: SceneServerOptions) {
     textureMaxTileSize > 256
   )
     throw new RangeError("textures.maxTileSize must be a power of two from 4 to 256");
-  const textureBudget =
-    positiveInteger(textureOptions?.budgetMiB ?? 32, "textures.budgetMiB") * MIB;
+  const textureSettings = {
+    maxTileSize: textureMaxTileSize,
+    budgetBytes: positiveInteger(textureOptions?.budgetMiB ?? 32, "textures.budgetMiB") * MIB,
+    ...(textureOptions?.limits === undefined ? {} : { limits: textureOptions.limits }),
+  };
   const texturedSizes = {
     memory: wholeNumber(textureOptions?.memoryMiB ?? 32, "textures.memoryMiB") * MIB,
     disk: positiveInteger(textureOptions?.diskCacheMiB ?? 512, "textures.diskCacheMiB") * MIB,
@@ -269,8 +279,15 @@ export function createSceneServer(options: SceneServerOptions) {
   let regionPrewarm: Prewarmer | undefined;
   let discoveryPrewarm: Prewarmer | undefined;
   let texturePrewarm: Prewarmer | undefined;
+  let stopTexturePrewarm: AbortController | undefined;
   let prewarming: Promise<PrewarmResult> | undefined;
+  /** The running prewarm's size and signal, once it reaches the textured regions. */
+  let texturePrewarmRun: { readonly maxRegions: number; readonly signal: AbortSignal } | undefined;
   const stopPrewarm = new AbortController();
+  // The texture stack may change while the server runs (`setTextures`); changes run in turn.
+  let textureSet: TextureSet | undefined;
+  let textureError: string | undefined;
+  let textureChange: Promise<unknown> = Promise.resolve();
 
   /** Checks the world, opens the caches and reads the stored area, once. */
   function ready(): Promise<Opened> {
@@ -307,22 +324,20 @@ export function createSceneServer(options: SceneServerOptions) {
     );
     // Packs are optional: one that cannot be read leaves the world untextured, not unavailable.
     let textures: SceneTextures | undefined;
-    let textureError: string | undefined;
+    let error: string | undefined;
     if (textureSource !== undefined) {
       try {
-        textures = await SceneTextures.open(
-          textureSource,
-          cacheDirectory,
-          {
-            maxTileSize: textureMaxTileSize,
-            budgetBytes: textureBudget,
-            ...(textureOptions?.limits === undefined ? {} : { limits: textureOptions.limits }),
-          },
-          event,
-        );
+        textures = await SceneTextures.open(textureSource, cacheDirectory, textureSettings, event);
       } catch (cause) {
-        textureError = cause instanceof Error ? cause.message : String(cause);
-        event("textures.failed", { message: textureError });
+        error = cause instanceof Error ? cause.message : String(cause);
+        event("textures.failed", { message: error });
+      }
+    }
+    // Atlases of other stacks, such as one set while the server last ran, leave the disk.
+    if (error === undefined) {
+      await SceneTextures.removeOtherRevisions(cacheDirectory, textures?.revision, event);
+      if (textures === undefined) {
+        await rm(join(cacheDirectory, "textures", "regions"), { recursive: true, force: true });
       }
     }
     const extent = bounds === undefined ? await loadExtent(revision) : undefined;
@@ -343,35 +358,12 @@ export function createSceneServer(options: SceneServerOptions) {
       signal: AbortSignal,
       background?: boolean,
     ) => pools.build(dimension, request, signal, background);
-    let textured: Opened["textured"];
-    if (textures !== undefined) {
-      const stack = textures;
-      // Textured regions depend on the world and the stack: other pairs leave the disk.
-      const disk = await DiskCache.open(
-        join(cacheDirectory, "textures", "regions"),
-        createHash("sha256").update(`${revision}\0${stack.revision}`).digest("hex").slice(0, 20),
-        texturedSizes.disk,
-        events,
-      );
-      const service = new RegionService({
-        mode: "surface",
-        dimensions: servedBounds,
-        build,
-        store: disk,
-        memoryBytes: texturedSizes.memory,
-        maxPending: texturedSizes.pending,
-        onEvent: event,
-        textures: async () => (await stack.load())!.index,
-      });
-      textured = { service, disk };
-    }
+    const opened = { revision, bounds: servedBounds, build };
+    textureSet = textures === undefined ? undefined : await openTextureSet(opened, textures, true);
+    textureError = error;
     return {
-      revision,
-      textures,
-      textureError,
-      textured,
+      ...opened,
       info: { name: first.info.name, spawn: first.info.spawn },
-      bounds: servedBounds,
       pools,
       disks: { surface: surfaceDisk, caves: caveDisk, discoveries: discoveryDisk },
       surface: new RegionService({
@@ -403,6 +395,142 @@ export function createSceneServer(options: SceneServerOptions) {
         onEvent: event,
       }),
     };
+  }
+
+  /**
+   * The services of a stack's textured regions. Their cache depends on the world and the stack;
+   * at start other pairs leave the disk, and while running the set it replaces is retired.
+   */
+  async function openTextureSet(
+    world: Pick<Opened, "revision" | "bounds" | "build">,
+    stack: SceneTextures,
+    removeOthers: boolean,
+  ): Promise<TextureSet> {
+    const disk = await DiskCache.open(
+      join(cacheDirectory, "textures", "regions"),
+      createHash("sha256")
+        .update(`${world.revision}\0${stack.revision}`)
+        .digest("hex")
+        .slice(0, 20),
+      texturedSizes.disk,
+      { onEvent: event },
+      { removeOthers },
+    );
+    const service = new RegionService({
+      mode: "surface",
+      dimensions: world.bounds,
+      build: world.build,
+      store: disk,
+      memoryBytes: texturedSizes.memory,
+      maxPending: texturedSizes.pending,
+      onEvent: event,
+      textures: async () => (await stack.load())!.index,
+    });
+    return { stack, surface: { service, disk } };
+  }
+
+  /** Removes a replaced stack's atlas and textured regions from the disk. */
+  async function retireTextureSet(set: TextureSet): Promise<void> {
+    await Promise.all([set.stack.retire(), set.surface.disk.retire()]);
+  }
+
+  /**
+   * Replaces the texture stack without a restart, or removes it with `null`. The packs are read
+   * and the atlas is built before anything changes: a stack that cannot be read or built leaves
+   * the current one in place and comes back as a failed report, as `validateTextureStack` would
+   * give it. Then the world metadata names the new revision, requests for the previous one answer
+   * 409 like a changed world, and its atlas and textured regions leave the disk. Calls run one
+   * after another; the stack uses the atlas options and limits the server was created with.
+   */
+  function setTextures(source: TextureStackSource | null): Promise<TextureStackReport> {
+    const change = textureChange.then(() => replaceTextures(source));
+    textureChange = change.catch(() => undefined);
+    return change;
+  }
+
+  async function replaceTextures(source: TextureStackSource | null): Promise<TextureStackReport> {
+    if (closed) throw new Error("The scene server is closed");
+    const world = await ready();
+    const previous = textureSet;
+    if (source === null) {
+      textureSet = undefined;
+      textureError = undefined;
+      if (previous !== undefined) {
+        stopTexturePrewarm?.abort();
+        await retireTextureSet(previous);
+        event("textures.changed", { previous: previous.stack.revision });
+      }
+      return { ok: true, errors: [] };
+    }
+    let next: SceneTextures;
+    try {
+      next = await SceneTextures.open(
+        resolveTextureSource(source),
+        cacheDirectory,
+        textureSettings,
+        event,
+      );
+    } catch (cause) {
+      event("textures.rejected", { message: String(cause) });
+      return failedReport(cause);
+    }
+    if (previous?.stack.revision === next.revision) {
+      return previous.stack.report().catch(failedReport);
+    }
+    let report: TextureStackReport;
+    try {
+      report = await next.report();
+    } catch (cause) {
+      await next.retire();
+      event("textures.rejected", { message: String(cause) });
+      return failedReport(cause);
+    }
+    const set = await openTextureSet(world, next, false);
+    if (closed) {
+      await retireTextureSet(set);
+      throw new Error("The scene server is closed");
+    }
+    textureSet = set;
+    textureError = undefined;
+    stopTexturePrewarm?.abort();
+    if (previous !== undefined) await retireTextureSet(previous);
+    event("textures.changed", {
+      revision: next.revision,
+      ...(previous === undefined ? {} : { previous: previous.stack.revision }),
+    });
+    // A prewarm that already reached the textured regions starts them again for the new stack.
+    if (texturePrewarmRun !== undefined && !texturePrewarmRun.signal.aborted) {
+      void prewarmTextures(world, set, texturePrewarmRun.maxRegions, texturePrewarmRun.signal);
+    }
+    return report;
+  }
+
+  /** Builds the textured level 0 Surface regions of a stack, behind every visitor. */
+  async function prewarmTextures(
+    world: Opened,
+    set: TextureSet,
+    maxRegions: number,
+    signal: AbortSignal,
+  ): Promise<PrewarmProgress> {
+    stopTexturePrewarm?.abort();
+    const stop = new AbortController();
+    stopTexturePrewarm = stop;
+    texturePrewarmRun = { maxRegions, signal };
+    const jobs = prewarmPlan(world.bounds, maxRegions).filter((job) => job.level === 0);
+    const prewarmer = new Prewarmer(
+      {
+        load: async (dimension, request, jobSignal, load) => {
+          // The atlas comes first; a failed atlas stops the run on its first job.
+          await set.stack.load();
+          return set.surface.service.load(dimension, request, jobSignal, load);
+        },
+      },
+      jobs,
+      nearlyFull(set.surface.disk),
+      (name, detail) => event(`textures.${name}`, detail),
+    );
+    texturePrewarm = prewarmer;
+    return prewarmer.run(AbortSignal.any([signal, stop.signal]));
   }
 
   /** The stored area saved for this revision, or one scan of the database keys. */
@@ -448,9 +576,9 @@ export function createSceneServer(options: SceneServerOptions) {
       caves: CAVE_LIMITS,
       snapshotRevision: world.revision,
       discoveries: DISCOVERY_LIMITS,
-      ...(world.textures === undefined
+      ...(textureSet === undefined
         ? {}
-        : { textures: { revision: world.textures.revision, packs: world.textures.packs } }),
+        : { textures: { revision: textureSet.stack.revision, packs: textureSet.stack.packs } }),
     };
   }
 
@@ -463,9 +591,10 @@ export function createSceneServer(options: SceneServerOptions) {
     revision: string,
     load: Pick<LoadOptions, "cacheOnly"> = {},
   ): Promise<SceneAtlas | undefined> {
-    const world = await ready();
-    if (world.textures?.revision !== revision) return undefined;
-    return world.textures.load(load.cacheOnly === true);
+    await ready();
+    const stack = textureSet?.stack;
+    if (stack?.revision !== revision) return undefined;
+    return stack.load(load.cacheOnly === true);
   }
 
   /** The packs and files the atlas of `revision` was made of, for attribution. */
@@ -478,7 +607,8 @@ export function createSceneServer(options: SceneServerOptions) {
 
   /** The texture revision served, or undefined without textures. */
   async function getTextureRevision(): Promise<string | undefined> {
-    return (await ready()).textures?.revision;
+    await ready();
+    return textureSet?.stack.revision;
   }
 
   /**
@@ -500,13 +630,14 @@ export function createSceneServer(options: SceneServerOptions) {
     const context = sceneContext(input.dimension, input);
     const world = await ready();
     if (load.textures !== undefined) {
-      if (world.textured === undefined || load.textures !== world.textures?.revision) {
+      const set = textureSet;
+      if (set === undefined || load.textures !== set.stack.revision) {
         throw new InvalidRegionError(`No texture revision ${load.textures} is served`);
       }
       if (context.mode !== "surface") {
         throw new InvalidRegionError("Textured regions are Surface regions only");
       }
-      return world.textured.service.load(
+      return set.surface.service.load(
         context.dimension,
         {
           level: request.level,
@@ -571,7 +702,6 @@ export function createSceneServer(options: SceneServerOptions) {
           ? stopPrewarm.signal
           : AbortSignal.any([stopPrewarm.signal, prewarmOptions.signal]);
       const maxRegions = positiveInteger(prewarmOptions.maxRegions ?? 100_000, "maxRegions");
-      const nearlyFull = (disk: DiskCache) => () => disk.stats.bytes > disk.stats.maxBytes * 0.85;
       regionPrewarm = new Prewarmer(
         world.surface,
         prewarmPlan(world.bounds, maxRegions),
@@ -600,23 +730,12 @@ export function createSceneServer(options: SceneServerOptions) {
         ? discoveryPrewarm.progress
         : await discoveryPrewarm.run(signal);
       let textures = IDLE;
-      if (world.textures !== undefined && world.textured !== undefined && !signal.aborted) {
-        const stack = world.textures;
-        const textured = world.textured;
-        const jobs = prewarmPlan(world.bounds, maxRegions).filter((job) => job.level === 0);
-        texturePrewarm = new Prewarmer(
-          {
-            load: async (dimension, request, jobSignal, load) => {
-              // The atlas comes first; a failed atlas stops the run on its first job.
-              await stack.load();
-              return textured.service.load(dimension, request, jobSignal, load);
-            },
-          },
-          jobs,
-          nearlyFull(textured.disk),
-          (name, detail) => event(`textures.${name}`, detail),
-        );
-        textures = await texturePrewarm.run(signal);
+      if (!signal.aborted) {
+        // Later stacks set with `setTextures` are prewarmed in turn.
+        texturePrewarmRun = { maxRegions, signal };
+        if (textureSet !== undefined) {
+          textures = await prewarmTextures(world, textureSet, maxRegions, signal);
+        }
       }
       return { regions, discoveries, textures };
     })();
@@ -633,19 +752,24 @@ export function createSceneServer(options: SceneServerOptions) {
       openDimensions: world.pools.openDimensions,
       surface: { builds: world.surface.stats, cache: world.disks.surface.stats },
       caves: { builds: world.caves.stats, cache: world.disks.caves.stats },
-      ...(world.textured === undefined
+      ...(textureSet === undefined
         ? {}
-        : { textured: { builds: world.textured.service.stats, cache: world.textured.disk.stats } }),
+        : {
+            textured: {
+              builds: textureSet.surface.service.stats,
+              cache: textureSet.surface.disk.stats,
+            },
+          }),
       discoveries: { builds: world.discoveries.stats, cache: world.disks.discoveries.stats },
       prewarm: {
         regions: regionPrewarm?.progress ?? IDLE,
         discoveries: discoveryPrewarm?.progress ?? IDLE,
         textures: texturePrewarm?.progress ?? IDLE,
       },
-      ...(world.textures !== undefined
-        ? { textures: textureStats(world.textures) }
-        : world.textureError !== undefined
-          ? { textures: { error: world.textureError } }
+      ...(textureSet !== undefined
+        ? { textures: textureStats(textureSet.stack) }
+        : textureError !== undefined
+          ? { textures: { error: textureError } }
           : {}),
     };
   }
@@ -655,6 +779,7 @@ export function createSceneServer(options: SceneServerOptions) {
     stopPrewarm.abort();
     const pending = opening;
     closed = true;
+    await textureChange;
     const world = await pending?.catch(() => undefined);
     await world?.pools.close();
   }
@@ -668,12 +793,24 @@ export function createSceneServer(options: SceneServerOptions) {
     loadTextureAtlas,
     loadTextureNotices,
     getTextureRevision,
+    setTextures,
     getRevision,
     getSnapshotRevision: getRevision,
     prewarm,
     stats,
     close,
   };
+}
+
+/** Packs and stack folders as absolute paths, so a later change of directory changes nothing. */
+function resolveTextureSource(source: TextureStackSource): TextureStackSource {
+  return "stack" in source
+    ? { stack: resolve(source.stack) }
+    : { packs: source.packs.map((pack) => resolve(pack)) };
+}
+
+function nearlyFull(disk: DiskCache): () => boolean {
+  return () => disk.stats.bytes > disk.stats.maxBytes * 0.85;
 }
 
 function textureStats(textures: SceneTextures): TextureStats {

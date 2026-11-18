@@ -18,7 +18,7 @@ import {
 import { regionEntry, type SurfaceHit } from "./quad-collider";
 import { projectedPixels, ViewCamera } from "./view-projection";
 import { RegionMesh, type RegionMeshPool } from "./region-mesh";
-import { ExplorationRequests } from "./exploration-requests";
+import { ExplorationRequestError, ExplorationRequests } from "./exploration-requests";
 import { exteriorBlock } from "./surface-visibility";
 import type { SceneMaterials } from "./shaders/materials";
 import {
@@ -57,6 +57,11 @@ export interface StreamingOptions {
   readonly memoryBudget: number;
   /** Called after a region arrives, so the viewer can redraw and refresh shadows. */
   readonly onRegion: () => void;
+  /**
+   * Called when the server answers that the texture revision of a textured region is not
+   * served (409 or 400): its texture stack changed, and fresh world metadata names the new one.
+   */
+  readonly onStaleTextures?: () => void;
 }
 
 /** The textured variant of nearby level 0 regions; see `RegionStreamer.setTextures`. */
@@ -262,6 +267,37 @@ export class RegionStreamer {
       this.bytes -= cached.mesh?.byteLength ?? 0;
       cached.mesh?.dispose();
     }
+  }
+
+  /**
+   * Removes every textured region at once, those on screen included, for textures whose atlas
+   * goes away. Their plain twins show again straight away, without a dissolve.
+   */
+  dropTextured(): void {
+    this.setTextures(undefined);
+    for (const [key, cached] of this.cache) {
+      if (!key.startsWith("t/")) continue;
+      this.cache.delete(key);
+      const mesh = cached.mesh;
+      if (mesh === undefined) continue;
+      this.bytes -= mesh.byteLength;
+      for (const [drawnKey, drawnMesh] of this.drawn) {
+        if (drawnMesh !== mesh) continue;
+        const plain = this.cache.get(drawnKey)?.mesh;
+        if (plain === undefined) {
+          this.drawn.delete(drawnKey);
+          continue;
+        }
+        this.fades.delete(plain);
+        plain.setFade();
+        if (plain.group.parent !== this.root) this.root.add(plain.group);
+        this.drawn.set(drawnKey, plain);
+      }
+      this.fades.delete(mesh);
+      this.root.remove(mesh.group);
+      mesh.dispose();
+    }
+    this.options.onRegion();
   }
 
   get stats(): StreamingStats {
@@ -576,7 +612,14 @@ export class RegionStreamer {
       })
       .catch((cause: unknown) => {
         if (this.disposed || controller.signal.aborted) return;
-        if (target.textured === true) this.texturedFailures.add(target.key);
+        if (target.textured === true) {
+          this.texturedFailures.add(target.key);
+          if (
+            cause instanceof ExplorationRequestError &&
+            (cause.status === 409 || cause.status === 400)
+          )
+            this.options.onStaleTextures?.();
+        }
         if (!(cause instanceof DOMException && cause.name === "AbortError")) {
           console.warn(cause);
         }

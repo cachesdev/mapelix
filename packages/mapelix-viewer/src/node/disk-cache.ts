@@ -30,6 +30,7 @@ export class DiskCache {
   /** Relative path to size, oldest first. */
   private readonly entries = new Map<string, number>();
   private bytes = 0;
+  private retired = false;
 
   private constructor(directory: string, maxBytes: number, events: DiskCacheEvents) {
     this.directory = directory;
@@ -42,11 +43,17 @@ export class DiskCache {
     revision: string,
     maxBytes: number,
     events: DiskCacheEvents = {},
+    { removeOthers = true }: { readonly removeOthers?: boolean } = {},
   ): Promise<DiskCache> {
     if (!REVISION_PATTERN.test(revision)) throw new Error(`Invalid cache revision ${revision}`);
     await mkdir(root, { recursive: true, mode: 0o750 });
     for (const entry of await readdir(root, { withFileTypes: true })) {
-      if (entry.isDirectory() && REVISION_PATTERN.test(entry.name) && entry.name !== revision) {
+      if (
+        removeOthers &&
+        entry.isDirectory() &&
+        REVISION_PATTERN.test(entry.name) &&
+        entry.name !== revision
+      ) {
         await rm(join(root, entry.name), { recursive: true, force: true });
         events.onEvent?.("cache.revision-removed", { revision: entry.name });
       }
@@ -82,13 +89,18 @@ export class DiskCache {
 
   /** Writes atomically. A failed write leaves the cache unchanged and is only reported. */
   async write(key: string, bytes: Uint8Array): Promise<void> {
-    if (bytes.byteLength > this.maxBytes) return;
+    if (bytes.byteLength > this.maxBytes || this.retired) return;
     const path = this.path(key);
     const temporary = `${path.absolute}.${randomUUID()}.tmp`;
     try {
       await mkdir(dirname(path.absolute), { recursive: true, mode: 0o750 });
       await writeFile(temporary, bytes, { mode: 0o640 });
       await rename(temporary, path.absolute);
+      // Retired while writing: the folder may already be gone, or come back for this file only.
+      if (this.retired) {
+        await removeFolder(this.directory);
+        return;
+      }
     } catch (cause) {
       await unlink(temporary).catch(() => undefined);
       this.events.onEvent?.("cache.write-failed", { key, message: errorMessage(cause) });
@@ -102,6 +114,19 @@ export class DiskCache {
     this.entries.set(path.relative, bytes.byteLength);
     this.bytes += bytes.byteLength;
     await this.evict();
+  }
+
+  /**
+   * Removes this revision's folder for good, for a cache another revision replaced while it
+   * was in use: later writes do nothing and reads find nothing.
+   */
+  async retire(): Promise<void> {
+    this.retired = true;
+    this.entries.clear();
+    this.bytes = 0;
+    await removeFolder(this.directory).catch((cause: unknown) =>
+      this.events.onEvent?.("cache.retire-failed", { message: errorMessage(cause) }),
+    );
   }
 
   /** Drops an entry whose bytes turned out to be unusable. */
@@ -174,4 +199,9 @@ export class DiskCache {
 
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+/** Removes a folder that writes still finishing may hold for a moment. */
+export function removeFolder(directory: string): Promise<void> {
+  return rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }

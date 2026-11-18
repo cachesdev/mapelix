@@ -146,6 +146,11 @@ export interface WorldViewerOptions {
   readonly textureFade?: TextureFade;
   /** Called when `TextureState` changes, a failure included. */
   readonly onTextureState?: (state: TextureState) => void;
+  /**
+   * Called when the server no longer serves the texture revision in use, for a textured
+   * region or the atlas: the host reads the world metadata again and calls `setWorldTextures`.
+   */
+  readonly onStaleTextures?: () => void;
 }
 
 export interface TextureSnapshot {
@@ -543,6 +548,18 @@ export class WorldViewer {
     this.applyWorld(world, keepView);
   }
 
+  /**
+   * Takes the server's texture stack from fresh world metadata, keeping the terrain and the
+   * view: a new revision loads its atlas and textured regions, none makes textures unavailable.
+   */
+  setWorldTextures(textures: WorldInfo["textures"]): void {
+    if (this.world.textures?.revision === textures?.revision) return;
+    const { textures: _previous, ...rest } = this.world;
+    this.world = textures === undefined ? rest : { ...rest, textures };
+    this.failedTextureRevision = undefined;
+    this.applyTextures();
+  }
+
   private applyWorld(world: WorldInfo, keepView: boolean, followDepth = false): void {
     // Validate before releasing the current terrain.
     const context = sceneContext(world.dimension, world);
@@ -604,6 +621,7 @@ export class WorldViewer {
       memoryBudget: caves
         ? (this.options.caveMemoryBudget ?? CAVE_LIMITS.memoryBudget)
         : 1024 * 1024 * 1024,
+      onStaleTextures: () => this.options.onStaleTextures?.(),
       onRegion: () => {
         this.regionsChanged = true;
       },
@@ -710,6 +728,7 @@ export class WorldViewer {
         this.failedTextureRevision = revision;
         console.warn(cause);
         this.setTextureState("failed");
+        this.options.onStaleTextures?.();
       },
     );
   }
@@ -720,7 +739,8 @@ export class WorldViewer {
     const set = this.textureSet;
     if (set === undefined) return;
     this.textureSet = undefined;
-    this.streamer.setTextures(undefined);
+    // Regions drawn with this atlas leave with it.
+    this.streamer.dropTextured();
     set.atlas.dispose();
     for (const pair of [set.materials.terrain, set.materials.plants]) {
       pair.steady.dispose();

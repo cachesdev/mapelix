@@ -396,4 +396,84 @@ describe("scene server", () => {
     });
     await server.close();
   });
+
+  it("replaces the texture stack while running, and keeps it when a new one is refused", async () => {
+    const zip = async (name: string, color: readonly [number, number, number, number]) => {
+      const path = join(root, name);
+      await writeFile(
+        path,
+        makeZip(
+          packFiles({
+            terrain: { stone: { textures: "textures/blocks/stone" } },
+            blocks: { stone: { textures: "stone" } },
+            images: { "textures/blocks/stone.png": makePng(16, color) },
+          }),
+        ),
+      );
+      return path;
+    };
+    const first = await zip("first.zip", [9, 8, 7, 255]);
+    const second = await zip("second.zip", [1, 2, 3, 255]);
+    const events: string[] = [];
+    const server = createSceneServer({ ...options, onEvent: (name) => events.push(name) });
+    const atlases = join(options.cacheDirectory, "textures", "atlas-v2");
+    const regions = join(options.cacheDirectory, "textures", "regions");
+    const request = { level: 0, x: 0, z: 0 };
+    expect(await server.getWorldMetadata()).not.toHaveProperty("textures");
+
+    const added = await server.setTextures({ packs: [first] });
+    expect(added).toMatchObject({ ok: true, errors: [], packs: [{ name: "Synthetic pack" }] });
+    const revision = added.revision!;
+    expect((await server.getWorldMetadata()).textures?.revision).toBe(revision);
+    expect(await server.loadTextureAtlas(revision, { cacheOnly: true })).toBeDefined();
+    const prewarmed = await server.prewarm({ maxRegions: 1000, discoveries: false });
+    expect(prewarmed.textures).toMatchObject({ state: "done", failed: 0 });
+
+    // A broken stack changes nothing; the same stack again builds nothing.
+    const broken = join(root, "broken.zip");
+    await writeFile(broken, "not a zip");
+    expect(await server.setTextures({ packs: [broken] })).toEqual({
+      ok: false,
+      errors: [expect.stringMatching(/broken\.zip: is not a zip archive/) as unknown],
+    });
+    expect(await server.getTextureRevision()).toBe(revision);
+    expect((await server.setTextures({ packs: [first] })).revision).toBe(revision);
+    expect(events.filter((name) => name === "textures.built")).toHaveLength(1);
+
+    // Another stack takes over; the previous revision is no longer served nor stored.
+    const swapped = await server.setTextures({ packs: [second] });
+    const next = swapped.revision!;
+    expect(next).not.toBe(revision);
+    expect(await server.getTextureRevision()).toBe(next);
+    await expect(
+      server.loadRegion(request, signal, sceneContext(), { textures: revision }),
+    ).rejects.toBeInstanceOf(InvalidRegionError);
+    expect(await server.loadTextureAtlas(revision)).toBeUndefined();
+    expect(await readdir(atlases)).toEqual([next]);
+    expect(await readdir(regions)).toHaveLength(1);
+    // The prewarm, which already reached the textured regions, builds them again for it.
+    await vi.waitFor(async () => {
+      const stats = await server.stats();
+      expect(stats.prewarm.textures).toMatchObject({ state: "done", failed: 0 });
+      expect(stats.textured?.cache.entries).toBe(prewarmed.textures.total);
+    });
+    const textured = await server.loadRegion(request, signal, sceneContext(), { textures: next });
+    expect(textured.cacheStatus).not.toBe("build");
+
+    // Changes run in turn: the last one wins.
+    const [, last] = await Promise.all([
+      server.setTextures({ packs: [first] }),
+      server.setTextures({ packs: [second] }),
+    ]);
+    expect(await server.getTextureRevision()).toBe(last.revision);
+
+    expect(await server.setTextures(null)).toEqual({ ok: true, errors: [] });
+    expect(await server.getWorldMetadata()).not.toHaveProperty("textures");
+    expect(await server.stats()).not.toHaveProperty("textured");
+    expect(await readdir(atlases)).toEqual([]);
+    expect(await readdir(regions)).toEqual([]);
+    expect(events).toContain("textures.changed");
+    await server.close();
+    await expect(server.setTextures({ packs: [first] })).rejects.toThrow(/closed/);
+  });
 });

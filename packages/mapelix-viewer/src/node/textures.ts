@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { brotliCompress, constants, gzip } from "node:zlib";
 
+import { removeFolder } from "./disk-cache.js";
+
 import {
   ATLAS_FORMAT_VERSION,
   buildTextureAtlas,
@@ -49,7 +51,8 @@ const ATLAS_FILES = ["atlas.bin", "atlas.bin.gz", "atlas.bin.br", "index.json", 
 /**
  * The textures of one resource pack stack. Opening reads the packs' JSON and names the texture
  * revision; the atlas is read from `<cache>/textures/atlas-v<n>/<revision>/` or built on first
- * use, once, and stored there. Other revisions are removed when the stack opens.
+ * use, once, and stored there. `removeOtherRevisions` clears the atlases of other stacks, and
+ * `retire` the atlas of a stack another one replaced.
  */
 export class SceneTextures {
   readonly revision: string;
@@ -61,6 +64,7 @@ export class SceneTextures {
   private atlas: SceneAtlas | undefined;
   private building: Promise<SceneAtlas> | undefined;
   private failure: string | undefined;
+  private retired = false;
 
   private constructor(
     stack: ResourcePackStack,
@@ -85,13 +89,7 @@ export class SceneTextures {
   ): Promise<SceneTextures> {
     const stack = await openResourcePackStack(source, options.limits);
     const revision = textureRevision(stack.fingerprint, options);
-    const root = join(cacheDirectory, "textures", `atlas-v${ATLAS_FORMAT_VERSION}`);
-    for (const entry of await readdir(root).catch(() => [] as string[])) {
-      if (entry !== revision) {
-        await rm(join(root, entry), { recursive: true, force: true });
-        event("textures.cache-removed", { revision: entry });
-      }
-    }
+    const root = atlasRoot(cacheDirectory);
     const textures = new SceneTextures(stack, revision, join(root, revision), options, event);
     const startedAt = performance.now();
     textures.atlas = await readStored(textures.folder, revision).catch(() => undefined);
@@ -102,6 +100,49 @@ export class SceneTextures {
       });
     }
     return textures;
+  }
+
+  /** Removes the stored atlases of every revision but `keep`. */
+  static async removeOtherRevisions(
+    cacheDirectory: string,
+    keep: string | undefined,
+    event: Event,
+  ): Promise<void> {
+    const root = atlasRoot(cacheDirectory);
+    for (const entry of await readdir(root).catch(() => [] as string[])) {
+      if (entry !== keep) {
+        await rm(join(root, entry), { recursive: true, force: true });
+        event("textures.cache-removed", { revision: entry });
+      }
+    }
+  }
+
+  /**
+   * Removes this revision's stored atlas, for a stack another one replaced: a build still
+   * running finishes in memory only.
+   */
+  async retire(): Promise<void> {
+    this.retired = true;
+    try {
+      await removeFolder(this.folder);
+      this.event("textures.cache-removed", { revision: this.revision });
+    } catch (cause) {
+      this.event("textures.retire-failed", { revision: this.revision, message: String(cause) });
+    }
+  }
+
+  /** What `validateTextureStack` reports for this stack; builds the atlas when needed. */
+  async report(): Promise<TextureStackReport> {
+    const atlas = (await this.load())!;
+    return stackReport(this.stack, atlas.revision, {
+      tileSize: atlas.tileSize,
+      tiles: atlas.tiles,
+      gpuBytes: atlas.gpuBytes,
+      bytes: atlas.bytes.byteLength,
+      gzipBytes: atlas.gzip.byteLength,
+      brotliBytes: atlas.brotli.byteLength,
+      notices: atlas.notices,
+    });
   }
 
   /** The atlas once built or read, without building it. */
@@ -147,7 +188,6 @@ export class SceneTextures {
         index: built.index,
         notices: built.notices,
       };
-      await mkdir(this.folder, { recursive: true });
       const contents = [
         atlas.bytes,
         atlas.gzip,
@@ -155,10 +195,15 @@ export class SceneTextures {
         JSON.stringify(atlas.index),
         JSON.stringify(atlas.notices),
       ];
-      for (const [index, name] of ATLAS_FILES.entries()) {
-        const temporary = join(this.folder, `${name}.${process.pid}.tmp`);
-        await writeFile(temporary, contents[index]!);
-        await rename(temporary, join(this.folder, name));
+      if (!this.retired) {
+        await mkdir(this.folder, { recursive: true });
+        for (const [index, name] of ATLAS_FILES.entries()) {
+          const temporary = join(this.folder, `${name}.${process.pid}.tmp`);
+          await writeFile(temporary, contents[index]!);
+          await rename(temporary, join(this.folder, name));
+        }
+        // Retired while writing: nothing of this revision stays on disk.
+        if (this.retired) await removeFolder(this.folder);
       }
       this.atlas = atlas;
       this.failure = undefined;
@@ -179,6 +224,10 @@ export class SceneTextures {
       throw cause;
     }
   }
+}
+
+function atlasRoot(cacheDirectory: string): string {
+  return join(cacheDirectory, "textures", `atlas-v${ATLAS_FORMAT_VERSION}`);
 }
 
 async function readStored(folder: string, revision: string): Promise<SceneAtlas> {
@@ -236,10 +285,6 @@ export async function validateTextureStack(
   };
   try {
     const stack = await openResourcePackStack(source, options.limits);
-    const packs = [];
-    for (const pack of stack.packs) {
-      packs.push({ ...pack.info, fingerprint: await packFingerprint(pack) });
-    }
     const built = await buildTextureAtlas(stack, settings);
     const [gzipped, brotli] = await Promise.all([
       gzipAsync(built.bytes, { level: 9 }),
@@ -247,23 +292,44 @@ export async function validateTextureStack(
         params: { [constants.BROTLI_PARAM_QUALITY]: 9 },
       }),
     ]);
-    return {
-      ok: true,
-      errors: [],
-      revision: built.fingerprint,
-      stackFingerprint: stack.fingerprint,
-      packs,
-      atlas: {
-        tileSize: built.atlas.tileSize,
-        tiles: built.atlas.tiles.length,
-        gpuBytes: built.gpuBytes,
-        bytes: built.bytes.byteLength,
-        gzipBytes: gzipped.byteLength,
-        brotliBytes: brotli.byteLength,
-      },
+    return await stackReport(stack, built.fingerprint, {
+      tileSize: built.atlas.tileSize,
+      tiles: built.atlas.tiles.length,
+      gpuBytes: built.gpuBytes,
+      bytes: built.bytes.byteLength,
+      gzipBytes: gzipped.byteLength,
+      brotliBytes: brotli.byteLength,
       notices: built.notices,
-    };
+    });
   } catch (cause) {
-    return { ok: false, errors: [cause instanceof Error ? cause.message : String(cause)] };
+    return failedReport(cause);
   }
+}
+
+/** The report of a stack that could not be read or built. */
+export function failedReport(cause: unknown): TextureStackReport {
+  return { ok: false, errors: [cause instanceof Error ? cause.message : String(cause)] };
+}
+
+async function stackReport(
+  stack: ResourcePackStack,
+  revision: string,
+  {
+    notices,
+    ...atlas
+  }: NonNullable<TextureStackReport["atlas"]> & { readonly notices: readonly TextureNotice[] },
+): Promise<TextureStackReport> {
+  const packs = [];
+  for (const pack of stack.packs) {
+    packs.push({ ...pack.info, fingerprint: await packFingerprint(pack) });
+  }
+  return {
+    ok: true,
+    errors: [],
+    revision,
+    stackFingerprint: stack.fingerprint,
+    packs,
+    atlas,
+    notices,
+  };
 }

@@ -72,6 +72,11 @@ working unchanged, with textures off, and with a server that has no texture stac
   cubes draw; `snapshot().textures.leaves`.
 - Control texts `textures`, `texturesUnavailable`, `texturesFailed` and `detailedLeaves`; the
   address keeps `textures=1` and `leaves=detailed`.
+- Added later in version 5, optional for hosts: `MapelixViewer.refreshWorld()` reads the world
+  metadata again and takes a texture stack changed on the server (`SceneServer.setTextures()`),
+  which the viewer also does by itself when the server no longer serves its texture revision;
+  `WorldViewer.setWorldTextures()` and the `onStaleTextures` option for hosts that drive a
+  `WorldViewer` directly.
 
 ### API version 4 (changes from 3)
 

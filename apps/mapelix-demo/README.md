@@ -52,6 +52,25 @@ Markers can be added, edited and deleted (`src/lib/marker-store.ts`): the demo k
 browser's local storage only, adds a "Public" field, and leaves the spawn read-only.
 `?readonly=1` shows the map as a public, read-only page.
 
+## Texture packs
+
+`MAPELIX_TEXTURE_STACK` (a stack folder) or `MAPELIX_TEXTURE_PACKS` (packs separated by the path
+delimiter, highest priority first) give the 3D world its block textures at start; see
+[`docs/texture-stack.md`](../../docs/texture-stack.md). Textures are off until turned on in the
+settings panel.
+
+With `MAPELIX_TEXTURE_UPLOADS=1`, the page `/textures` changes the pack while the server runs:
+upload a `.zip` or `.mcpack`, use the vanilla pack, or remove the textures. Open maps pick up the
+change by themselves. The vanilla pack is the resource pack of Mojang's Bedrock samples,
+downloaded once from `MAPELIX_VANILLA_PACK_URL` (by default the v1.26.60.5 release on GitHub,
+about 162 MiB); `MAPELIX_TEXTURE_VANILLA=1` downloads and uses it when the demo starts without a
+pack. Packs are kept in `MAPELIX_TEXTURE_PACK_DIRECTORY` (default `texture-packs` in the cache
+folder), up to `MAPELIX_TEXTURE_PACK_MIB` (256) each, and the last one chosen is used again after
+a restart. The scene server refuses a pack it cannot read and keeps the current one. A built
+server limits request bodies to 512 KiB by default: start it with `BODY_SIZE_LIMIT=256M` to
+upload packs. This page is for the demo only; it has no access control beyond a header that
+other sites cannot send, so do not enable it on a public server.
+
 ## Tests
 
 ```sh
