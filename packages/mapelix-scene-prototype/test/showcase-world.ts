@@ -165,20 +165,18 @@ row(61, [
   b("soul_campfire", { "minecraft:cardinal_direction": "south", extinguished: 0 }),
 ]);
 
+// Enchanting table, end portal frame, composters filling up, lecterns facing the four ways.
+row(57, [
+  b("enchanting_table"),
+  b("end_portal_frame", { direction: 0, end_portal_eye_bit: 0 }),
+  ...[0, 3, 7, 8].map((composter_fill_level) => b("composter", { composter_fill_level })),
+  ...[0, 1, 2, 3].map((direction) => b("lectern", { direction, powered_bit: 0 })),
+]);
+
 // Still drawn as cubes: detailed blocks that need their own models.
 row(
   64,
-  [
-    "lectern",
-    "enchanting_table",
-    "brewing_stand",
-    "composter",
-    "smithing_table",
-    "bell",
-    "end_portal_frame",
-    "loom",
-    "chiseled_bookshelf",
-  ].map((name) => b(name)),
+  ["brewing_stand", "smithing_table", "bell", "loom", "chiseled_bookshelf"].map((name) => b(name)),
 );
 // Still invisible or approximate: thin and wall blocks.
 row(

@@ -30,7 +30,9 @@ Detailed LOD 0 geometry includes:
   rod alone. Anvils (intact, chipped, damaged) and grindstones on the floor, the
   ceiling or a wall; the grindstone's legs, pivots and wheel each read their own face
   of the block's textures. Stonecutters (base and flat blade) and campfires (four logs, a
-  bed of embers and two crossed planes of flame, none when extinguished). These are cuboid
+  bed of embers and two crossed planes of flame, none when extinguished). Lecterns (base,
+  post, a desk in two steps), composters filling with their level, and the lower enchanting
+  table and end portal frame (no eye yet). These are cuboid
   representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.

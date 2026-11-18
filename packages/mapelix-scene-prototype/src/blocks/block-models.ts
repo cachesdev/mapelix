@@ -51,7 +51,10 @@ export type ModelFamily =
   | "anvil"
   | "grindstone"
   | "stonecutter"
-  | "campfire";
+  | "campfire"
+  | "lectern"
+  | "composter"
+  | "low-box";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -98,6 +101,7 @@ export const MODEL_STATES = [
   "bite_counter",
   "attachment",
   "extinguished",
+  "composter_fill_level",
   "liquid_depth",
 ] as const;
 
@@ -144,6 +148,9 @@ export function resolveBlockModel(
   else if (block === "grindstone") family = "grindstone";
   else if (block === "stonecutter_block") family = "stonecutter";
   else if (block === "campfire" || block === "soul_campfire") family = "campfire";
+  else if (block === "lectern") family = "lectern";
+  else if (block === "composter") family = "composter";
+  else if (block === "enchanting_table" || block === "end_portal_frame") family = "low-box";
   if (family === undefined) return undefined;
   const modelStates = Object.fromEntries(
     MODEL_STATES.flatMap((key) => (states[key] === undefined ? [] : [[key, states[key]]])),
@@ -536,6 +543,31 @@ export function blockModelParts(
     }
     case "campfire":
       return campfireParts(s, facing);
+    case "lectern":
+      // Base, post, and the desk in two steps sloping down to its front.
+      return oriented(
+        [
+          part([0, 0, 0, 16, 2, 16]),
+          part([4, 2, 4, 12, 12, 12]),
+          part([0, 12, 0, 16, 15, 8]),
+          part([0, 12, 8, 16, 14, 16]),
+        ],
+        facing,
+      );
+    case "composter": {
+      // The compost rises with the fill level; it reads the bottom texture, as the top one is
+      // open in its middle.
+      const level = Math.min(7, numberState(s, "composter_fill_level"));
+      return [
+        { bounds: [2, 0, 2, 14, 2 + level * 2, 14], faces: COMPOST_FACES },
+        part([0, 0, 0, 2, 16, 16]),
+        part([14, 0, 0, 16, 16, 16]),
+        part([2, 0, 0, 14, 16, 2]),
+        part([2, 0, 14, 14, 16, 16]),
+      ];
+    }
+    case "low-box":
+      return [part([0, 0, 0, 16, model.block === "enchanting_table" ? 12 : 13, 16])];
     case "hopper":
       return [
         part([0, 10, 0, 2, 16, 16]),
@@ -590,6 +622,14 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+const COMPOST_FACES: readonly number[] = [
+  Face.PositiveX,
+  Face.NegativeX,
+  Face.NegativeY,
+  Face.NegativeY,
+  Face.PositiveZ,
+  Face.NegativeZ,
+];
 /** A stonecutter's base: its sides all read the south face, as the east and west hold the saw. */
 const STONECUTTER_BASE_FACES: readonly number[] = [
   Face.PositiveZ,
@@ -753,6 +793,11 @@ export function modelCatalog(): readonly BlockModel[] {
   }
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
+  add("enchanting_table");
+  add("end_portal_frame");
+  for (let composter_fill_level = 0; composter_fill_level <= 8; composter_fill_level++)
+    add("composter", { composter_fill_level });
+  for (let direction = 0; direction < 4; direction++) add("lectern", { direction });
   for (const side of ["north", "east"]) {
     add("stonecutter_block", { "minecraft:cardinal_direction": side });
     for (const extinguished of [0, 1])
