@@ -521,7 +521,8 @@ export function blockModelParts(
     case "ladder": {
       const parts: ModelPart[] = [part([2, 0, 0, 4, 16, 2]), part([12, 0, 0, 14, 16, 2])];
       for (const y of [1, 4, 7, 10, 13]) parts.push(part([4, y, 0, 12, y + 1, 2]));
-      return oriented(parts, [0, 0, 0, 2, 3, 1][numberState(s, "facing_direction", 2)]!);
+      // `facing_direction` points away from the wall, as for buttons.
+      return oriented(parts, [2, 2, 2, 0, 1, 3][numberState(s, "facing_direction", 3)]!);
     }
     case "candle": {
       const count = Math.min(4, Math.max(1, numberState(s, "candles") + 1));
