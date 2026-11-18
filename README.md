@@ -57,6 +57,20 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
      --dimension overworld,nether --incremental --surface-cache
    ```
 
+5. **Textures** (optional): draw the 3D world with the textures of Bedrock resource packs. The
+   simplest way is to let the demo download the vanilla pack and to choose packs on its
+   `/textures` page:
+
+   ```sh
+   BODY_SIZE_LIMIT=256M MAPELIX_TEXTURE_UPLOADS=1 MAPELIX_TEXTURE_VANILLA=1 \
+   MAPELIX_TILES_DIRECTORY=/path/to/map \
+   MAPELIX_WORLD_DIRECTORY=/path/to/world \
+   PORT=3000 node apps/mapelix-demo/build/index.js
+   ```
+
+   Then turn on **Block textures** in the settings panel; **Choose the texture packs** below that
+   switch opens the packs page. See [Block textures](#block-textures) for the other ways.
+
 ## Features
 
 ### 2D map
@@ -102,6 +116,61 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
   touch (48 px), light and dark, from `@mapelix/viewer/controls`. Touch: drag to move, two fingers
   to turn and tilt, pinch to zoom. Mouse: drag, right button to turn, wheel. Keys: WASD or arrows,
   Q/E, R/F, +/−, and Space/C up and down. Compass, return home, go to coordinates.
+
+### Block textures
+
+![The 3D view drawn with the textures of a resource pack](docs/images/texture_pack.jpg)
+
+- **Bedrock resource packs** (folders, `.zip` or `.mcpack`) texture the 3D world near the camera:
+  terrain, plants, leaves, water and lava animations, Surface and Caves. Far away, and below 4 CSS
+  pixels per block, blocks keep their flat colors; between 4 and 8 pixels the two blend, so the
+  textures fade in without a jump.
+- **Stacks, as in the game:** packs are listed highest priority first, and a block takes each
+  texture from the first pack that has it. A pack that changes a few blocks goes on top of the
+  vanilla pack, which fills in the rest.
+- **Any pack, safely:** packs are read with limits on size, entries, compression and image size.
+  An image a pack holds but cannot be used, such as a 512-pixel animation strip or a damaged
+  file, is skipped alone and taken from the next pack; the report names it.
+- **Changed while running:** the scene server switches stacks without a restart
+  (`SceneServer.setTextures`), and open maps pick up the new textures by themselves.
+- **Light:** one atlas of every texture (about 6 MiB on the GPU and 630 KiB to download for the
+  vanilla pack), textured regions only near the camera, and the untextured view unchanged pixel
+  for pixel. **Detailed leaves** cut out leaf holes, at about twice the geometry in forests.
+- Mapelix never ships or downloads a pack itself; the host gives the packs. The demo can
+  download Mojang's vanilla pack (Bedrock samples on GitHub) when asked to.
+
+Three ways to give packs:
+
+| Where                 | How                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Demo page `/textures` | `MAPELIX_TEXTURE_UPLOADS=1`: add a pack on top, add the vanilla pack at the bottom, reorder, remove, see skipped images. The choice survives restarts. |
+| Demo, fixed at start  | `MAPELIX_TEXTURE_PACKS="mine.mcpack:vanilla.zip"` (highest priority first, `;` on Windows) or `MAPELIX_TEXTURE_STACK=/path/to/stack-folder`.           |
+| Your own server       | `createSceneServer({ textures: { packs: [...] } })` or `{ stack }`, then `setTextures()` to change it ([texture stacks](docs/texture-stack.md)).       |
+
+Check a stack without a server, from the command line. It prints the texture revision, each
+pack's fingerprint, the atlas size, the packs and files used, and the skipped images, and writes
+nothing:
+
+```sh
+mise exec -- pnpm exec turbo run build --filter=@mapelix/viewer...
+node packages/mapelix-viewer/dist/node/texture-cli.js --packs mine.mcpack vanilla.zip
+node packages/mapelix-viewer/dist/node/texture-cli.js /path/to/stack-folder
+node packages/mapelix-viewer/dist/node/texture-cli.js --packs mine.mcpack vanilla.zip \
+  --max-tile-size 32 --budget-mib 64
+```
+
+The demo's packs page has the same API from a terminal (`curl` examples in the
+[demo README](apps/mapelix-demo/README.md#texture-packs)):
+
+```sh
+curl http://localhost:3000/demo/textures
+curl -X POST -H "x-mapelix-demo: 1" -H "x-mapelix-pack-name: mine.mcpack" \
+  --data-binary @mine.mcpack http://localhost:3000/demo/textures
+```
+
+Not textured yet: lanterns, torches, chains, candles, end rods, flower pots and lightning rods
+(their textures are sheets of small parts; they keep their colors), beds, signs, mobs and other
+entities, and the 2D map.
 
 ### Markers
 
@@ -154,8 +223,9 @@ All packages are private and their APIs can still change.
 - **The 3D view needs a server** that reads the world; there is no static 3D export.
 - **2D:** no textures and no isometric images. Bed colors stored in block entities are not read yet.
 - **3D:** coarse levels of detail can close narrow caves; the Nether atmosphere does not change with
-  biomes; resource packs, custom dimensions and entities are not drawn, and unknown blocks fall
-  back to a plain solid.
+  biomes; custom dimensions and entities are not drawn, and unknown blocks fall back to a plain
+  solid. Block textures show near the camera only, and a few small models keep their colors (see
+  [Block textures](#block-textures)).
 - **Isometric 3D:** exploration-area handles still pick as in perspective, and discovery markers
   behind the camera can show.
 - **Discoveries** are limited by a search budget around the view, and exposure is uncertain next to
@@ -208,7 +278,8 @@ system `unzip` command to expand the committed `.mcworld` fixture into a tempora
   [dimensions](docs/native-dimensions.md), [underground rendering](docs/underground-rendering.md),
   [underground exploration](docs/underground-exploration.md),
   [cave navigation](docs/cave-navigation.md), [clouds and weather](docs/clouds-weather.md),
-  [block models and lava](docs/block-models-and-lava.md), [block colors](docs/block-colors.md).
+  [block models and lava](docs/block-models-and-lava.md), [block colors](docs/block-colors.md),
+  [block textures and resource packs](docs/texture-stack.md).
 - Discoveries: [labels](docs/discovery-labels.md), [navigation](docs/discovery-navigation.md).
 - Hosting: [scene server and handlers](packages/mapelix-viewer/README.md),
   [demo](apps/mapelix-demo/README.md), [on-demand viewer](apps/prototype-viewer/README.md).
