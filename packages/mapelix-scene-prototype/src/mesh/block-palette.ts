@@ -74,14 +74,10 @@ export const TintCode = {
 const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter"]);
 
 /**
- * Blocks whose pack texture is a sheet of small parts that no shape here matches yet. Drawn
- * from block coordinates they would show stray fragments, so they keep their block color.
- * Lanterns, chains, candles, end rods and flower pots are models whose parts read their own
- * rectangles of the sheet (see `ModelPart.sheet`); torches are below.
+ * A torch's stick: its sides as the sheet holds them, its top and bottom from the stick. Models
+ * drawn from a sheet of parts, such as lanterns, name their rectangles on each part instead
+ * (`ModelPart.sheet`).
  */
-const SPRITE_SHEET = /(?:^|_)lightning_rod$/;
-
-/** A torch's stick: its sides as the sheet holds them, its top and bottom from the stick. */
 const TORCH: PartSheet = { side: [7, 6], top: [7, 6], bottom: [7, 13] };
 const TORCH_BLOCK = /(?:^|_)torch$/;
 
@@ -222,7 +218,6 @@ export class BlockPalette {
     appearance: BlockAppearance,
   ): void {
     const base = name.replace(/^minecraft:/, "");
-    if (SPRITE_SHEET.test(base)) return;
     const textures = resolveBlockTextures(this.names!, name, states, appearance);
     if (textures === undefined) return;
     const ownColor = SELF_TINTED.has(base);

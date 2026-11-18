@@ -123,4 +123,36 @@ describe("Bedrock block models", () => {
     expect(head.map((p) => p.bounds[4])).toEqual([4, 5]);
     expect(head.every((p) => p.color === undefined)).toBe(true);
   });
+
+  it("gives standing and hanging end rods their base, and lying ones their rod alone", () => {
+    const bounds = (facing_direction: number) =>
+      parts("end_rod", { facing_direction }).map((p) => p.bounds);
+    expect(bounds(1)).toEqual([
+      [7, 0, 7, 9, 16, 9],
+      [6, 0, 6, 10, 1, 10],
+    ]);
+    expect(bounds(0)).toEqual([
+      [7, 0, 7, 9, 16, 9],
+      [6, 15, 6, 10, 16, 10],
+    ]);
+    expect(bounds(5)).toEqual([[0, 7, 7, 16, 9, 9]]);
+    expect(bounds(2)).toEqual([[7, 7, 0, 9, 9, 16]]);
+  });
+
+  it.each(["lightning_rod", "exposed_lightning_rod", "waxed_oxidized_lightning_rod"])(
+    "draws %s as a rod with its tip on top of standing and hanging rods",
+    (block) => {
+      const bounds = (facing_direction: number) =>
+        parts(block, { facing_direction }).map((p) => p.bounds);
+      expect(bounds(1)).toEqual([
+        [7, 0, 7, 9, 16, 9],
+        [6, 12, 6, 10, 16, 10],
+      ]);
+      expect(bounds(0)).toEqual([
+        [7, 0, 7, 9, 16, 9],
+        [6, 0, 6, 10, 4, 10],
+      ]);
+      expect(bounds(4)).toEqual([[0, 7, 7, 16, 9, 9]]);
+    },
+  );
 });

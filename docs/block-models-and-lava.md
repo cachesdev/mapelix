@@ -25,7 +25,9 @@ Detailed LOD 0 geometry includes:
 - Hollow scaffolding, bed mattresses/legs/pillows with existing per-bed dyes,
   non-flat straw-bed cubes and chorus branches on all six axes.
 - Lantern bodies, pots, axis-aligned rods/chains, ladders, candle groups, bitten
-  cakes, hollow cauldrons and hoppers. These are cuboid representations:
+  cakes, hollow cauldrons and hoppers. Standing and hanging end rods have their
+  base, and lightning rods (every copper stage) their tip; lying ones keep the
+  rod alone, as the catalog has room for few more boxes. These are cuboid representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.
 
@@ -67,7 +69,7 @@ material IDs. Optional extensions use reserved/non-plant bits:
   Other fields provide a full-box fallback for old readers.
 - Non-model word 1 bit 27 marks lava; bits 28-31 encode horizontal flow.
   The base material stays `Emissive`, giving old readers static emission.
-- The append-only catalog has 180 bounds, stored as shared scalar uniforms.
+- The append-only catalog has 183 bounds, stored as shared scalar uniforms.
   Its encoding permits 192 entries. Never reorder IDs. With Node 24, run
   `node packages/mapelix-scene-prototype/scripts/generate-model-bounds.mjs`,
   then format the output with the existing formatter.

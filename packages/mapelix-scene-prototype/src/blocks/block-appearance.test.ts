@@ -104,4 +104,14 @@ describe("dimension block appearances", () => {
       expect(resolveBlockAppearance(`minecraft:${name}`, {}).shape).toMatchObject({ kind: "cube" });
     },
   );
+  it("draws lightning rods as unlit models and end rods as glowing ones", () => {
+    expect(resolveBlockAppearance("minecraft:lightning_rod", {}).shape).toMatchObject({
+      kind: "model",
+      material: QuadMaterial.Solid,
+    });
+    expect(resolveBlockAppearance("minecraft:end_rod", {}).shape).toMatchObject({
+      kind: "model",
+      material: QuadMaterial.Emissive,
+    });
+  });
 });

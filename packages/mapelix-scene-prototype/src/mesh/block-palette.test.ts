@@ -39,12 +39,8 @@ describe("block palette textures", () => {
     return [...palette.textureWords.slice(id * 6, id * 6 + 6)];
   };
 
-  it("keeps the block color of a sheet of parts no shape matches", () => {
-    expect(words("lightning_rod")).toEqual([0, 0, 0, 0, 0, 0]);
-  });
-
   it("textures models drawn from a sheet of parts; their parts pick the rectangles", () => {
-    for (const name of ["lantern", "soul_lantern", "end_rod", "iron_chain"])
+    for (const name of ["lantern", "soul_lantern", "end_rod", "iron_chain", "lightning_rod"])
       expect(
         words(name).every((word) => word !== 0),
         name,

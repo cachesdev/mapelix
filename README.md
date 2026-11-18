@@ -168,8 +168,8 @@ curl -X POST -H "x-mapelix-demo: 1" -H "x-mapelix-pack-name: mine.mcpack" \
   --data-binary @mine.mcpack http://localhost:3000/demo/textures
 ```
 
-Lanterns, torches, chains, candles, end rods and flower pots read their pieces from their
-texture's sheet of parts, as the vanilla pack lays it out. Not textured yet: lightning rods, beds,
+Lanterns, torches, chains, candles, end rods, lightning rods and flower pots read their pieces
+from their texture's sheet of parts, as the vanilla pack lays it out. Not textured yet: beds,
 signs, mobs and other entities, and the 2D map.
 
 ### Markers

@@ -30,6 +30,7 @@ export type ModelFamily =
   | "lantern"
   | "pot"
   | "rod"
+  | "lightning-rod"
   | "chain"
   | "ladder"
   | "candle"
@@ -85,6 +86,7 @@ export const MODEL_STATES = [
 export const COPPER_PREFIX = "(?:waxed_)?(?:exposed_|weathered_|oxidized_)?copper_";
 const LANTERN = new RegExp(`^(?:soul_|${COPPER_PREFIX})?lantern$`);
 const BARS = new RegExp(`^(?:iron_|${COPPER_PREFIX})bars$`);
+const LIGHTNING_ROD = /^(?:waxed_)?(?:exposed_|weathered_|oxidized_)?lightning_rod$/;
 
 export function resolveBlockModel(
   block: string,
@@ -105,6 +107,7 @@ export function resolveBlockModel(
   else if (LANTERN.test(block)) family = "lantern";
   else if (block === "flower_pot") family = "pot";
   else if (block === "end_rod") family = "rod";
+  else if (LIGHTNING_ROD.test(block)) family = "lightning-rod";
   else if (block === "chain" || block.endsWith("_chain")) family = "chain";
   else if (block === "ladder") family = "ladder";
   else if (/(?:^|_)candle$/.test(block)) family = "candle";
@@ -137,6 +140,14 @@ const LANTERN_CAP: PartSheet = { side: [1, 0], top: [1, 10] };
 const LANTERN_CHAIN: PartSheet = { side: [11, 1] };
 const CANDLE: PartSheet = { side: [0, 8], top: [0, 6], bottom: [0, 14] };
 const POT_FLOOR: PartSheet = { side: [5, 15], top: [5, 10] };
+const END_ROD_BASE: PartSheet = { side: [2, 6], top: [2, 2] };
+const LIGHTNING_ROD_TIP: PartSheet = { side: [0, 0] };
+/** Rods and chains through the middle of the block, by axis. */
+const ROD_BOUNDS: Readonly<Record<"x" | "y" | "z", ModelBounds>> = {
+  x: [0, 7, 7, 16, 9, 9],
+  y: [7, 0, 7, 9, 16, 9],
+  z: [7, 7, 0, 9, 9, 16],
+};
 const isSet = (value: unknown): boolean => value === 1 || value === true;
 const numberState = (s: LittleEndianNbtCompoundValue, key: string, fallback = 0): number =>
   typeof s[key] === "number" ? s[key] : fallback;
@@ -356,25 +367,31 @@ export function blockModelParts(
         part([6, 1, 5, 10, 6, 6]),
         part([6, 1, 10, 10, 6, 11]),
       ];
-    case "rod":
     case "chain": {
-      const axis =
-        family === "chain"
-          ? s.pillar_axis
-          : ["y", "y", "z", "z", "x", "x"][numberState(s, "facing_direction", 1)];
-      const sheet: PartSheet =
-        family === "chain"
-          ? { axis: axis === "x" ? "x" : axis === "z" ? "z" : "y", side: [0, 0] }
-          : { axis: axis === "x" ? "x" : axis === "z" ? "z" : "y", side: [0, 0], top: [2, 0] };
+      const axis = s.pillar_axis === "x" ? "x" : s.pillar_axis === "z" ? "z" : "y";
+      return [sheetPart(ROD_BOUNDS[axis], { axis, side: [0, 0] })];
+    }
+    case "rod":
+    case "lightning-rod": {
+      // Facing 0 down, 1 up, 2 north, 3 south, 4 west, 5 east: odd ones point to a positive end.
+      const facing = numberState(s, "facing_direction", 1);
+      const axis = (["y", "y", "z", "z", "x", "x"] as const)[facing] ?? "y";
+      const positive = facing % 2 === 1;
+      // The sheet's rod column runs from the rod's positive end. It is shorter than a block: the
+      // texels past it fall where the base or the tip covers the rod, or where it meets its block.
+      // Only standing and hanging rods get their base or tip: the box catalog has room for few.
+      if (family === "rod")
+        return [
+          sheetPart(ROD_BOUNDS[axis], { axis, side: [0, positive ? 0 : 15], top: [2, 0] }),
+          ...(axis === "y"
+            ? [sheetPart(positive ? [6, 0, 6, 10, 1, 10] : [6, 15, 6, 10, 16, 10], END_ROD_BASE)]
+            : []),
+        ];
       return [
-        sheetPart(
-          axis === "x"
-            ? [0, 7, 7, 16, 9, 9]
-            : axis === "z"
-              ? [7, 7, 0, 9, 9, 16]
-              : [7, 0, 7, 9, 16, 9],
-          sheet,
-        ),
+        sheetPart(ROD_BOUNDS[axis], { axis, side: [0, positive ? 0 : 4], top: [0, 0] }),
+        ...(axis === "y"
+          ? [sheetPart(positive ? [6, 12, 6, 10, 16, 10] : [6, 0, 6, 10, 4, 10], LIGHTNING_ROD_TIP)]
+          : []),
       ];
     }
     case "ladder": {
@@ -516,6 +533,7 @@ export function modelCatalog(): readonly BlockModel[] {
   for (const hanging of [0, 1]) add("lantern", { hanging });
   for (let facing_direction = 0; facing_direction < 6; facing_direction++) {
     add("end_rod", { facing_direction });
+    add("lightning_rod", { facing_direction });
     if (facing_direction >= 2) add("ladder", { facing_direction });
   }
   for (const pillar_axis of ["x", "y", "z"]) add("chain", { pillar_axis });

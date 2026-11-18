@@ -19,7 +19,12 @@ const FACES = [
  * The texels a face reads, as the textured terrain shader computes them: coordinates from the
  * position, quarter turns `(u, v)` to `(v, -u)`, then the offset, wrapped to the tile.
  */
-function readTexels(word: number, bounds: ModelBounds, face: number): Set<string> {
+function readTexels(
+  word: number,
+  bounds: ModelBounds,
+  face: number,
+  only: (position: readonly number[]) => boolean = () => true,
+): Set<string> {
   const texture = unpackQuadTexture(word)!;
   const [across, down] = texture.offset ?? [0, 0];
   const axis = face >> 1;
@@ -32,6 +37,7 @@ function readTexels(word: number, bounds: ModelBounds, face: number): Set<string
       p[axis] = plane;
       p[a!] = i;
       p[b!] = j;
+      if (!only(p)) continue;
       const [x, y, z] = p as [number, number, number];
       let [u, v] = [
         [-z, -y],
@@ -95,6 +101,17 @@ describe("sheet faces", () => {
         expect(texels, `${axis} face ${face}`).toEqual(
           face >> 1 === along ? rectangle(2, 0, 2, 2) : rectangle(0, 0, 2, 16),
         );
+        if (face >> 1 === along) continue;
+        // Every side reads the column from the rod's positive end, as a standing rod from its top.
+        const word = sheetFaceWord(WORD, bounds, face, sheet);
+        expect(
+          readTexels(word, bounds, face, (p) => p[along]! > 15),
+          `${axis} face ${face}`,
+        ).toEqual(rectangle(0, 0, 2, 1));
+        expect(
+          readTexels(word, bounds, face, (p) => p[along]! < 1),
+          `${axis} face ${face}`,
+        ).toEqual(rectangle(0, 15, 2, 1));
       }
     }
   });
