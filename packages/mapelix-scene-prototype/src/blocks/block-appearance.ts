@@ -74,7 +74,7 @@ const PLANTS = PLANT_COLOR_RULES.map(
 /** Simple boxes in sixteenths. Multipart models are resolved before these fallbacks. */
 const BOXES: ReadonlyArray<readonly [RegExp, QuadBox, SurfaceMaterial]> = [
   [
-    /(?:^|_)carpet$|^pink_petals$|^leaf_litter$|^(?:waterlily|lily_pad)$/,
+    /(?:^|_)carpet$|^pink_petals$|^wildflowers$|^leaf_litter$|^(?:waterlily|lily_pad)$/,
     box(1, 0),
     QuadMaterial.Solid,
   ],
