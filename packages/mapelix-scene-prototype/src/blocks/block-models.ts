@@ -509,11 +509,11 @@ export function blockModelParts(
     // Cauldron and hopper tops are open in the middle: their floors read the bottom texture.
     case "cauldron":
       return [
-        { bounds: [0, 0, 0, 16, 4, 16], faces: COMPOST_FACES },
-        part([0, 4, 0, 2, 16, 16]),
-        part([14, 4, 0, 16, 16, 16]),
-        part([2, 4, 0, 14, 16, 2]),
-        part([2, 4, 14, 14, 16, 16]),
+        { bounds: [0, 0, 0, 16, 4, 16], faces: CAULDRON_FLOOR },
+        { bounds: [0, 4, 0, 2, 16, 16], faces: CAULDRON_WALL },
+        { bounds: [14, 4, 0, 16, 16, 16], faces: CAULDRON_WALL },
+        { bounds: [2, 4, 0, 14, 16, 2], faces: CAULDRON_WALL },
+        { bounds: [2, 4, 14, 14, 16, 16], faces: CAULDRON_WALL },
       ];
     case "anvil": {
       // The top runs across the way the anvil faces; its texture runs along the top.
@@ -624,6 +624,26 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+/**
+ * A cauldron's textures: the side on the north face, the inside on the south one (east and
+ * west hold water), and a bottom cut out between its feet.
+ */
+const CAULDRON_FLOOR: readonly number[] = [
+  Face.NegativeZ,
+  Face.NegativeZ,
+  Face.PositiveZ,
+  Face.NegativeY,
+  Face.NegativeZ,
+  Face.NegativeZ,
+];
+const CAULDRON_WALL: readonly number[] = [
+  Face.NegativeZ,
+  Face.NegativeZ,
+  Face.PositiveY,
+  Face.NegativeZ,
+  Face.NegativeZ,
+  Face.NegativeZ,
+];
 /** Faces of a floor under an open top: its top reads the bottom texture. */
 const COMPOST_FACES: readonly number[] = [
   Face.PositiveX,
