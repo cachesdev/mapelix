@@ -34,6 +34,7 @@ export type ModelFamily =
   | "rod"
   | "lightning-rod"
   | "portal"
+  | "shelf-mushroom"
   | "chain"
   | "ladder"
   | "candle"
@@ -113,6 +114,7 @@ export function resolveBlockModel(
   else if (block === "end_rod") family = "rod";
   else if (LIGHTNING_ROD.test(block)) family = "lightning-rod";
   else if (block === "portal") family = "portal";
+  else if (block === "shelf_mushroom") family = "shelf-mushroom";
   else if (block === "chain" || block.endsWith("_chain")) family = "chain";
   else if (block === "ladder") family = "ladder";
   else if (/(?:^|_)candle$/.test(block)) family = "candle";
@@ -402,6 +404,21 @@ export function blockModelParts(
     case "portal":
       // A Nether portal's sheet, four sixteenths thick, across the axis it spans.
       return [part(s.portal_axis === "z" ? [6, 0, 0, 10, 16, 16] : [0, 0, 6, 16, 16, 10])];
+    case "shelf-mushroom": {
+      // A shelf jutting from the log behind it toward `minecraft:cardinal_direction`.
+      const side = s["minecraft:cardinal_direction"];
+      return [
+        part(
+          side === "west"
+            ? [8, 6, 2, 16, 8, 14]
+            : side === "south"
+              ? [2, 6, 0, 14, 8, 8]
+              : side === "north"
+                ? [2, 6, 8, 14, 8, 16]
+                : [0, 6, 2, 8, 8, 14],
+        ),
+      ];
+    }
     case "ladder": {
       const parts: ModelPart[] = [part([2, 0, 0, 4, 16, 2]), part([12, 0, 0, 14, 16, 2])];
       for (const y of [1, 4, 7, 10, 13]) parts.push(part([4, y, 0, 12, y + 1, 2]));
@@ -546,6 +563,8 @@ export function modelCatalog(): readonly BlockModel[] {
   }
   for (const pillar_axis of ["x", "y", "z"]) add("chain", { pillar_axis });
   for (const portal_axis of ["x", "z"]) add("portal", { portal_axis });
+  for (const side of ["north", "south", "east", "west"])
+    add("shelf_mushroom", { "minecraft:cardinal_direction": side });
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   return samples;

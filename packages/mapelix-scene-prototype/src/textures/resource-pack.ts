@@ -162,6 +162,10 @@ export async function openResourcePack(source: string, limits: PackLimits): Prom
       if (faces !== undefined) blocks.set(key.replace(/^minecraft:/, ""), faces);
     }
   }
+  // Blocks the game textures in code, which blocks.json lists without textures.
+  for (const [block, name] of Object.entries(CODE_TEXTURED_BLOCKS))
+    if (!blocks.has(block) && terrain.has(name))
+      blocks.set(block, { up: name, down: name, north: name, south: name, east: name, west: name });
 
   const flipbooks = new Map<string, Flipbook>();
   if (files.sizes.has("textures/flipbook_textures.json")) {
@@ -235,8 +239,13 @@ function blockFaces(value: unknown): BlockTextureNames | undefined {
   };
 }
 
+/** Blocks whose textures the game assigns in code: the terrain texture each one takes. */
+const CODE_TEXTURED_BLOCKS: Readonly<Record<string, string>> = {
+  shelf_mushroom: "shelf_mushroom_large",
+};
+
 /** The version of the texture pipeline; part of every stack and pack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 7;
+export const TEXTURE_PIPELINE_VERSION = 8;
 
 const PACK_JSON = [
   "manifest.json",
