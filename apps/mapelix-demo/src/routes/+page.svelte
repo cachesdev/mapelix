@@ -38,6 +38,15 @@
       )
         result.weather = stored.weather;
       if (typeof stored.autoDepth === "boolean") result.autoDepth = stored.autoDepth;
+      if (typeof stored.showFps === "boolean") result.showFps = stored.showFps;
+      if (stored.blockLight !== null && typeof stored.blockLight === "object") {
+        const modes = stored.blockLight as Record<string, unknown>;
+        result.blockLight = Object.fromEntries(
+          ["overworld", "nether", "the-end"].flatMap(dimension =>
+            typeof modes[dimension] === "boolean" ? [[dimension, modes[dimension]]] : [],
+          ),
+        );
+      }
       return result;
     } catch {
       return {};
@@ -127,6 +136,8 @@
             clouds: settings.clouds,
             weather: settings.weather,
             autoDepth: settings.autoDepth,
+            showFps: settings.showFps,
+            blockLight: settings.blockLight,
           });
           if (preferences !== lastPreferences) {
             lastPreferences = preferences;

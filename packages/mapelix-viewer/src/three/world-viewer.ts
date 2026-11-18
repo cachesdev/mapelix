@@ -65,6 +65,7 @@ import {
   contextKey,
   type SceneContext,
   type SceneContextInput,
+  type Dimension,
 } from "@mapelix/scene-prototype/dimensions";
 
 export interface WorldInfo extends SceneContextInput {
@@ -79,6 +80,8 @@ export interface WorldInfo extends SceneContextInput {
 
 /** Block textures asked for by the host. */
 export type TextureMode = "off" | "on";
+/** Missing dimensions keep baked block illumination enabled. */
+export type BlockLightSettings = Readonly<Partial<Record<Dimension, boolean>>>;
 /**
  * How textured leaves and other cut-out blocks draw: `fast` fills their transparent texels
  * with a dark shade of their color; `detailed` cuts them out and draws the faces between them,
@@ -102,6 +105,8 @@ export type { AutoPerspective, ViewProjection } from "./view-projection";
 
 /** Kept across view switches so embedding does not fall back to a different server. */
 export interface WorldViewerOptions {
+  /** Baked block illumination per dimension (default enabled everywhere). */
+  readonly blockLight?: BlockLightSettings;
   /** Animated block clouds in Overworld Surface views (default true). */
   readonly clouds?: boolean;
   /** Cosmetic Overworld Surface weather only, independent of the server (default clear). */
@@ -260,6 +265,7 @@ export class WorldViewer {
   private projectionFrom = 0;
   private projectionProgress = 1;
   private textureMode: TextureMode = "off";
+  private blockLight: BlockLightSettings = {};
   private leafMode: LeafMode = "fast";
   private textureState: TextureState = "off";
   private textureFade: TextureFade = DEFAULT_TEXTURE_FADE;
@@ -286,6 +292,7 @@ export class WorldViewer {
     this.context = sceneContext(world.dimension, world);
     if (this.context.mode === "caves") this.caveThickness = this.context.maxY - this.context.minY;
     this.options = options;
+    this.blockLight = { ...options.blockLight };
     this.depthFollow = new DepthFollow(
       options.loadDepth,
       (next) => {
@@ -605,6 +612,7 @@ export class WorldViewer {
     return new RegionStreamer({
       context: this.context,
       revision: world.revision,
+      blockLight: this.blockLight[world.dimension] !== false,
       ...(this.options.regionBase === undefined ? {} : { regionBase: this.options.regionBase }),
       ...(this.options.regionSuffix === undefined
         ? {}
@@ -626,6 +634,21 @@ export class WorldViewer {
         this.regionsChanged = true;
       },
     });
+  }
+
+  /** Loads near-region geometry with or without baked light, retaining the camera and atlas. */
+  setBlockLight(enabled: boolean, dimension: Dimension = this.context.dimension): void {
+    if (typeof enabled !== "boolean" || !Object.hasOwn(DIMENSIONS, dimension))
+      throw new RangeError("Block light needs a boolean and a vanilla dimension");
+    const previous = this.blockLight[dimension] !== false;
+    this.blockLight = { ...this.blockLight, [dimension]: enabled };
+    if (previous === enabled || dimension !== this.context.dimension) return;
+    this.scene.remove(this.streamer.root);
+    this.streamer.dispose();
+    this.streamer = this.createStreamer(this.world);
+    this.scene.add(this.streamer.root);
+    this.applyTextures();
+    this.regionsChanged = true;
   }
 
   /** Fades terrain into the sky before the edge of the loaded area, or lets the edge show. */

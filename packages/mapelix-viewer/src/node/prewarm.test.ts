@@ -104,3 +104,14 @@ describe("Prewarmer", () => {
     expect(result).toMatchObject({ state: "stopped", reason: "cache-full" });
   });
 });
+
+describe("prewarmPlan block light modes", () => {
+  it("adds unlit variants of the near levels only", () => {
+    const lit = prewarmPlan(WORLD, 1000);
+    const both = prewarmPlan(WORLD, 1000, [true, false]);
+    const unlit = both.filter((job) => job.blockLight === false);
+    expect(unlit.length).toBe(lit.filter((job) => job.level <= 1).length);
+    expect(unlit.every((job) => job.level <= 1)).toBe(true);
+    expect(() => prewarmPlan(WORLD, 1000, [])).toThrow(RangeError);
+  });
+});

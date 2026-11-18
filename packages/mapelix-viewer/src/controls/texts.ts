@@ -51,6 +51,9 @@ export interface ControlTexts {
   readonly atmosphereOnly: string;
   readonly clouds: string;
   readonly textures: string;
+  readonly blockLight: string;
+  readonly showFps: string;
+  readonly frameRate: (fps: number | undefined) => string;
   readonly texturesUnavailable: string;
   readonly detailedLeaves: string;
   readonly texturesFailed: string;
@@ -137,6 +140,9 @@ export const DEFAULT_CONTROL_TEXTS: ControlTexts = {
   atmosphereOnly: "Weather and time apply to the Overworld surface in 3D.",
   clouds: "Clouds",
   textures: "Block textures",
+  blockLight: "Block lighting",
+  showFps: "Show FPS",
+  frameRate: (fps) => `${fps && Number.isFinite(fps) ? Math.round(fps) : "—"} FPS`,
   texturesUnavailable: "This world has no block textures.",
   detailedLeaves: "Detailed leaves",
   texturesFailed: "Block textures could not load; blocks keep their colors.",

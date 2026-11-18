@@ -3,6 +3,7 @@ import {
   discoveryFilterSearch,
 } from "@mapelix/scene-prototype/discoveries";
 import { selectionFromSearch } from "@mapelix/scene-prototype/selection";
+import { type Dimension } from "@mapelix/scene-prototype/dimensions";
 import type { MapView } from "../map/tile-math.js";
 import type { MapelixViewer, WorldSettings } from "./mapelix-viewer.js";
 import type { Projection } from "./view-state.js";
@@ -20,6 +21,7 @@ const number = (params: URLSearchParams, name: string): number | undefined => {
   const value = raw === null || raw === "" ? Number.NaN : Number(raw);
   return Number.isFinite(value) ? value : undefined;
 };
+const DIMENSIONS: readonly Dimension[] = ["overworld", "nether", "the-end"];
 
 /**
  * The view and settings as address parameters: `dimension`, `x`, `z`, `scale` (CSS pixels per
@@ -45,6 +47,9 @@ export function viewerSearch(viewer: MapelixViewer): URLSearchParams {
   params.set("hour", String(settings.hour));
   if (settings.weather !== "clear") params.set("weather", settings.weather);
   if (!settings.clouds) params.set("clouds", "0");
+  if (settings.showFps) params.set("fps", "1");
+  const unlit = DIMENSIONS.filter((dimension) => settings.blockLight[dimension] === false);
+  if (unlit.length) params.set("noBlockLight", unlit.join(","));
   if (settings.textures === "on") params.set("textures", "1");
   if (settings.leaves === "detailed") params.set("leaves", "detailed");
   if (!settings.autoDepth) params.set("autoDepth", "0");
@@ -77,6 +82,13 @@ export function startFromSearch(params: URLSearchParams): SearchStart {
   const weather = params.get("weather");
   if (weather === "rain" || weather === "thunderstorm") settings.weather = weather;
   if (params.get("clouds") === "0") settings.clouds = false;
+  if (params.get("fps") === "1" || params.get("fps") === "0")
+    settings.showFps = params.get("fps") === "1";
+  const unlit = params.get("noBlockLight");
+  if (unlit !== null)
+    settings.blockLight = Object.fromEntries(
+      DIMENSIONS.map((dimension) => [dimension, !unlit.split(",").includes(dimension)]),
+    );
   if (params.get("textures") === "1") settings.textures = "on";
   if (params.get("leaves") === "detailed") settings.leaves = "detailed";
   if (params.get("autoDepth") === "0") settings.autoDepth = false;

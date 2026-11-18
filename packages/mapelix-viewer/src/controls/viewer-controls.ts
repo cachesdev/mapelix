@@ -107,6 +107,7 @@ export class ViewerControls {
   // Elements updated on every change.
   private readonly readoutPosition = make("span");
   private readonly readoutScale = make("span", "mx-scale");
+  private readonly readoutFps = make("span", "mx-scale");
   /** The name of the last block clicked in 3D, shown under its position. */
   private readonly readoutBlock = make("span", "mx-scale");
   private clicked: { x: number; y: number; z: number; name: string } | undefined;
@@ -150,7 +151,14 @@ export class ViewerControls {
     const readout = make("p", "mx-readout mx-glass");
     readout.setAttribute("aria-live", "off");
     this.readoutNote.setAttribute("role", "status");
-    readout.append(this.readoutPosition, this.readoutBlock, this.readoutScale, this.readoutNote);
+    this.readoutFps.dataset.part = "fps";
+    readout.append(
+      this.readoutPosition,
+      this.readoutBlock,
+      this.readoutScale,
+      this.readoutFps,
+      this.readoutNote,
+    );
     this.compassIcon = document.createElementNS(SVG, "svg");
     this.compassIcon.setAttribute("viewBox", "0 0 24 24");
     this.compassIcon.setAttribute("aria-hidden", "true");
@@ -699,6 +707,10 @@ export class ViewerControls {
     // Block textures near the camera, when the server has them.
     const textures = this.check(t.textures, (on) => viewer.setTextures(on ? "on" : "off"));
     textures.dataset.part = "textures";
+    const blockLight = this.check(t.blockLight, (on) => viewer.setBlockLight(on));
+    blockLight.dataset.part = "block-light";
+    const fps = this.check(t.showFps, (on) => viewer.setShowFps(on));
+    fps.dataset.part = "show-fps";
     const leaves = this.check(t.detailedLeaves, (on) => viewer.setLeaves(on ? "detailed" : "fast"));
     leaves.dataset.part = "leaves";
     const texturesNote = make("p", undefined);
@@ -709,6 +721,8 @@ export class ViewerControls {
       ceiling,
       caves,
       wrapperOf(textures),
+      wrapperOf(blockLight),
+      wrapperOf(fps),
       wrapperOf(leaves),
       texturesNote,
     );
@@ -945,6 +959,9 @@ export class ViewerControls {
     const at = status.pointed ?? { x: Math.floor(view.x), z: Math.floor(view.z) };
     this.readoutPosition.textContent = t.position(at.x, at.z, at.y);
     this.readoutScale.textContent = t.scale(view.pixelsPerBlock);
+    this.readoutFps.hidden = !is3d || !settings.showFps;
+    const fps = t.frameRate(status.framesPerSecond);
+    if (this.readoutFps.textContent !== fps) this.readoutFps.textContent = fps;
     const clicked = this.clicked;
     const named =
       is3d &&
@@ -1093,6 +1110,13 @@ export class ViewerControls {
     if (tool) tool.value = settings.selectionTool;
 
     // Block textures.
+    const blockLight = this.part<HTMLInputElement>("block-light");
+    if (blockLight) {
+      blockLight.checked = dimension === undefined || settings.blockLight[dimension] !== false;
+      blockLight.disabled = !status.available || status.changing || dimension === undefined;
+    }
+    const fps = this.part<HTMLInputElement>("show-fps");
+    if (fps) fps.checked = settings.showFps;
     const textures = this.part<HTMLInputElement>("textures");
     if (textures) {
       textures.checked = settings.textures === "on";

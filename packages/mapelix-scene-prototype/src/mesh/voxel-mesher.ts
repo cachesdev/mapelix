@@ -75,8 +75,9 @@ export function meshRegionVolume(
   regionZ: number,
   geometry: GeometryMode = "surface",
   cutout = false,
+  blockLight = true,
 ): SceneRegion {
-  return new VoxelMesher(volume, palette, geometry, cutout).mesh(regionX, regionZ);
+  return new VoxelMesher(volume, palette, geometry, cutout, blockLight).mesh(regionX, regionZ);
 }
 
 class VoxelMesher {
@@ -111,13 +112,17 @@ class VoxelMesher {
   private readonly cutout: Uint8Array | undefined;
   /** Whether cubes with holes are seen through too, see `meshRegionVolume`. */
   private readonly cutoutCubes: boolean;
+  /** Whether faces take the light of the blocks around them; off builds lighter regions. */
+  private readonly blockLight: boolean;
 
   constructor(
     volume: RegionVolume,
     palette: BlockPalette,
     geometry: GeometryMode,
     cutout: boolean,
+    blockLight: boolean,
   ) {
+    this.blockLight = blockLight;
     this.geometry = geometry;
     this.cutout = palette.textures !== undefined ? palette.cutout : undefined;
     this.cutoutCubes = cutout;
@@ -145,14 +150,16 @@ class VoxelMesher {
     this.findOpenAir();
     this.findColumnRanges();
     if (this.high >= this.low) {
-      this.light = buildBlockLight({
-        width: VOLUME_SIZE,
-        layers: this.limitY - this.baseY,
-        minLayer: this.low - this.baseY - 15,
-        maxLayer: this.high - this.baseY + 16,
-        emission: (index) => this.palette.emission[this.cells[index]! & PALETTE_ID_MASK]!,
-        opaque: (index) => this.palette.isOpaque(this.cells[index]! & PALETTE_ID_MASK),
-      });
+      this.light = this.blockLight
+        ? buildBlockLight({
+            width: VOLUME_SIZE,
+            layers: this.limitY - this.baseY,
+            minLayer: this.low - this.baseY - 15,
+            maxLayer: this.high - this.baseY + 16,
+            emission: (index) => this.palette.emission[this.cells[index]! & PALETTE_ID_MASK]!,
+            opaque: (index) => this.palette.isOpaque(this.cells[index]! & PALETTE_ID_MASK),
+          })
+        : undefined;
       for (let face = 0; face < 6; face += 1) this.meshFace(face);
       this.meshPlants();
       if (this.hasModels) this.meshModels();

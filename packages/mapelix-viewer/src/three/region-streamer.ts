@@ -36,6 +36,8 @@ import {
 } from "@mapelix/scene-prototype/dimensions";
 
 export interface StreamingOptions {
+  /** False requests lighter LOD 0/1 geometry rather than hiding illumination in a shader. */
+  readonly blockLight?: boolean;
   readonly context: SceneContextInput;
   readonly revision: string;
   readonly regionBase?: string;
@@ -586,6 +588,7 @@ export class RegionStreamer {
     this.requests.set(target.key, controller);
     const params = contextSearch(this.context);
     params.set("revision", this.options.revision);
+    if (this.options.blockLight === false && target.level <= 1) params.set("blockLight", "0");
     const textures = target.textured === true ? this.textures : undefined;
     if (textures !== undefined) {
       params.set("textures", textures.revision);

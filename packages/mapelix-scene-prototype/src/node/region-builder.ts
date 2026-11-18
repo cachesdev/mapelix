@@ -13,6 +13,8 @@ import { buildDiscoveryIndex } from "../world/discovery-index.js";
 import type { DiscoveryRequest } from "../discoveries.js";
 
 export interface RegionRequest extends SceneContextOptions {
+  /** Baked illumination on receiving faces (default true); false builds lighter near meshes. */
+  readonly blockLight?: boolean;
   /** Exclusive upper mesh bound, in multiples of 16. Defaults to the dimension profile. */
   readonly ceilingY?: number;
   readonly level: number;
@@ -132,9 +134,25 @@ export class RegionBuilder {
       const volume = buildRegionVolume(this.chunks, palette, x, z, context.maxY, window);
       return volume === undefined
         ? emptyRegion(level, x, z, palette !== this.palette)
-        : meshRegionVolume(volume, palette, x, z, geometry, request.cutout === true);
+        : meshRegionVolume(
+            volume,
+            palette,
+            x,
+            z,
+            geometry,
+            request.cutout === true,
+            request.blockLight !== false,
+          );
     }
-    const voxels = buildVoxelRegion(this.voxels, level, x, z, context.maxY, window);
+    const voxels = buildVoxelRegion(
+      this.voxels,
+      level,
+      x,
+      z,
+      context.maxY,
+      window,
+      request.blockLight !== false,
+    );
     return voxels === undefined ? emptyRegion(level, x, z) : meshVoxelRegion(voxels, geometry);
   }
 }

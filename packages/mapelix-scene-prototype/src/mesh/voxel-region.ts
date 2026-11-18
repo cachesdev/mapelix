@@ -44,6 +44,7 @@ export function buildVoxelRegion(
   regionZ: number,
   ceilingY?: number,
   window?: VerticalBounds,
+  blockLight = true,
 ): VoxelRegion | undefined {
   const voxelSize = regionCellSize(level);
   const span = regionGridSize(level);
@@ -66,7 +67,7 @@ export function buildVoxelRegion(
         voxelSize,
         ceilingY,
         window,
-        level === 1,
+        level === 1 && blockLight,
       );
       if (chunk === undefined) continue;
       regionHasChunks ||=
@@ -81,7 +82,7 @@ export function buildVoxelRegion(
 
   const low = Math.min(...placed.map((chunk) => chunk.low));
   const high = Math.max(...placed.map((chunk) => chunk.low + chunk.box.layers * voxelSize));
-  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize, level === 1);
+  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize, level === 1 && blockLight);
   const explored = new Uint8Array(box.width * box.width);
   for (const chunk of placed) {
     placeChunk(

@@ -35,7 +35,11 @@ export interface PrewarmTarget {
 export function prewarmPlan(
   dimensions: ReadonlyMap<Dimension, BlockBounds | undefined>,
   maxRegions: number,
+  blockLightModes: readonly boolean[] = [true],
 ): PrewarmJob[] {
+  if (blockLightModes.length === 0 || blockLightModes.some((mode) => typeof mode !== "boolean"))
+    throw new RangeError("blockLightModes needs at least one boolean");
+  const modes = [...new Set(blockLightModes)];
   const jobs: PrewarmJob[] = [];
   // Dimension by dimension, so only one dimension's builders are busy at a time.
   for (const [dimension, bounds] of dimensions) {
@@ -58,8 +62,10 @@ export function prewarmPlan(
       }
       levelJobs.sort((left, right) => left.distance - right.distance);
       for (const { distance: _distance, ...job } of levelJobs) {
-        if (jobs.length >= maxRegions) return jobs;
-        jobs.push(job);
+        for (const enabled of level <= 1 ? modes : [true]) {
+          if (jobs.length >= maxRegions) return jobs;
+          jobs.push(enabled ? job : { ...job, blockLight: false });
+        }
       }
     }
   }

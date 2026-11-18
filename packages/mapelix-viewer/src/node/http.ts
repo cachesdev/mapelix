@@ -248,6 +248,10 @@ async function regionResponse(
   if (cutoutParam !== null && (cutoutParam !== "1" || textures === null))
     return failure(400, "cutout=1 needs a texture revision");
   const cutout = cutoutParam === "1";
+  const lightParam = url.searchParams.get("blockLight");
+  if (lightParam !== null && lightParam !== "0" && lightParam !== "1")
+    return failure(400, "blockLight must be 0 or 1");
+  const position = { level, x, z, ...(lightParam === "0" ? { blockLight: false } : {}) };
   if (textures !== null) {
     if (!/^[0-9a-f]{20}$/.test(textures)) return failure(400, "Invalid texture revision");
     if (level !== 0) return failure(400, "Textured regions are level 0 only");
@@ -269,7 +273,7 @@ async function regionResponse(
       false,
       async () =>
         binary(
-          await server.loadRegion({ level, x, z }, request.signal, context, {
+          await server.loadRegion(position, request.signal, context, {
             cacheOnly: true,
             textures,
             ...(cutout ? { cutout } : {}),
@@ -281,7 +285,7 @@ async function regionResponse(
   }
   return admitted(request, admit, context.mode === "caves", async (cacheOnly) =>
     binary(
-      await server.loadRegion({ level, x, z }, request.signal, context, {
+      await server.loadRegion(position, request.signal, context, {
         cacheOnly,
         ...(textures === null ? {} : { textures }),
         ...(cutout ? { cutout } : {}),

@@ -133,3 +133,13 @@ it.each([0, 1])("retains level-11 portal illumination at LOD %i in both modes", 
         expect(region.blockLight!.opaque[i]).toBe(0);
   }
 });
+
+it("builds lighter near regions without block light when asked", () => {
+  for (const level of [0, 1]) {
+    const lit = decodeSceneRegion(builders[0]!.build({ level, x: 0, z: 0 }));
+    const unlit = decodeSceneRegion(builders[0]!.build({ level, x: 0, z: 0, blockLight: false }));
+    expect(topLight(lit, 0, 63, 8)).toBe(14);
+    expect(topLight(unlit, 0, 63, 8)).toBe(0);
+    expect(unlit.opaque.length).toBeLessThanOrEqual(lit.opaque.length);
+  }
+});

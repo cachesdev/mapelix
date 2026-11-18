@@ -8,6 +8,7 @@ import {
   parseDimension,
   sceneContext,
   type SceneContext,
+  type Dimension,
 } from "@mapelix/scene-prototype/dimensions";
 import {
   DEFAULT_DISCOVERY_FILTERS,
@@ -29,6 +30,7 @@ import type { SelectionTool } from "../three/selection-box.js";
 import type { AutoPerspective } from "../three/view-projection.js";
 import type { WeatherMode } from "../three/weather-layer.js";
 import type {
+  BlockLightSettings,
   LeafMode,
   TextureMode,
   TextureState,
@@ -73,6 +75,7 @@ export interface WorldSource {
     | "selection"
     | "onSelectionChange"
     | "textures"
+    | "blockLight"
     | "leaves"
     | "textureBase"
     | "onTextureState"
@@ -81,6 +84,10 @@ export interface WorldSource {
 
 /** What the 3D world shows. Kept while the map is on screen and applied when the world shows. */
 export interface WorldSettings {
+  /** Show the 3D frame-rate readout in the default controls (default false). */
+  readonly showFps: boolean;
+  /** Missing dimensions keep baked block illumination enabled. */
+  readonly blockLight: BlockLightSettings;
   /** Surface or a vertical cave slice; caves open the 3D world. */
   readonly viewMode: "surface" | "caves";
   /** Lowest Y of the cave slice, a multiple of 16. */
@@ -106,6 +113,8 @@ export interface WorldSettings {
 }
 
 export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
+  showFps: false,
+  blockLight: {},
   viewMode: "surface",
   caveMinY: 0,
   caveThickness: CAVE_LIMITS.defaultThickness,
@@ -123,6 +132,8 @@ export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
 
 /** Live state of the world for host controls. Texts are left to the host. */
 export interface WorldStatus {
+  /** Rendered 3D frames per second, measured over one second; absent in 2D. */
+  readonly framesPerSecond?: number;
   /** A 3D world is configured and has not failed. */
   readonly available: boolean;
   /** The 3D world is on screen. */
@@ -278,7 +289,11 @@ export class MapelixViewer {
     this.projectionChoice = options.projection ?? "isometric";
     if (options.autoTilt !== undefined) tiltPitch(options.autoTilt);
     this.autoTiltDegrees = options.autoTilt;
-    this.settingsNow = { ...DEFAULT_WORLD_SETTINGS, ...options.settings };
+    this.settingsNow = {
+      ...DEFAULT_WORLD_SETTINGS,
+      ...options.settings,
+      blockLight: { ...options.settings?.blockLight },
+    };
     if (getComputedStyle(element).position === "static") element.style.position = "relative";
     this.mapLayer = this.layer();
     this.worldLayer = this.layer();
@@ -383,6 +398,7 @@ export class MapelixViewer {
     const streaming = snapshot?.streaming;
     return {
       available: this.hasWorld,
+      framesPerSecond: snapshot?.framesPerSecond,
       shown: world !== undefined,
       name: this.info?.name,
       spawn: this.info?.spawn,
@@ -517,6 +533,21 @@ export class MapelixViewer {
     this.updateSettings({ selectionTool: "off" });
     this.worldViewer?.setSelectionTool("off");
     this.worldViewer?.recoverCamera();
+  }
+
+  setShowFps(enabled: boolean): void {
+    this.updateSettings({ showFps: enabled });
+  }
+
+  /** Chooses lighter near-region geometry for one dimension; other dimensions retain their setting. */
+  setBlockLight(
+    enabled: boolean,
+    dimension: Dimension = parseDimension(this.worldDimension()),
+  ): void {
+    parseDimension(dimension);
+    if (typeof enabled !== "boolean") throw new RangeError("Block light must be a boolean");
+    this.updateSettings({ blockLight: { ...this.settingsNow.blockLight, [dimension]: enabled } });
+    this.worldViewer?.setBlockLight(enabled, dimension);
   }
 
   setTimeOfDay(hour: number): void {
@@ -1058,6 +1089,7 @@ export class MapelixViewer {
           clouds: this.settingsNow.clouds,
           weather: this.settingsNow.weather,
           textures: this.settingsNow.textures,
+          blockLight: this.settingsNow.blockLight,
           leaves: this.settingsNow.leaves,
           textureBase: `${source.base}/textures`,
           onTextureState: () => this.publish(),
