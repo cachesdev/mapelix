@@ -213,16 +213,31 @@ row(
   64,
   ["smithing_table", "loom", "chiseled_bookshelf"].map((name) => b(name)),
 );
-// Still invisible or approximate: thin and wall blocks.
-row(
-  70,
-  ["web", "amethyst_cluster", "pointed_dripstone", "fire", "end_portal", "sea_pickle"].map((name) =>
-    b(name),
-  ),
+// Crossed planes, the End portal and sea pickles.
+row(70, [
+  b("web"),
+  b("fire"),
+  b("soul_fire"),
+  b("cave_vines_head_with_berries"),
+  b("small_amethyst_bud", { facing_direction: 1 }),
+  b("amethyst_cluster", { facing_direction: 1 }),
+  b("end_portal"),
+  ...[0, 1, 2, 3].map((cluster_count) => b("sea_pickle", { cluster_count, dead_bit: 0 })),
+]);
+// Dripstone growing up from the floor and down from stone, tip to base.
+["tip", "frustum", "base"].forEach((dripstone_thickness, i) =>
+  put(36, FLOOR + 2 - i, 70, b("pointed_dripstone", { dripstone_thickness, hanging: 0 })),
 );
+put(39, FLOOR + 3, 70, "minecraft:stone");
+["base", "frustum", "tip"].forEach((dripstone_thickness, i) =>
+  put(39, FLOOR + 2 - i, 70, b("pointed_dripstone", { dripstone_thickness, hanging: 1 })),
+);
+// An amethyst cluster on a wall.
+put(42, FLOOR, 71, "minecraft:amethyst_block");
+put(42, FLOOR, 70, b("amethyst_cluster", { facing_direction: 2 }));
 // Plants that hang or cling: vines and lichen against stone, cave vines under it.
 put(3, FLOOR, 75, "minecraft:stone");
-put(3, FLOOR, 74, b("vine", { vine_direction_bits: 4 }));
+put(3, FLOOR, 74, b("vine", { vine_direction_bits: 1 }));
 put(6, FLOOR, 75, "minecraft:stone");
 put(6, FLOOR, 74, b("glow_lichen", { multi_face_direction_bits: 8 }));
 put(9, FLOOR + 2, 74, "minecraft:stone");
@@ -230,8 +245,7 @@ put(9, FLOOR + 1, 74, b("cave_vines_head_with_berries"));
 
 // Gold floor under the samples still to do, so the invisible ones can be found.
 const todo = (x: number, z: number) =>
-  (z === 64 || z >= 70) &&
-  [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
+  z === 64 && [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
 
 const records: FixtureRecord[] = [];
 for (let cz = 0; cz < CHUNKS_Z; cz++)

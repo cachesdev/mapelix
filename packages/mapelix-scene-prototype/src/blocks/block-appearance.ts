@@ -144,6 +144,11 @@ function resolveShape(block: string, states: LittleEndianNbtCompoundValue): Bloc
       : model.family === "lantern" ||
           model.family === "rod" ||
           model.family === "portal" ||
+          model.family === "end-portal" ||
+          /^(?:fire|soul_fire|glow_lichen|amethyst_cluster|cave_vines_\w+_with_berries)$/.test(
+            block,
+          ) ||
+          (model.family === "pickle" && !states.dead_bit) ||
           (model.family === "wall-torch" && !block.startsWith("unlit_")) ||
           (model.family === "campfire" &&
             states.extinguished !== 1 &&

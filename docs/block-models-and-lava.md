@@ -35,7 +35,9 @@ Detailed LOD 0 geometry includes:
   table and end portal frame (no eye yet). Brewing stands (base plates, rod, the bottles
   picture on two crossed planes) and bells under their beam, on posts, from the ceiling or
   a wall. Buttons, levers, signs (standing, on a wall, hanging), banners, heads and item
-  frames, on the floor, the ceiling or a wall; banners keep one block of cloth, and heads
+  frames, on the floor, the ceiling or a wall; webs, fire, amethyst, pointed dripstone and cave
+  vines as two crossed planes; vines and lichen as flat planes on their sides; sea pickles;
+  the End portal as a glowing plane; banners keep one block of cloth, and heads
   and banners their block color until block entities are read. These are cuboid
   representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain

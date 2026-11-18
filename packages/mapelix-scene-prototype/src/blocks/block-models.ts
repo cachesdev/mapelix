@@ -62,7 +62,11 @@ export type ModelFamily =
   | "sign"
   | "banner"
   | "head"
-  | "frame";
+  | "frame"
+  | "cross"
+  | "cover"
+  | "pickle"
+  | "end-portal";
 
 export interface BlockModel {
   readonly family: ModelFamily;
@@ -114,7 +118,16 @@ export const MODEL_STATES = [
   "lever_direction",
   "ground_sign_direction",
   "liquid_depth",
+  "vine_direction_bits",
+  "multi_face_direction_bits",
+  "dripstone_thickness",
+  "cluster_count",
+  "dead_bit",
 ] as const;
+
+/** Blocks drawn as two crossed planes. */
+export const CROSS =
+  /^(?:web|fire|soul_fire|pointed_dripstone|amethyst_cluster|(?:small|medium|large)_amethyst_bud|cave_vines(?:_body_with_berries|_head_with_berries)?|hanging_roots|spore_blossom)$/;
 
 /** Copper blocks at any oxidation stage, waxed or not: `copper_`, `waxed_oxidized_copper_`... */
 export const COPPER_PREFIX = "(?:waxed_)?(?:exposed_|weathered_|oxidized_)?copper_";
@@ -168,6 +181,10 @@ export function resolveBlockModel(
   else if (/(?:^|_)banner$/.test(block)) family = "banner";
   else if (block === "skull" || /_(?:head|skull)$/.test(block)) family = "head";
   else if (block === "frame" || block === "glow_frame") family = "frame";
+  else if (CROSS.test(block)) family = "cross";
+  else if (/^(?:vine|glow_lichen|sculk_vein|resin_clump)$/.test(block)) family = "cover";
+  else if (block === "sea_pickle") family = "pickle";
+  else if (block === "end_portal") family = "end-portal";
   else if (block === "composter") family = "composter";
   else if (block === "enchanting_table" || block === "end_portal_frame") family = "low-box";
   if (family === undefined) return undefined;
@@ -595,6 +612,19 @@ export function blockModelParts(
     }
     case "frame":
       return attached([part([2, 0, 2, 14, 1, 14])], numberState(s, "facing_direction", 1));
+    case "cross":
+      return crossParts(model.block, s);
+    case "cover":
+      return coverParts(model.block, s);
+    case "pickle": {
+      const spots = PICKLE_SPOTS[numberState(s, "cluster_count") & 3]!;
+      return spots.map(([x, z, h]) => ({
+        bounds: [x, 0, z, x + 4, h, z + 4] as ModelBounds,
+        sheet: { side: [0, 6] as const, top: [8, 1] as const },
+      }));
+    }
+    case "end-portal":
+      return [part([0, 12, 0, 16, 12, 16])];
     case "lectern":
       // Base, post, and the desk in two steps sloping down to its front.
       return oriented(
@@ -680,6 +710,76 @@ const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, 
  * Parts drawn lying on the floor, turned onto the face `facing_direction` names: 1 the floor,
  * 0 the ceiling, 2 to 5 facing north, south, west or east from the wall behind them.
  */
+/** Where each sea pickle of a cluster stands: x, z, height. */
+const PICKLE_SPOTS: readonly (readonly (readonly [number, number, number])[])[] = [
+  [[6, 6, 6]],
+  [
+    [3, 3, 6],
+    [9, 8, 4],
+  ],
+  [
+    [2, 2, 6],
+    [9, 4, 4],
+    [5, 10, 6],
+  ],
+  [
+    [2, 2, 6],
+    [10, 2, 4],
+    [2, 10, 4],
+    [9, 9, 6],
+  ],
+];
+
+/** The block face whose texture each pointed dripstone thickness reads. */
+const DRIPSTONE_FACES: Readonly<Record<string, number>> = {
+  tip: Face.NegativeZ,
+  frustum: Face.NegativeY,
+  middle: Face.PositiveZ,
+  base: Face.PositiveX,
+  merge: Face.NegativeX,
+};
+
+/** Two crossed planes, turned to the side a cluster grows from or hanging when it hangs. */
+function crossParts(block: string, s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
+  let faces: readonly number[] | undefined;
+  if (block === "pointed_dripstone") {
+    faces = ALL_FACES(DRIPSTONE_FACES[String(s.dripstone_thickness ?? "tip")] ?? Face.NegativeZ);
+  }
+  const planes: ModelPart[] = [
+    [0, 0, 8, 16, 16, 8] as ModelBounds,
+    [8, 0, 0, 8, 16, 16] as ModelBounds,
+  ].map((bounds) => (faces === undefined ? { bounds } : { bounds, faces }));
+  if (/amethyst/.test(block)) return attached(planes, numberState(s, "facing_direction", 1));
+  if (block === "pointed_dripstone" && isSet(s.hanging)) return attached(planes, 0);
+  return planes;
+}
+
+/**
+ * Flat growth on the faces of its block: vines by `vine_direction_bits` (south, west, north,
+ * east), the others by `multi_face_direction_bits` (down, up, north, south, west, east).
+ */
+function coverParts(block: string, s: LittleEndianNbtCompoundValue): readonly ModelPart[] {
+  const PLANES: Readonly<Record<string, ModelBounds>> = {
+    down: [0, 1, 0, 16, 1, 16],
+    up: [0, 15, 0, 16, 15, 16],
+    north: [0, 0, 1, 16, 16, 1],
+    south: [0, 0, 15, 16, 16, 15],
+    west: [1, 0, 0, 1, 16, 16],
+    east: [15, 0, 0, 15, 16, 16],
+  };
+  const sides =
+    block === "vine"
+      ? ["south", "west", "north", "east"]
+      : ["down", "up", "north", "south", "west", "east"];
+  const bits = numberState(
+    s,
+    block === "vine" ? "vine_direction_bits" : "multi_face_direction_bits",
+  );
+  const parts = sides.filter((_, i) => bits & (1 << i)).map((side) => part(PLANES[side]!));
+  // A vine without a side hangs under the block above.
+  return parts.length > 0 ? parts : [part(block === "vine" ? PLANES.up! : PLANES.down!)];
+}
+
 function attached(parts: readonly ModelPart[], facingDirection: number): readonly ModelPart[] {
   return parts.map((p) => {
     const [x0, y0, z0, x1, y1, z1] = p.bounds;
@@ -962,6 +1062,15 @@ export function modelCatalog(): readonly BlockModel[] {
   for (let candles = 0; candles < 4; candles++) add("candle", { candles });
   for (let bite_counter = 0; bite_counter < 7; bite_counter++) add("cake", { bite_counter });
   add("enchanting_table");
+  for (let facing_direction = 0; facing_direction < 6; facing_direction++)
+    add("amethyst_cluster", { facing_direction });
+  for (const dripstone_thickness of ["tip", "frustum", "middle", "base", "merge"])
+    for (const hanging of [0, 1]) add("pointed_dripstone", { dripstone_thickness, hanging });
+  for (const name of ["web", "fire", "cave_vines_head_with_berries", "end_portal"]) add(name);
+  for (let bits = 0; bits < 16; bits++) add("vine", { vine_direction_bits: bits });
+  for (const bits of [1, 2, 8, 63]) add("glow_lichen", { multi_face_direction_bits: bits });
+  for (let cluster_count = 0; cluster_count < 4; cluster_count++)
+    add("sea_pickle", { cluster_count, dead_bit: 0 });
   for (let facing_direction = 0; facing_direction < 6; facing_direction++) {
     add("stone_button", { facing_direction, button_pressed_bit: 0 });
     add("frame", { facing_direction });
