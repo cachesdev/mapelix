@@ -506,9 +506,10 @@ export function blockModelParts(
     }
     case "cake":
       return [part([Math.min(13, 1 + numberState(s, "bite_counter") * 2), 0, 1, 15, 8, 15])];
+    // Cauldron and hopper tops are open in the middle: their floors read the bottom texture.
     case "cauldron":
       return [
-        part([0, 0, 0, 16, 4, 16]),
+        { bounds: [0, 0, 0, 16, 4, 16], faces: COMPOST_FACES },
         part([0, 4, 0, 2, 16, 16]),
         part([14, 4, 0, 16, 16, 16]),
         part([2, 4, 0, 14, 16, 2]),
@@ -574,7 +575,7 @@ export function blockModelParts(
         part([14, 10, 0, 16, 16, 16]),
         part([2, 10, 0, 14, 16, 2]),
         part([2, 10, 14, 14, 16, 16]),
-        part([4, 4, 4, 12, 10, 12]),
+        { bounds: [4, 4, 4, 12, 10, 12], faces: COMPOST_FACES },
         part([6, 0, 6, 10, 4, 10]),
       ];
   }
@@ -622,6 +623,7 @@ function grindstoneParts(s: LittleEndianNbtCompoundValue, facing: number): reado
 }
 
 const ALL_FACES = (face: number): readonly number[] => [face, face, face, face, face, face];
+/** Faces of a floor under an open top: its top reads the bottom texture. */
 const COMPOST_FACES: readonly number[] = [
   Face.PositiveX,
   Face.NegativeX,
