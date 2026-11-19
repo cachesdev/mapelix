@@ -17,15 +17,21 @@ function isPublic(marker: Marker | MarkerInput): boolean {
 }
 
 export class DemoMarkerStore {
+  /** One list per world when `worldId` is given. */
+  private readonly key: string;
   private markers = new Map<string, MarkerInput>();
   /** Test hook: the next save or delete is refused with this message. */
   failNext: string | undefined;
+
+  constructor(worldId = "") {
+    this.key = worldId === "" ? KEY : `${KEY}:${worldId}`;
+  }
 
   /** The stored markers, or `seed` the first time. */
   load(seed: readonly MarkerInput[]): MarkerInput[] {
     let stored: Stored | undefined;
     try {
-      const text = localStorage.getItem(KEY);
+      const text = localStorage.getItem(this.key);
       stored = text === null ? undefined : (JSON.parse(text) as Stored);
     } catch {
       stored = undefined;
@@ -39,7 +45,7 @@ export class DemoMarkerStore {
 
   private persist(): void {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ markers: [...this.markers.values()] }));
+      localStorage.setItem(this.key, JSON.stringify({ markers: [...this.markers.values()] }));
     } catch {
       /* Private browsing: the markers live until the page closes. */
     }

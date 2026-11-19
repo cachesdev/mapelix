@@ -4,7 +4,10 @@ import type { MarkerInput } from "@mapelix/viewer";
  * Example markers around a point (the world spawn when the 3D world is served). A real host
  * would read them from its own store; Mapelix only draws what it is given.
  */
-export function sampleMarkers(center: { x: number; z: number }): MarkerInput[] {
+export function sampleMarkers(
+  center: { x: number; z: number },
+  spawnOnly = false,
+): MarkerInput[] {
   const at = (dx: number, dz: number) => ({
     x: Math.round(center.x + dx),
     z: Math.round(center.z + dz),
@@ -19,6 +22,9 @@ export function sampleMarkers(center: { x: number; z: number }): MarkerInput[] {
       group: "places",
       priority: 10,
     },
+  ];
+  if (spawnOnly) return markers;
+  markers.push(
     {
       id: "village",
       ...at(150, -40),
@@ -66,7 +72,7 @@ export function sampleMarkers(center: { x: number; z: number }): MarkerInput[] {
       group: "places",
       priority: 5,
     },
-  ];
+  );
   // A survey: many points close together, grouped when zoomed out.
   let seed = 12_345;
   const random = () => (seed = (seed * 16_807) % 2_147_483_647) / 2_147_483_647;

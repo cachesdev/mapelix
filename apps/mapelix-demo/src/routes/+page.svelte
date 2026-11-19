@@ -14,7 +14,11 @@
   import { sampleMarkers } from "$lib/sample-markers";
   import { DemoMarkerStore } from "$lib/marker-store";
 
-  let { data }: { data: { world: boolean; texturePacks: boolean } } = $props();
+  let {
+    data,
+  }: {
+    data: { world: boolean; texturePacks: boolean; markers: "spawn" | "examples"; worldId: string };
+  } = $props();
 
   /** Preferences kept on this device; the address keeps the view itself. */
   const PREFERENCES = "mapelix-demo-preferences-v1";
@@ -109,7 +113,7 @@
         });
         // Markers are edited in place and kept in this browser; `?readonly=1` shows a public,
         // read-only map.
-        const store = new DemoMarkerStore();
+        const store = new DemoMarkerStore(data.worldId);
         const readOnly = new URLSearchParams(location.search).get("readonly") === "1";
         controls = createViewerControls(viewer, container, {
           texts,
@@ -118,11 +122,11 @@
             ? { texturesLink: { href: "/textures", label: "Choose the texture packs" } }
             : {}),
         });
-        // Example markers around the world spawn, else around the start view.
+        // Example markers (or the spawn alone) around the world spawn, else the start view.
         const shown = viewer;
         const origin = { x: shown.view.x, z: shown.view.z };
         void (data.world ? worldSpawn() : Promise.resolve(undefined)).then((spawn) => {
-          if (!disposed) shown.markers.set(store.load(sampleMarkers(spawn ?? origin)));
+          if (!disposed) shown.markers.set(store.load(sampleMarkers(spawn ?? origin, data.markers === "spawn")));
         });
         Reflect.set(window, "__mapelixMarkerStore", store);
         let lastPreferences = "";

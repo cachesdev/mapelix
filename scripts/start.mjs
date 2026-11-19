@@ -222,6 +222,8 @@ function startServer(config) {
       MAPELIX_TEXTURE_PACK_DIRECTORY: join(config.data, "texture-packs"),
       MAPELIX_TEXTURE_UPLOADS: "1",
       MAPELIX_TEXTURE_VANILLA: "1",
+      MAPELIX_MARKERS: "spawn",
+      MAPELIX_WORLD_ID: basename(worldData(config)),
       BODY_SIZE_LIMIT: "256M",
     },
   });
