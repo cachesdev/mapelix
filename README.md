@@ -15,6 +15,28 @@ dependency and no call into the .NET uNmINeD CLI.
 | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | ![A village and its river on the 2D map](docs/images/map-2d.jpg) | ![The same place in the 3D view, in perspective](docs/images/world-perspective.jpg) |
 
+## Easiest start
+
+For anyone who just wants to see their world, with no commands to learn:
+
+1. Install [Node.js](https://nodejs.org) 24 or newer, and download this repository (green
+   **Code** button, **Download ZIP**, then unzip it).
+2. **Windows:** double-click `start.cmd`. **Linux and macOS:** run `./start.sh` in a terminal.
+3. Give it your Bedrock world folder, the one that holds `db` and `level.dat`.
+
+The first start installs and builds Mapelix, which takes a few minutes. Then, at every start, the
+script copies the world, updates the 2D map (only what changed), starts the viewer with block
+textures and block lighting, and opens the browser. It prints the address to open from a phone
+on the same Wi-Fi. Keep the window open while you use the map; close it to stop.
+
+- It remembers the world in `mapelix-start.json` and keeps the copy, the map and the caches in
+  `mapelix-data/`. Start it with `--reconfigure` to choose another world.
+- It can update the map while it runs: answer the question at the first start, or pass
+  `--refresh <minutes>`. The viewer stops for a moment during each update.
+- Other options: `--port <n>` (default 3000), `--data <folder>`, `--no-open`.
+- It works on its own copy of the world and never writes to the world itself. For a world that
+  is being played, the copy is most reliable while the game or the server is stopped.
+
 ## Quick start
 
 Work on a copy of the world: Mapelix only reads it, but the game may change it while it runs.

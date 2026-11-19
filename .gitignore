@@ -9,3 +9,5 @@ playwright-report/
 test-results/
 generated-tiles/
 .local/
+mapelix-start.json
+mapelix-data/
