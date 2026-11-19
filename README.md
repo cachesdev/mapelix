@@ -33,6 +33,8 @@ on the same Wi-Fi. Keep the window open while you use the map; close it to stop.
   `--world <folder>`) to switch to another world. Each world keeps its own copy, map and caches
   in `mapelix-data/worlds/`, so switching never mixes two maps and coming back to a world reuses
   its map; texture packs are shared.
+- The map starts with a single marker on the world spawn. Markers added with the editor are kept
+  in the browser, one list per world.
 - It can update the map while it runs: answer the question at the first start, or pass
   `--refresh <minutes>`. The viewer stops for a moment during each update.
 - Other options: `--port <n>` (default 3000), `--data <folder>`, `--no-open`.
