@@ -10,7 +10,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { networkInterfaces, platform } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +60,10 @@ async function configure() {
     refresh: Number(option("refresh") ?? saved.refresh ?? 0),
   };
   if (config.world === undefined || !isWorld(config.world)) {
+    if (!process.stdin.isTTY) {
+      fail(`No Bedrock world at "${config.world ?? ""}": the folder needs "db" and "level.dat".
+  Pass another one with --world <folder>.`);
+    }
     const ask = createInterface({ input: process.stdin, output: process.stdout });
     console.log(`
 Welcome to Mapelix. Point it at a Bedrock world folder: the one that holds "db" and
@@ -141,6 +146,17 @@ async function build(data) {
 
 // --- World copy and 2D map -----------------------------------------------------------------
 
+/**
+ * Each world keeps its copy, map and caches in its own folder, named after the world folder and
+ * a short hash of its full path, so switching worlds never mixes two maps and coming back to a
+ * world reuses its map. Texture packs are shared by all worlds.
+ */
+function worldData(config) {
+  const name = basename(config.world).replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40) || "world";
+  const hash = createHash("sha256").update(resolve(config.world)).digest("hex").slice(0, 8);
+  return join(config.data, "worlds", `${name}-${hash}`);
+}
+
 /** Mirrors the world into `target`, copying only files whose size or date changed. */
 async function mirror(source, target) {
   await mkdir(target, { recursive: true });
@@ -164,9 +180,9 @@ async function mirror(source, target) {
 }
 
 async function update(config) {
-  const snapshot = join(config.data, "world");
-  const map = join(config.data, "map");
-  say("Copying the world…");
+  const snapshot = join(worldData(config), "world");
+  const map = join(worldData(config), "map");
+  say(`Copying the world "${basename(config.world)}"…`);
   await mirror(config.world, snapshot);
   say("Updating the 2D map (only what changed)…");
   const again = existsSync(join(map, "manifest.json"));
@@ -200,9 +216,9 @@ function startServer(config) {
     env: {
       ...process.env,
       PORT: String(config.port),
-      MAPELIX_WORLD_DIRECTORY: join(config.data, "world"),
-      MAPELIX_TILES_DIRECTORY: join(config.data, "map"),
-      MAPELIX_CACHE_DIRECTORY: join(config.data, "cache"),
+      MAPELIX_WORLD_DIRECTORY: join(worldData(config), "world"),
+      MAPELIX_TILES_DIRECTORY: join(worldData(config), "map"),
+      MAPELIX_CACHE_DIRECTORY: join(worldData(config), "cache"),
       MAPELIX_TEXTURE_PACK_DIRECTORY: join(config.data, "texture-packs"),
       MAPELIX_TEXTURE_UPLOADS: "1",
       MAPELIX_TEXTURE_VANILLA: "1",
@@ -243,7 +259,7 @@ async function startView(config) {
     const { readLevelInfo } = await import(
       new URL("../packages/mapelix-scene-prototype/dist/world/level-info.js", import.meta.url).href
     );
-    const { spawn } = await readLevelInfo(join(config.data, "world"));
+    const { spawn } = await readLevelInfo(join(worldData(config), "world"));
     view.set("x", String(spawn.x));
     view.set("z", String(spawn.z));
     view.set("scale", "3");

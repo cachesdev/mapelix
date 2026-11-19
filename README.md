@@ -29,8 +29,10 @@ script copies the world, updates the 2D map (only what changed), starts the view
 textures and block lighting, and opens the browser. It prints the address to open from a phone
 on the same Wi-Fi. Keep the window open while you use the map; close it to stop.
 
-- It remembers the world in `mapelix-start.json` and keeps the copy, the map and the caches in
-  `mapelix-data/`. Start it with `--reconfigure` to choose another world.
+- It remembers the world in `mapelix-start.json`. Start it with `--reconfigure` (or
+  `--world <folder>`) to switch to another world. Each world keeps its own copy, map and caches
+  in `mapelix-data/worlds/`, so switching never mixes two maps and coming back to a world reuses
+  its map; texture packs are shared.
 - It can update the map while it runs: answer the question at the first start, or pass
   `--refresh <minutes>`. The viewer stops for a moment during each update.
 - Other options: `--port <n>` (default 3000), `--data <folder>`, `--no-open`.
