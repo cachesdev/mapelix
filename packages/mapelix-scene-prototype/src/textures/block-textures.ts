@@ -32,6 +32,7 @@ export interface BlockTextures {
 const ALIASES: Readonly<Record<string, string>> = {
   grass_block: "grass",
   dirt_path: "grass_path",
+  lily_pad: "waterlily",
   iron_chain: "chain",
 };
 

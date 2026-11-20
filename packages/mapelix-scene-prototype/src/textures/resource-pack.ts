@@ -246,7 +246,7 @@ const CODE_TEXTURED_BLOCKS: Readonly<Record<string, string>> = {
 };
 
 /** The version of the texture pipeline; part of every stack and pack fingerprint. */
-export const TEXTURE_PIPELINE_VERSION = 9;
+export const TEXTURE_PIPELINE_VERSION = 10;
 
 const PACK_JSON = [
   "manifest.json",

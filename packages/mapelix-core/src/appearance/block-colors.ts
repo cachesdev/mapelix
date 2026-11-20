@@ -16,6 +16,24 @@ export interface AppearanceColors {
 
 const DIRT = rgb(134, 96, 67);
 const STONE = rgb(125, 125, 125);
+const DYES = [
+  "white",
+  "orange",
+  "magenta",
+  "light_blue",
+  "yellow",
+  "lime",
+  "pink",
+  "gray",
+  "light_gray",
+  "cyan",
+  "purple",
+  "blue",
+  "brown",
+  "green",
+  "red",
+  "black",
+] as const;
 
 export const PLANT_COLOR_RULES: ReadonlyArray<
   readonly [RegExp, PlantColorKind, number, BiomeTint]
@@ -163,7 +181,7 @@ const COLORS: ReadonlyArray<readonly [RegExp, number, number?]> = [
 ];
 
 const FOLIAGE_TINTED =
-  /^(?:leaves|leaves2|(?:oak|spruce|birch|jungle|acacia|dark_oak|mangrove)_leaves)$/;
+  /^(?:vine|leaves|leaves2|(?:oak|spruce|birch|jungle|acacia|dark_oak|mangrove)_leaves)$/;
 
 /** Shared color decisions; geometry and lighting remain in their rendering adapters. */
 export function resolveAppearanceColors(
@@ -174,6 +192,13 @@ export function resolveAppearanceColors(
 ): AppearanceColors {
   const block = canonicalBlockName(name, states);
   if (kind === "water") return uniform(rgb(38, 92, 200), "water");
+  if (block === "standing_banner" || block === "wall_banner") {
+    // Entity colors use the same normalized dye order as beds; absent metadata is white cloth.
+    const value = states.color;
+    const dye =
+      typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 16 ? value : 0;
+    return uniform(BEDROCK_BLOCK_COLORS[`${DYES[dye]}_wool`]!.colors[0]);
+  }
   const sampled =
     !name.includes(":") || name.startsWith("minecraft:") ? BEDROCK_BLOCK_COLORS[block] : undefined;
   if (

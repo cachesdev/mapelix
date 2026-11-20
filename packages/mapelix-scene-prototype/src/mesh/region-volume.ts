@@ -85,6 +85,7 @@ export function buildRegionVolume(
             chunk.bedColors.get(section.y),
             allocated.minY,
             allocated.maxY,
+            chunk.bannerColors.get(section.y),
           );
       }
     }
@@ -150,9 +151,10 @@ function writeSection(
   bedColors?: ReadonlyMap<number, number>,
   minY = WORLD_MIN_Y,
   maxY = WORLD_MAX_Y,
+  bannerColors?: ReadonlyMap<number, number>,
 ): void {
   if (section.y < minY / 16 || section.y >= maxY / 16) return;
-  const blocks = sectionCells(section, palette, bedColors);
+  const blocks = sectionCells(section, palette, bedColors, bannerColors);
   const baseY = section.y * 16;
   for (let index = 0; index < 4096; index += 1) {
     const cell = blocks[index]!;
@@ -171,6 +173,7 @@ export function sectionCells(
   section: DecodedSubchunk,
   palette: BlockPalette,
   bedColors?: ReadonlyMap<number, number>,
+  bannerColors?: ReadonlyMap<number, number>,
 ): Uint16Array {
   const storage = section.primary;
   const ids = Uint16Array.from(storage.palette, (name, index) =>
@@ -190,6 +193,15 @@ export function sectionCells(
       const id = storage.indexes[index]!;
       const name = storage.palette[id];
       if (name !== "minecraft:bed" && name !== "bed") continue;
+      cells[index] =
+        palette.idFor(name, { ...storage.states?.[id], color }) | (cells[index]! & WATERLOGGED);
+    }
+  }
+  if (bannerColors !== undefined) {
+    for (const [index, color] of bannerColors) {
+      const id = storage.indexes[index]!;
+      const name = storage.palette[id];
+      if (name === undefined || !/^(?:minecraft:)?(?:standing|wall)_banner$/.test(name)) continue;
       cells[index] =
         palette.idFor(name, { ...storage.states?.[id], color }) | (cells[index]! & WATERLOGGED);
     }

@@ -124,7 +124,7 @@ export function bedEntityRecord(
   dimension: number,
   chunkX: number,
   chunkZ: number,
-  beds: readonly { x: number; y: number; z: number; color?: number; id?: string }[],
+  beds: readonly { x: number; y: number; z: number; color?: number; base?: number; id?: string }[],
 ): FixtureRecord {
   const bytes: number[] = [];
   const string = (value: string): number[] => {
@@ -139,6 +139,11 @@ export function bedEntityRecord(
       bytes.push(3, ...string(key), ...value);
     }
     if (bed.color !== undefined) bytes.push(1, ...string("color"), bed.color & 255);
+    if (bed.base !== undefined) {
+      const value = new Uint8Array(4);
+      new DataView(value.buffer).setInt32(0, bed.base, true);
+      bytes.push(3, ...string("Base"), ...value);
+    }
     bytes.push(0);
   }
   return { key: chunkKey(dimension, chunkX, chunkZ, 0x31), value: new Uint8Array(bytes) };

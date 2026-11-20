@@ -1,8 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { bedEntityRecord, chunkKey } from "../../test/dimension-fixture.js";
-import { isBlockEntityKey, readBedColors } from "./bed-colors.js";
+import { isBlockEntityKey, readBedColors, readBannerColors } from "./bed-colors.js";
 
 describe("bed block-entity colors", () => {
+  it("reads all banner Base dyes without mixing beds, foreign cells or malformed metadata", () => {
+    const entries = Array.from({ length: 16 }, (_, base) => ({
+      id: "Banner",
+      x: -16 + base,
+      y: 70,
+      z: 0,
+      base,
+    }));
+    const bytes = bedEntityRecord(0, -1, 0, [
+      ...entries,
+      { id: "Banner", x: -16, y: 70, z: 1, base: 16 },
+      { id: "Banner", x: 0, y: 70, z: 0, base: 0 },
+      { id: "Banner", x: -16, y: 320, z: 0, base: 0 },
+      { id: "Bed", x: -16, y: 70, z: 2, color: 14 },
+    ]).value;
+    const colors = readBannerColors(new Uint8Array([...bytes, 10]), -1, 0, -64, 320);
+    expect(colors.get(4)?.size).toBe(16);
+    for (let base = 0; base < 16; base++)
+      expect(colors.get(4)?.get((base << 8) | 6)).toBe(15 - base);
+    expect(readBedColors(bytes, -1, 0, -64, 320).get(4)?.size).toBe(1);
+    expect(readBannerColors(undefined, -1, 0, -64, 320).size).toBe(0);
+  });
   it("isolates dimensions and ignores other terrain record types", () => {
     expect(isBlockEntityKey(chunkKey(0, -1, 2, 0x31), 0)).toBe(true);
     expect(isBlockEntityKey(chunkKey(1, -1, 2, 0x31), 1)).toBe(true);

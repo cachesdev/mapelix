@@ -13,7 +13,7 @@ import {
 import type { LiveRecord, WorldDatabase } from "../leveldb/world-database.js";
 import { DIMENSIONS, parseDimension, type Dimension, type DimensionConfig } from "../dimensions.js";
 import { Data3DBiomes } from "./data-3d-biomes.js";
-import { isBlockEntityKey, readBedColors, type BedColors } from "./bed-colors.js";
+import { isBlockEntityKey, readBedColors, readBannerColors, type BedColors } from "./bed-colors.js";
 
 export type { Dimension } from "../dimensions.js";
 
@@ -25,6 +25,7 @@ export interface ChunkRecords {
   readonly sections: readonly SectionRecord[];
   readonly biomes: ChunkBiomes;
   readonly bedColors: BedColors;
+  readonly bannerColors: BedColors;
 }
 
 export interface SectionRecord {
@@ -39,6 +40,7 @@ export interface DecodedChunk {
   readonly sections: readonly DecodedSubchunk[];
   readonly biomes: ChunkBiomes;
   readonly bedColors: BedColors;
+  readonly bannerColors: BedColors;
 }
 
 /**
@@ -113,6 +115,13 @@ export class ChunkSource {
       sections,
       biomes: new ChunkBiomes(data3D, data2D),
       bedColors: readBedColors(blockEntities, chunkX, chunkZ, this.config.minY, this.config.maxY),
+      bannerColors: readBannerColors(
+        blockEntities,
+        chunkX,
+        chunkZ,
+        this.config.minY,
+        this.config.maxY,
+      ),
     };
   }
 
@@ -135,6 +144,7 @@ export class ChunkSource {
             z: chunkZ,
             biomes: records.biomes,
             bedColors: records.bedColors,
+            bannerColors: records.bannerColors,
             sections: records.sections
               .map((section) => decodeSection(section))
               .filter(

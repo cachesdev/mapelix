@@ -212,6 +212,7 @@ const LANTERN_BODY: PartSheet = { side: [0, 2], top: [0, 9] };
 const LANTERN_CAP: PartSheet = { side: [1, 0], top: [1, 10] };
 const LANTERN_CHAIN: PartSheet = { side: [11, 1] };
 const CANDLE: PartSheet = { side: [0, 8], top: [0, 6], bottom: [0, 14] };
+const BANNER_CLOTH: PartSheet = { side: [1, 0] };
 const POT_FLOOR: PartSheet = { side: [5, 15], top: [5, 10] };
 const END_ROD_BASE: PartSheet = { side: [2, 6], top: [2, 2] };
 const LIGHTNING_ROD_TIP: PartSheet = { side: [0, 0] };
@@ -603,8 +604,14 @@ export function blockModelParts(
       return signParts(model.block, s);
     case "banner":
       return model.block === "wall_banner"
-        ? attached([part([1, 0, 0, 15, 1, 14])], numberState(s, "facing_direction", 3))
-        : oriented([part([7, 0, 7, 9, 16, 9]), part([1, 2, 9, 15, 16, 10])], groundTurn(s));
+        ? attached(
+            [sheetPart([1, 0, 1, 15, 1, 15], BANNER_CLOTH), part([0, 0, 0, 16, 2, 1], 0xa2834f)],
+            numberState(s, "facing_direction", 3),
+          )
+        : oriented(
+            [part([7, 0, 7, 9, 16, 9], 0xa2834f), sheetPart([1, 2, 9, 15, 16, 10], BANNER_CLOTH)],
+            groundTurn(s),
+          );
     case "head": {
       const side = numberState(s, "facing_direction", 1);
       return side >= 2

@@ -22,6 +22,28 @@ export function readBedColors(
   minY: number,
   maxY: number,
 ): BedColors {
+  return readColors(bytes, chunkX, chunkZ, minY, maxY, "Bed");
+}
+
+/** Banner Base uses the reverse of bed/wool dye order: 0 black through 15 white. */
+export function readBannerColors(
+  bytes: Uint8Array | undefined,
+  chunkX: number,
+  chunkZ: number,
+  minY: number,
+  maxY: number,
+): BedColors {
+  return readColors(bytes, chunkX, chunkZ, minY, maxY, "Banner");
+}
+
+function readColors(
+  bytes: Uint8Array | undefined,
+  chunkX: number,
+  chunkZ: number,
+  minY: number,
+  maxY: number,
+  kind: "Bed" | "Banner",
+): BedColors {
   const colors = new Map<number, Map<number, number>>();
   if (bytes === undefined) return colors;
   let offset = 0;
@@ -33,9 +55,10 @@ export function readBedColors(
       break;
     }
     offset = entry.nextOffset;
-    const { id, x, y, z, color } = entry.value;
+    const { id, x, y, z } = entry.value;
+    const color = entry.value[kind === "Bed" ? "color" : "Base"];
     if (
-      id !== "Bed" ||
+      id !== kind ||
       typeof x !== "number" ||
       typeof y !== "number" ||
       typeof z !== "number" ||
@@ -51,7 +74,7 @@ export function readBedColors(
       section = new Map();
       colors.set(sectionY, section);
     }
-    section.set(((x & 15) << 8) | ((z & 15) << 4) | (y & 15), color);
+    section.set(((x & 15) << 8) | ((z & 15) << 4) | (y & 15), kind === "Bed" ? color : 15 - color);
   }
   return colors;
 }

@@ -249,6 +249,28 @@ row(78, [
   ...[0, 1].map((rail_data_bit) => b("golden_rail", { rail_direction: 0, rail_data_bit })),
 ]);
 
+// Water plants: fixed green lily pads, and vines on every side plus a hanging vine.
+for (let z = 76; z <= 83; z++)
+  for (let x = 36; x <= 59; x++) put(x, FLOOR - 1, z, "minecraft:water");
+for (const z of [78, 82]) for (const x of [39, 45, 51, 57]) put(x, FLOOR, z, b("waterlily"));
+SIDE.forEach(([dx, dz], index) => {
+  const x = 4 + index * 6;
+  put(x + dx, FLOOR, 82 + dz, "minecraft:stone");
+  put(x, FLOOR, 82, b("vine", { vine_direction_bits: 1 << index }));
+});
+put(28, FLOOR + 1, 82, "minecraft:stone");
+put(28, FLOOR, 82, b("vine", { vine_direction_bits: 0 }));
+
+// All 16 saved banner base dyes, standing and on a wall. Base 0 is black, 15 white.
+const banners: { x: number; y: number; z: number; base: number; id: string }[] = [];
+for (let base = 0; base < 16; base++) {
+  const x = 3 + base * 3;
+  put(x, FLOOR, 86, b("standing_banner", { ground_sign_direction: 0 }));
+  put(x, FLOOR, 89, "minecraft:stone");
+  put(x, FLOOR, 90, b("wall_banner", { facing_direction: 3 }));
+  for (const z of [86, 90]) banners.push({ x, y: FLOOR, z, base, id: "Banner" });
+}
+
 // Gold floor under the samples still to do, so the invisible ones can be found.
 const todo = (x: number, z: number) =>
   z === 64 && [...blocks.keys()].some((key) => key.startsWith(`${x},`) && key.endsWith(`,${z}`));
@@ -257,12 +279,18 @@ const records: FixtureRecord[] = [];
 for (let cz = 0; cz < CHUNKS_Z; cz++)
   for (let cx = 0; cx < CHUNKS_X; cx++) {
     records.push(
-      sectionRecord(0, cx, cz, 3, (x, y, z) =>
-        y !== FLOOR - 1
-          ? "minecraft:stone"
-          : todo(x, z)
-            ? "minecraft:gold_block"
-            : "minecraft:grass_block",
+      sectionRecord(
+        0,
+        cx,
+        cz,
+        3,
+        (x, y, z) =>
+          blocks.get(`${x},${y},${z}`) ??
+          (y !== FLOOR - 1
+            ? "minecraft:stone"
+            : todo(x, z)
+              ? "minecraft:gold_block"
+              : "minecraft:grass_block"),
       ),
     );
     records.push(
@@ -270,7 +298,9 @@ for (let cz = 0; cz < CHUNKS_Z; cz++)
     );
     records.push(biomeRecord(0, cx, cz, Array<number>(24).fill(1)));
     const inChunk = beds.filter((bed) => bed.x >> 4 === cx && bed.z >> 4 === cz);
-    if (inChunk.length > 0) records.push(bedEntityRecord(0, cx, cz, inChunk));
+    const cloth = banners.filter((banner) => banner.x >> 4 === cx && banner.z >> 4 === cz);
+    if (inChunk.length + cloth.length > 0)
+      records.push(bedEntityRecord(0, cx, cz, [...inChunk, ...cloth]));
   }
 await writeFixtureWorld(target, records);
 console.log("wrote", target, blocks.size, "blocks");

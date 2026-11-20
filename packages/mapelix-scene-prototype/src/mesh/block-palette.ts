@@ -14,6 +14,7 @@ import { MODEL_STATES, blockModelParts, type BlockModel } from "../blocks/block-
 import { QUAD_CUTOUT, packQuadTexture } from "../textures/atlas-format.js";
 import { sheetFaceWord, type PartSheet } from "../textures/sheet-faces.js";
 import { BED_COLORS, bedTilePath, type BedTile } from "../textures/bed-tiles.js";
+import { BANNER_TILE } from "../textures/banner-tile.js";
 import {
   TEXTURE_STATES,
   resolveBlockTextures,
@@ -73,7 +74,7 @@ export const TintCode = {
  * Blocks whose gray texture the game colors with a tint this engine keeps as the block's own
  * color, such as the dry foliage color of leaf litter: the texture takes that color.
  */
-const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter"]);
+const SELF_TINTED: ReadonlySet<string> = new Set(["leaf_litter", "waterlily", "lily_pad"]);
 
 /**
  * A torch's stick: its sides as the sheet holds them, its top and bottom from the stick. Models
@@ -225,6 +226,16 @@ export class BlockPalette {
   ): void {
     const base = name.replace(/^minecraft:/, "");
     if (base === "bed") return this.writeBedTextures(id, states);
+    if (base === "standing_banner" || base === "wall_banner") {
+      // blocks.json names planks for the support; only the entity sheet holds the cloth.
+      const tile = this.textures!.tiles[BANNER_TILE];
+      if (tile === undefined) return;
+      const cutout = this.cutoutTiles.has(tile);
+      const word = packQuadTexture(tile, 0, true) | (cutout ? QUAD_CUTOUT : 0);
+      this.textureWords.fill(word, id * 6, id * 6 + 6);
+      if (cutout) this.cutout[id] = 2;
+      return;
+    }
     const textures = resolveBlockTextures(this.names!, name, states, appearance);
     if (textures === undefined) return;
     const ownColor = SELF_TINTED.has(base);

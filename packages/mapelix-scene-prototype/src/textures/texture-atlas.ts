@@ -17,6 +17,7 @@ import {
 } from "./atlas-format.js";
 import type { TextureNames } from "./block-textures.js";
 import type { PackImage } from "./pack-image.js";
+import { BANNER_TEXTURE, BANNER_TILE, bannerTileSide, cutBannerTile } from "./banner-tile.js";
 import {
   BED_COLORS,
   BED_TILES,
@@ -98,6 +99,7 @@ interface Source {
   readonly overlay: boolean;
   /** A tile cut from a bed's entity texture (see `cutBedTile`), read from `image`. */
   readonly bed?: { readonly image: string; readonly tile: BedTile };
+  readonly banner?: true;
 }
 
 function atlasOptions(options: TextureAtlasOptions): Required<TextureAtlasOptions> {
@@ -207,6 +209,18 @@ export async function buildTextureAtlas(
         bed: { image, tile },
       });
   }
+  const bannerSize = await stack.readImageSize(BANNER_TEXTURE);
+  const bannerSide =
+    bannerSize === undefined ? undefined : bannerTileSide(bannerSize.width, bannerSize.height);
+  if (bannerSide !== undefined)
+    sources.push({
+      path: BANNER_TILE,
+      side: bannerSide,
+      frames: [0],
+      ticksPerFrame: 1,
+      overlay: false,
+      banner: true,
+    });
   const count = sources.reduce((sum, source) => sum + source.frames.length, 0);
   if (count === 0) throw new RangeError("The resource packs hold no block texture");
   if (count > MAX_ATLAS_TILES) {
@@ -243,15 +257,20 @@ export async function buildTextureAtlas(
   const tiles: AtlasTileInfo[] = [];
   const tileOf: Record<string, number> = {};
   const used = new Map<ResourcePack, string[]>();
-  const bedImages = new Map<string, PackImage | undefined>();
+  const sheetImages = new Map<string, PackImage | undefined>();
   for (const source of sources) {
-    const file = source.bed?.image ?? source.path;
+    const file = source.banner ? BANNER_TEXTURE : (source.bed?.image ?? source.path);
     let image: PackImage | undefined;
-    if (source.bed === undefined) image = await stack.readImage(file);
+    if (source.bed === undefined && !source.banner) image = await stack.readImage(file);
     else {
-      if (!bedImages.has(file)) bedImages.set(file, await stack.readImage(file));
-      const sheet = bedImages.get(file);
-      image = sheet === undefined ? undefined : cutBedTile(sheet, source.bed.tile);
+      if (!sheetImages.has(file)) sheetImages.set(file, await stack.readImage(file));
+      const sheet = sheetImages.get(file);
+      image =
+        sheet === undefined
+          ? undefined
+          : source.banner
+            ? cutBannerTile(sheet)
+            : cutBedTile(sheet, source.bed!.tile);
     }
     if (image === undefined) continue;
     const found = (await stack.locateImage(file))!;

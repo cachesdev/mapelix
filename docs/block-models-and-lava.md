@@ -37,8 +37,10 @@ Detailed LOD 0 geometry includes:
   a wall. Buttons, levers, signs (standing, on a wall, hanging), banners, heads and item
   frames, on the floor, the ceiling or a wall; webs, fire, amethyst, pointed dripstone and cave
   vines as two crossed planes; vines and lichen as flat planes on their sides; sea pickles;
-  the End portal as a glowing plane; banners keep one block of cloth, and heads
-  and banners their block color until block entities are read. These are cuboid
+  the End portal as a glowing plane. Banners keep an approximate one-block cloth
+  with its saved base dye, a separate wooden support and the pack's entity cloth
+  texture; heads retain their block color. See [foliage and banners](foliage-and-banners.md)
+  for tinting, cloth textures and remaining limits. These are cuboid
   representations:
   curved chains, tilted details, cutout textures and flat straw fringes remain
   approximations. Other small blocks retain their previous appearance.

@@ -3,6 +3,17 @@ import { QuadMaterial } from "../format.js";
 import { resolveBlockAppearance } from "./block-appearance.js";
 
 describe("dimension block appearances", () => {
+  it("colors vine foliage and lily pads while keeping banner cloth separate from wood", () => {
+    expect(resolveBlockAppearance("minecraft:vine", {}).tint).toBe("foliage");
+    for (const name of ["waterlily", "lily_pad"]) {
+      const lily = resolveBlockAppearance(`minecraft:${name}`, {});
+      expect(lily.tint).toBe("none");
+      expect((lily.top >> 8) & 255).toBeGreaterThan(lily.top >> 16);
+    }
+    expect(resolveBlockAppearance("minecraft:wall_banner", {}).top).toBe(
+      resolveBlockAppearance("minecraft:white_wool", {}).top,
+    );
+  });
   // Leaf block identifiers present in Mojang's Bedrock samples v1.26.60.5.
   it.each([
     ["oak_leaves", "foliage"],

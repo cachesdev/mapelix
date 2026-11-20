@@ -95,6 +95,10 @@ as many blocks on each side, up to 2048 by 2048 at level 5.
 
 ## Format
 
+Vines and lily pads retain their green tint in both display modes. Banners read
+their saved base dye and use the pack's entity cloth texture instead of its wood
+placeholder. See [foliage and banners](../../docs/foliage-and-banners.md).
+
 `@mapelix/scene-prototype/format` has no Node.js dependency. It encodes and decodes regions and
 packs quads. A region is a 40-byte header, a height grid, and three quad lists: opaque, plants,
 and translucent. Decoding returns views into the original buffer.
