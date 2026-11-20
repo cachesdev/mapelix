@@ -208,6 +208,12 @@ release. Only compiled modules ship, so the release computes the same scene revi
 checkout it came from, and the same commit packs the same bytes: nothing records a time or a
 machine path.
 
+The release also declares `snapshotValidationVersion` (currently **1**), `snapshotValidationApi`
+(the lightweight Node module), and `snapshotValidationCli: { entry, args: ["validate"] }`.
+Run `node <release>/<snapshotValidationCli.entry> validate --world /path/to/world`, or import
+`validateSnapshot` from the declared API path. These modules and their dependencies are included
+in `files` and its SHA-256 checks. See the [validation contract](../../docs/snapshot-validation.md).
+
 A release never holds block textures: the host gives its own packs to `createSceneServer`.
 Version 5 of the embed API only adds options; a host written for version 4 runs it unchanged,
 with textures off. Binary regions use format 4 in both modes; update the scene server and

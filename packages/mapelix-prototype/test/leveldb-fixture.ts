@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { deflateRawSync, deflateSync } from "node:zlib";
 
 export const encodeText = (text: string): Uint8Array => new TextEncoder().encode(text);
 export const concatBytes = (...parts: Uint8Array[]): Uint8Array =>
@@ -102,7 +103,9 @@ export function internalFixtureKey(record: FixtureVersion): Uint8Array {
   );
 }
 
-function block(entries: readonly { key: Uint8Array; value: Uint8Array }[]): Uint8Array {
+export function fixtureBlock(
+  entries: readonly { key: Uint8Array; value: Uint8Array }[],
+): Uint8Array {
   return concatBytes(
     ...entries.map(({ key, value }) =>
       concatBytes(
@@ -118,45 +121,123 @@ function block(entries: readonly { key: Uint8Array; value: Uint8Array }[]): Uint
   );
 }
 
-function tableBlock(bytes: Uint8Array): Uint8Array {
-  const encoded = concatBytes(bytes, new Uint8Array([0]));
+export function fixtureTableBlock(
+  bytes: Uint8Array,
+  compression: "none" | "zlib" | "raw" | "snappy" = "none",
+): Uint8Array {
+  let data = bytes;
+  let tag = 0;
+  if (compression === "zlib") {
+    data = deflateSync(bytes);
+    tag = 2;
+  }
+  if (compression === "raw") {
+    data = deflateRawSync(bytes);
+    tag = 4;
+  }
+  if (compression === "snappy") {
+    const length = bytes.length - 1;
+    const extra: number[] = [];
+    let remaining = length;
+    if (length >= 60)
+      do {
+        extra.push(remaining & 255);
+        remaining >>>= 8;
+      } while (remaining > 0);
+    data = concatBytes(
+      fixtureVarint(bytes.length),
+      new Uint8Array([(length < 60 ? length : 59 + extra.length) << 2, ...extra]),
+      bytes,
+    );
+    tag = 1;
+  }
+  const encoded = concatBytes(data, new Uint8Array([tag]));
   return concatBytes(encoded, fixed32(fixtureChecksum(encoded)));
 }
 
-export function fixtureTable(records: readonly FixtureVersion[]): Uint8Array {
-  const sorted = [...records].sort(
-    (a, b) => Buffer.compare(a.key, b.key) || (a.sequence > b.sequence ? -1 : 1),
+export interface FixtureTableOptions {
+  readonly blockRecordCount?: number;
+  readonly compression?: "none" | "zlib" | "raw" | "snappy";
+  readonly filter?: Uint8Array;
+}
+
+function sortedVersions(records: readonly FixtureVersion[]): FixtureVersion[] {
+  return [...records].sort(
+    (a, b) =>
+      Buffer.compare(a.key, b.key) ||
+      (a.sequence > b.sequence
+        ? -1
+        : a.sequence < b.sequence
+          ? 1
+          : Number(a.value === undefined) - Number(b.value === undefined)),
   );
-  const dataBytes = block(
-    sorted.map((record) => ({
-      key: internalFixtureKey(record),
-      value: record.value ?? new Uint8Array(),
-    })),
-  );
-  const data = tableBlock(dataBytes);
-  const metadataBytes = block([]);
-  const metadata = tableBlock(metadataBytes);
-  const indexBytes = block(
-    sorted.length === 0
-      ? []
-      : [
-          {
-            key: internalFixtureKey(sorted[sorted.length - 1]!),
-            value: concatBytes(fixtureVarint(0), fixtureVarint(dataBytes.length)),
-          },
-        ],
-  );
+}
+
+export function fixtureTable(
+  records: readonly FixtureVersion[],
+  options: FixtureTableOptions = {},
+): Uint8Array {
+  const sorted = sortedVersions(records);
+  const count = options.blockRecordCount ?? (sorted.length || 1);
+  const parts: Uint8Array[] = [];
+  const indexEntries: { key: Uint8Array; value: Uint8Array }[] = [];
+  let offset = 0;
+  for (let position = 0; position < sorted.length; position += count) {
+    const group = sorted.slice(position, position + count);
+    const encoded = fixtureTableBlock(
+      fixtureBlock(
+        group.map((record) => ({
+          key: internalFixtureKey(record),
+          value: record.value ?? new Uint8Array(),
+        })),
+      ),
+      options.compression,
+    );
+    indexEntries.push({
+      key: internalFixtureKey(group[group.length - 1]!),
+      value: concatBytes(fixtureVarint(offset), fixtureVarint(encoded.length - 5)),
+    });
+    parts.push(encoded);
+    offset += encoded.length;
+  }
+  const metadataEntries: { key: Uint8Array; value: Uint8Array }[] = [];
+  if (options.filter !== undefined) {
+    const encoded = fixtureTableBlock(options.filter);
+    metadataEntries.push({
+      key: encodeText("filter.test"),
+      value: concatBytes(fixtureVarint(offset), fixtureVarint(encoded.length - 5)),
+    });
+    parts.push(encoded);
+    offset += encoded.length;
+  }
+  const metadataOffset = offset;
+  const metadata = fixtureTableBlock(fixtureBlock(metadataEntries), options.compression);
+  const index = fixtureTableBlock(fixtureBlock(indexEntries), options.compression);
   const footer = new Uint8Array(48);
   footer.set(
     concatBytes(
-      fixtureVarint(data.length),
-      fixtureVarint(metadataBytes.length),
-      fixtureVarint(data.length + metadata.length),
-      fixtureVarint(indexBytes.length),
+      fixtureVarint(metadataOffset),
+      fixtureVarint(metadata.length - 5),
+      fixtureVarint(metadataOffset + metadata.length),
+      fixtureVarint(index.length - 5),
     ),
   );
   footer.set([0x57, 0xfb, 0x80, 0x8b, 0x24, 0x75, 0x47, 0xdb], 40);
-  return concatBytes(data, metadata, tableBlock(indexBytes), footer);
+  return concatBytes(...parts, metadata, index, footer);
+}
+
+export function fixtureTableMetadata(
+  number: number,
+  records: readonly FixtureVersion[],
+  options?: FixtureTableOptions,
+): FixtureTableMetadata {
+  const sorted = sortedVersions(records);
+  return {
+    number,
+    bytes: fixtureTable(records, options),
+    smallest: internalFixtureKey(sorted[0]!),
+    largest: internalFixtureKey(sorted[sorted.length - 1]!),
+  };
 }
 
 export interface FixtureTableMetadata {

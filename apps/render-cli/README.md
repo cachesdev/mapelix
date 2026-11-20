@@ -47,6 +47,27 @@ See the [overview contract](../../docs/2d-overviews.md) for grid, filtering and 
 
 ## Limits
 
+### Validate without exporting
+
+The existing entry also validates a snapshot without rendering, caches or an output directory:
+
+```sh
+node apps/render-cli/dist/index.js validate --world /srv/snapshots/world
+node apps/render-cli/dist/index.js validate --world /srv/snapshots/world \
+  --max-input-file-bytes 268435456 --max-decoded-block-bytes 16777216 \
+  --max-total-input-bytes 34359738368 --timeout-seconds 300
+node apps/render-cli/dist/index.js validate --help
+```
+
+It prints one JSON result on stdout, including failures; human diagnostics go to stderr.
+Exit codes: **0** valid, **1** invalid/limited/timed out, **2** invalid invocation,
+**130** SIGINT, **143** SIGTERM. Help is text and exits zero. These validation limits are
+independent of the rendering options below. The API is `validateSnapshot` from
+`@mapelix/core/node/snapshot`. See the [version-1 validation contract](../../docs/snapshot-validation.md)
+for exact fields, read permissions, validation scope and release commands.
+
+### Export limits
+
 Every limit is checked before acceptance where possible, and errors have nonzero exit status.
 
 | Option                   |      Default | Meaning                                                                    |

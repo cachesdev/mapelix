@@ -1,5 +1,6 @@
 import { levelDbLogRecords } from "./leveldb-log.js";
 import { parseInternalKey } from "./record-source.js";
+import { compareInternalKeys } from "./table-validation.js";
 
 export type LevelDbSnapshotErrorCode =
   | "CURRENT_INVALID"
@@ -9,6 +10,7 @@ export type LevelDbSnapshotErrorCode =
   | "ACTIVE_TABLE_INVALID"
   | "REQUIRED_LOG_INVALID"
   | "SNAPSHOT_IO_ERROR"
+  | "SNAPSHOT_LIMIT_EXCEEDED"
   | "SOURCE_CHANGED";
 
 /** Stable error details shared by readers and snapshot validation. */
@@ -229,19 +231,6 @@ export function selectLevelDbFiles(
 
 function compareNumbers(a: bigint, b: bigint): number {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-function compareInternalKeys(left: Uint8Array, right: Uint8Array): number {
-  const a = parseInternalKey(left, "manifest");
-  const b = parseInternalKey(right, "manifest");
-  for (let index = 0; index < Math.min(a.key.length, b.key.length); index++) {
-    const difference = a.key[index]! - b.key[index]!;
-    if (difference !== 0) return difference;
-  }
-  return (
-    a.key.length - b.key.length ||
-    compareNumbers(b.sequence, a.sequence) ||
-    Number(a.deleted) - Number(b.deleted)
-  );
 }
 export function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);

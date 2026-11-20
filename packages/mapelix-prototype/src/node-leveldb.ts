@@ -39,6 +39,11 @@ export function openLevelDbSnapshot(
   worldDirectory: string,
   options: LevelDbSnapshotOptions = {},
 ): LevelDbSnapshot {
+  if (
+    options.maxFileBytes !== undefined &&
+    (!Number.isSafeInteger(options.maxFileBytes) || options.maxFileBytes < 1)
+  )
+    throw new RangeError("maxFileBytes must be a positive safe integer");
   options.signal?.throwIfAborted();
   const directory = join(worldDirectory, "db");
   let names: string[];
@@ -48,7 +53,12 @@ export function openLevelDbSnapshot(
   } catch (cause) {
     throw new LevelDbSnapshotError("SNAPSHOT_IO_ERROR", "db", errorMessage(cause), cause);
   }
-  const currentBytes = readMetadata(directory, "CURRENT", 4096, "CURRENT_INVALID");
+  const currentBytes = readMetadata(
+    directory,
+    "CURRENT",
+    Math.min(4096, options.maxFileBytes ?? Infinity),
+    "CURRENT_INVALID",
+  );
   const manifestName = readLevelDbCurrent(currentBytes);
   const manifestBytes = readMetadata(
     directory,
@@ -69,7 +79,11 @@ export function openLevelDbSnapshot(
       if (!details.isFile() || details.size < size || !Number.isSafeInteger(size))
         throw new Error("active file is not a regular file or is shorter than its logical length");
       if (size > (options.maxFileBytes ?? Infinity))
-        throw new Error("active file exceeds permitted bytes");
+        throw new LevelDbSnapshotError(
+          "SNAPSHOT_LIMIT_EXCEEDED",
+          file.name,
+          "active file exceeds permitted bytes",
+        );
       return { name: file.name, number: file.number, kind: file.kind, size };
     } catch (cause) {
       throw levelDbFileError(file, cause);
@@ -178,8 +192,13 @@ function readMetadata(
     const descriptor = openSync(path, "r");
     try {
       const before = fstatSync(descriptor);
-      if (!before.isFile() || before.size > limit)
-        throw new Error("metadata is not a regular file or exceeds permitted bytes");
+      if (!before.isFile()) throw new Error("metadata is not a regular file");
+      if (before.size > limit)
+        throw new LevelDbSnapshotError(
+          "SNAPSHOT_LIMIT_EXCEEDED",
+          name,
+          "metadata exceeds permitted bytes",
+        );
       const bytes = new Uint8Array(before.size);
       let position = 0;
       while (position < bytes.length) {

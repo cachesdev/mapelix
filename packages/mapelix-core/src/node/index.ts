@@ -13,6 +13,15 @@ import type { MapWorld } from "../types.js";
 export type { BedrockWorldDirectory as MapWorldDirectory, EffectiveBedrockRecord };
 export { createOverviewTile, type OverviewSourceTile } from "./overview.js";
 export { decodePng, encodePng } from "@mapelix/prototype/png";
+export {
+  validateSnapshot,
+  SNAPSHOT_VALIDATION_FORMAT,
+  SNAPSHOT_VALIDATION_VERSION,
+  type SnapshotValidationOptions,
+  type SnapshotValidationResult,
+  type SnapshotValidationIssue,
+  type SnapshotValidationErrorCode,
+} from "./snapshot.js";
 
 /** Adapts the reference renderer without coupling the portable profile entry to Node. */
 function withSurfaceProfiles(world: BedrockWorld): MapWorld {

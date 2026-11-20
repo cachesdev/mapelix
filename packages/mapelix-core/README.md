@@ -58,7 +58,29 @@ constructors apply the selected dimension's profile on every tile request and ex
 zoom-0 coverage through `getTileCoverage(dimension)`.
 
 The reader performs no writes. The caller owns output files, cache policy and snapshot lifecycle.
-Use an immutable snapshot; the existing reader's LevelDB checksum/manifest limitations still apply.
+Use an immutable snapshot; both readers follow the same checked CURRENT/manifest selection.
+
+## Validate a snapshot without rendering
+
+```ts
+import { validateSnapshot } from "@mapelix/core/node/snapshot";
+
+const result = await validateSnapshot("/path/to/immutable-snapshot", {
+  timeoutMs: 300_000,
+  maxInputFileBytes: 268_435_456,
+});
+if (!result.valid) throw new Error(result.errors[0]!.message);
+```
+
+This lightweight Node entry does not load the renderer or open caches. `@mapelix/core/node`
+also re-exports the API. It checks every selected table's data, index, metadata and filter blocks,
+the manifest and required journals, then verifies source stability. Its revision equals the 2D
+export's `source.revision`. It never opens inactive tables or changes input contents or rights.
+The result contract is `mapelix-snapshot-validation`, schema version 1. Invalid snapshots,
+cancellation and timeouts return `valid: false`; invalid API arguments reject with TypeError or
+RangeError. Values and optional `level.dat` remain opaque; this is LevelDB integrity validation,
+not Bedrock payload decoding. See the [full contract](../../docs/snapshot-validation.md)
+for limits, JSON fields, errors, release entries and CLI exit codes.
 
 ## Surface behavior
 

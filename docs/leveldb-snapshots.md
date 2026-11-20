@@ -67,3 +67,7 @@ Reader failures expose `LevelDbSnapshotError` with `code`, `file` and `message`.
 `CURRENT_INVALID`, `MANIFEST_INVALID`, `MANIFEST_UNSUPPORTED`, `ACTIVE_FILE_MISSING`,
 `ACTIVE_TABLE_INVALID`, `REQUIRED_LOG_INVALID`, `SNAPSHOT_IO_ERROR` and `SOURCE_CHANGED`.
 These details do not replace snapshot immutability or the host's acquisition and publication checks.
+
+The complete read-only `validateSnapshot` API and the existing CLI's `validate` mode implement
+that exhaustive pass. See the [version-1 validation contract](snapshot-validation.md) for commands,
+JSON, scope, limits, permissions and release entries.

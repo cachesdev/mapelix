@@ -285,17 +285,31 @@ function parseTable(
 
 /** Reads the index block handle from the last 48 bytes of a LevelDB table. */
 export function readTableFooter(footer: Uint8Array, source: string): BlockHandle {
+  return readTableFooterHandles(footer, source).index;
+}
+
+/** Decodes both footer handles; exhaustive validation also checks the reserved padding. */
+export function readTableFooterHandles(
+  footer: Uint8Array,
+  source: string,
+  strictPadding = false,
+): { metaindex: BlockHandle; index: BlockHandle } {
   if (
     footer.length !== TABLE_FOOTER_SIZE ||
     !LDB_MAGIC.every((byte, index) => footer[footer.length - 8 + index] === byte)
   ) {
     throw new Error(`${source}: invalid LevelDB table footer`);
   }
-  let offset = readVarint(footer, 0, source).next;
-  offset = readVarint(footer, offset, source).next;
-  const indexOffset = readVarint(footer, offset, source);
+  const metaOffset = readVarint(footer, 0, source);
+  const metaSize = readVarint(footer, metaOffset.next, source);
+  const indexOffset = readVarint(footer, metaSize.next, source);
   const indexSize = readVarint(footer, indexOffset.next, source);
-  return { offset: indexOffset.value, size: indexSize.value };
+  if (indexSize.next > 40 || (strictPadding && footer.subarray(indexSize.next, 40).some(Boolean)))
+    throw new Error(`${source}: invalid LevelDB footer padding`);
+  return {
+    metaindex: { offset: metaOffset.value, size: metaSize.value },
+    index: { offset: indexOffset.value, size: indexSize.value },
+  };
 }
 
 /** Decodes an index block entry value into the data block it points at. */
@@ -384,7 +398,7 @@ function decompressBlock(
   compression: number | undefined,
   source: string,
 ): Uint8Array {
-  if (compression === 1) return uncompressSnappy(raw, source);
+  if (compression === 1) return readSnappyBlock(raw, source);
   if (compression === 0) return tryInflateBlock(raw) ?? raw;
 
   // Some Bedrock tooling emits deflated blocks without a standard LevelDB trailer.
@@ -415,17 +429,37 @@ function looksLikeBlock(block: Uint8Array): boolean {
 }
 
 /** Parses the prefix-compressed entries of a decompressed table block. */
-export function parseTableBlock(block: Uint8Array, source: string): TableBlockEntry[] {
+export function parseTableBlock(
+  block: Uint8Array,
+  source: string,
+  strictRestarts = false,
+): TableBlockEntry[] {
   if (block.length < 4) throw new Error(`${source}: truncated LevelDB block`);
   const restartCount = fixed32(block, block.length - 4);
   const entriesEnd = block.length - 4 - restartCount * 4;
   if (entriesEnd < 0) throw new Error(`${source}: invalid LevelDB restart array`);
+  if (strictRestarts) {
+    if (restartCount === 0 || fixed32(block, entriesEnd) !== 0)
+      throw new Error(`${source}: invalid first LevelDB restart`);
+    for (let index = 1; index < restartCount; index++) {
+      const restart = fixed32(block, entriesEnd + index * 4);
+      if (restart <= fixed32(block, entriesEnd + (index - 1) * 4) || restart >= entriesEnd)
+        throw new Error(`${source}: invalid LevelDB restart offset`);
+    }
+  }
 
   let offset = 0;
+  let nextRestart = 0;
   let previousKey = new Uint8Array();
   const entries: TableBlockEntry[] = [];
   while (offset < entriesEnd) {
     const shared = readVarint(block, offset, source);
+    if (strictRestarts && nextRestart < restartCount) {
+      const restart = fixed32(block, entriesEnd + nextRestart * 4);
+      if (offset > restart || (offset === restart && shared.value !== 0))
+        throw new Error(`${source}: invalid LevelDB restart entry`);
+      if (offset === restart) nextRestart++;
+    }
     const unshared = readVarint(block, shared.next, source);
     const value = readVarint(block, unshared.next, source);
     if (
@@ -446,11 +480,24 @@ export function parseTableBlock(block: Uint8Array, source: string): TableBlockEn
     offset = value.next + unshared.value + value.value;
   }
   if (offset !== entriesEnd) throw new Error(`${source}: malformed LevelDB block entries`);
+  if (strictRestarts && entriesEnd > 0 && nextRestart !== restartCount)
+    throw new Error(`${source}: unused LevelDB restart offset`);
   return entries;
 }
 
-function uncompressSnappy(input: Uint8Array, source: string): Uint8Array {
+export class LevelDbBlockLimitError extends RangeError {}
+
+/** Checks Snappy's declared output length before allocating the output buffer. */
+export function readSnappyBlock(
+  input: Uint8Array,
+  source: string,
+  maxDecodedBytes = Infinity,
+): Uint8Array {
   const length = readVarint(input, 0, source);
+  if (length.value > maxDecodedBytes)
+    throw new LevelDbBlockLimitError(
+      `${source}: decoded block exceeds permitted bytes (${maxDecodedBytes})`,
+    );
   const output = new Uint8Array(length.value);
   let inputOffset = length.next;
   let outputOffset = 0;
@@ -467,7 +514,7 @@ function uncompressSnappy(input: Uint8Array, source: string): Uint8Array {
           throw new Error(`${source}: truncated Snappy literal`);
         literalLength = 1;
         for (let index = 0; index < extra; index++)
-          literalLength += input[inputOffset++]! << (8 * index);
+          literalLength += input[inputOffset++]! * 2 ** (8 * index);
       }
       if (
         inputOffset + literalLength > input.length ||

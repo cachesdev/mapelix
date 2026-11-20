@@ -8,6 +8,10 @@
     "dist"
   ],
   "exports": {
+    "./node/snapshot": {
+      "types": "./dist/node/snapshot.d.ts",
+      "import": "./dist/node/snapshot.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

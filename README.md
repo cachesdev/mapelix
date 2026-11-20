@@ -48,6 +48,8 @@ Work on a copy of the world: Mapelix only reads it, but the game may change it w
 Both renderers follow `db/CURRENT` and its LevelDB manifest. Unreferenced tables are ignored,
 including unfinished files left by compaction. Invalid active files fail explicitly. See
 [snapshot selection and integrity](docs/leveldb-snapshots.md).
+After building, `node apps/render-cli/dist/index.js validate --world /path/to/world` checks
+the complete selected snapshot without rendering or writing files, and prints a versioned JSON result.
 
 1. **Install.** With [Mise](https://mise.jdx.dev/), which selects Node.js 24 and pnpm 11:
 

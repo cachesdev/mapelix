@@ -36,6 +36,9 @@ export {
   readLevelDbRecords,
   readTableBlock,
   readTableFooter,
+  readTableFooterHandles,
+  readSnappyBlock,
+  LevelDbBlockLimitError,
   visitLevelDbRecords,
   verifyTableBlockTrailer,
   type BlockHandle,
@@ -64,3 +67,4 @@ export {
   type SelectedLevelDbTable,
   type LevelDbFileSelection,
 } from "./leveldb-snapshot.js";
+export { validateLevelDbTable, type ValidationBlockDecoder } from "./table-validation.js";

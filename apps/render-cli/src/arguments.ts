@@ -4,6 +4,8 @@ import type { BatchOptions, BatchLimits, BatchBounds } from "@mapelix/core/node/
 
 export const HELP = `Usage: mapelix-render --world <snapshot> --output <directory> [options]
 
+Validate without rendering: mapelix-render validate --world <snapshot> (see validate --help).
+
 Read-only classic 2D export. The output parent must already exist.
   --dimension <name>          Repeat or comma-separate overworld,nether,end (default: all)
   --zooms <integers>          Default: -4,-3,-2,-1,0,1,2; explicit +3 is also supported

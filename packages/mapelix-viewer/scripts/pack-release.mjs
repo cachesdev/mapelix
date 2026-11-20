@@ -80,6 +80,8 @@ const packages = {
 const embed = join(viewerPackage, "dist-embed");
 const build = "run the builds listed at the top of this script";
 await requireFile(join(viewerPackage, "dist", "node", "index.js"), build);
+await requireFile(join(packages.core, "dist", "node", "snapshot.js"), build);
+await requireFile(join(packages["render-cli"], "dist", "snapshot-cli.js"), build);
 for (const directory of Object.values(packages)) {
   await requireFile(join(directory, "dist", "index.js"), build);
 }
@@ -159,6 +161,12 @@ const { REGION_FORMAT_VERSION } = await scene("format.js");
 const { DISCOVERY_SCHEMA_VERSION } = await scene("discoveries.js");
 const { ATLAS_FORMAT_VERSION } = await scene("textures/atlas-format.js");
 const { TEXTURE_PIPELINE_VERSION } = await scene("textures/resource-pack.js");
+const snapshotApiPath = join(modules, "@mapelix", "core", "dist", "node", "snapshot.js");
+const { SNAPSHOT_VALIDATION_VERSION, validateSnapshot } = await import(
+  pathToFileURL(snapshotApiPath).href
+);
+if (typeof validateSnapshot !== "function")
+  throw new Error("The snapshot validation API is missing");
 const embedSource = await readFile(join(viewerPackage, "src", "embed.ts"), "utf8");
 const embedVersion = /EMBED_API_VERSION = (\d+)/.exec(embedSource)?.[1];
 if (embedVersion === undefined) throw new Error("EMBED_API_VERSION is missing from embed.ts");
@@ -202,6 +210,12 @@ const release = {
   texturePipelineVersion: TEXTURE_PIPELINE_VERSION,
   renderCliVersion: renderManifest.version,
   renderCli: posix(join(modules, "@mapelix", "render-cli", renderManifest.bin["mapelix-render"])),
+  snapshotValidationVersion: SNAPSHOT_VALIDATION_VERSION,
+  snapshotValidationApi: posix(snapshotApiPath),
+  snapshotValidationCli: {
+    entry: posix(join(modules, "@mapelix", "render-cli", renderManifest.bin["mapelix-render"])),
+    args: ["validate"],
+  },
   sceneServer: posix(join(viewerModule, "dist", "node", "index.js")),
   textureCli: posix(join(viewerModule, "dist", "node", "texture-cli.js")),
   viewer: "viewer/mapelix-viewer.js",
