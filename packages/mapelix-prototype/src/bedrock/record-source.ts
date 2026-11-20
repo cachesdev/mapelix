@@ -1,4 +1,5 @@
 import { inflate, inflateRaw } from "pako";
+import { levelDbLogRecords, maskedCrc32c } from "./leveldb-log.js";
 
 /** A LevelDB file already loaded by the caller. No file-system access is used. */
 export interface NamedLevelDbFile {
@@ -16,6 +17,8 @@ export interface LevelDbRecord {
 
 /** Controls which LevelDB keys are retained by a reader. */
 export interface LevelDbRecordOptions {
+  /** Snapshot adapters enable checksums; explicit legacy byte inputs may omit them. */
+  readonly verifyChecksums?: boolean;
   readonly includeKey?: (key: Uint8Array) => boolean;
   /** Returns a compact value to retain in a key index, or undefined to keep the value lazy. */
   readonly retainValue?: (key: Uint8Array, value: Uint8Array) => Uint8Array | undefined;
@@ -81,7 +84,6 @@ export const TABLE_FOOTER_SIZE = 48;
 /** Byte length of the compression type and checksum after each table block. */
 export const TABLE_BLOCK_TRAILER_SIZE = 5;
 
-const LOG_BLOCK_SIZE = 32 * 1024;
 const LDB_MAGIC = [0x57, 0xfb, 0x80, 0x8b, 0x24, 0x75, 0x47, 0xdb];
 
 /**
@@ -131,7 +133,7 @@ export function readLevelDbRecords(
   };
 
   for (const file of [...files].sort((left, right) => left.name.localeCompare(right.name))) {
-    parseFile(file, add);
+    parseFile(file, add, options.verifyChecksums);
   }
 
   return [...latest.values()]
@@ -185,7 +187,7 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
 
   return {
     addFile(file): void {
-      parseFile(file, add);
+      parseFile(file, add, options.verifyChecksums);
     },
     *drainRecords(): IterableIterator<LevelDbRecordIndexEntry> {
       for (const [encodedKey, record] of latest) {
@@ -207,76 +209,34 @@ export function createLevelDbRecordIndex(options: LevelDbRecordOptions = {}): Le
  * Visits every record version in one `.log`, `.ldb`, or `.sst` file, including tombstones.
  * Callers own last-write-wins resolution across files.
  */
-export function visitLevelDbRecords(file: NamedLevelDbFile, visit: LevelDbRecordVisitor): void {
-  parseFile(file, visit);
+export function visitLevelDbRecords(
+  file: NamedLevelDbFile,
+  visit: LevelDbRecordVisitor,
+  options: LevelDbRecordOptions = {},
+): void {
+  parseFile(file, visit, options.verifyChecksums);
 }
 
-function parseFile(file: NamedLevelDbFile, add: LevelDbRecordVisitor): void {
+function parseFile(
+  file: NamedLevelDbFile,
+  add: LevelDbRecordVisitor,
+  verifyChecksums = false,
+): void {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith(".log")) {
-    parseLog(file.bytes, file.name, add);
+    for (const batch of levelDbLogRecords(file.bytes, file.name, verifyChecksums))
+      parseWriteBatch(batch, file.name, add);
   } else if (lowerName.endsWith(".ldb") || lowerName.endsWith(".sst")) {
-    parseTable(file.bytes, file.name, add);
+    parseTable(file.bytes, file.name, add, verifyChecksums);
   }
-}
-
-function parseLog(bytes: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
-  let offset = 0;
-  let fragments: Uint8Array[] | undefined;
-
-  while (offset < bytes.length) {
-    const blockOffset = offset % LOG_BLOCK_SIZE;
-    const remaining = LOG_BLOCK_SIZE - blockOffset;
-    if (remaining < 7) {
-      offset += remaining;
-      continue;
-    }
-    if (offset + 7 > bytes.length) {
-      break;
-    }
-
-    const length = bytes[offset + 4]! | (bytes[offset + 5]! << 8);
-    const type = bytes[offset + 6]!;
-    offset += 7;
-    if (length > bytes.length - offset || length > remaining - 7) {
-      throw new Error(`${source}: invalid LevelDB log record length`);
-    }
-    const payload = bytes.subarray(offset, offset + length);
-    offset += length;
-
-    if (type === 0) {
-      // A zero-filled block trailer is not a logical record.
-      continue;
-    }
-    if (type === 1) {
-      if (fragments) {
-        throw new Error(`${source}: incomplete fragmented LevelDB log record`);
-      }
-      parseWriteBatch(payload, source, add);
-    } else if (type === 2) {
-      fragments = [payload];
-    } else if (type === 3) {
-      if (!fragments)
-        throw new Error(`${source}: LevelDB log middle fragment without first fragment`);
-      fragments.push(payload);
-    } else if (type === 4) {
-      if (!fragments)
-        throw new Error(`${source}: LevelDB log last fragment without first fragment`);
-      fragments.push(payload);
-      parseWriteBatch(join(fragments), source, add);
-      fragments = undefined;
-    } else {
-      throw new Error(`${source}: unknown LevelDB log record type ${type}`);
-    }
-  }
-
-  if (fragments) throw new Error(`${source}: incomplete fragmented LevelDB log record`);
 }
 
 function parseWriteBatch(batch: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
   if (batch.length < 12) throw new Error(`${source}: truncated LevelDB write batch`);
   const startSequence = fixed64(batch, 0);
   const count = fixed32(batch, 8);
+  if (startSequence + BigInt(Math.max(0, count - 1)) > (1n << 56n) - 1n)
+    throw new Error(`${source}: invalid LevelDB write batch sequence`);
   let offset = 12;
 
   for (let index = 0; index < count; index++) {
@@ -297,15 +257,25 @@ function parseWriteBatch(batch: Uint8Array, source: string, add: LevelDbRecordVi
   if (offset !== batch.length) throw new Error(`${source}: trailing bytes in LevelDB write batch`);
 }
 
-function parseTable(bytes: Uint8Array, source: string, add: LevelDbRecordVisitor): void {
+function parseTable(
+  bytes: Uint8Array,
+  source: string,
+  add: LevelDbRecordVisitor,
+  verifyChecksums: boolean,
+): void {
   if (bytes.length < TABLE_FOOTER_SIZE) {
     throw new Error(`${source}: invalid LevelDB table footer`);
   }
   const indexHandle = readTableFooter(bytes.subarray(bytes.length - TABLE_FOOTER_SIZE), source);
-  const indexBlock = readBlock(bytes, indexHandle, source);
+  const indexBlock = readBlock(bytes, indexHandle, source, verifyChecksums);
 
   for (const entry of parseTableBlock(indexBlock, source)) {
-    const dataBlock = readBlock(bytes, readBlockHandle(entry.value, source), source);
+    const dataBlock = readBlock(
+      bytes,
+      readBlockHandle(entry.value, source),
+      source,
+      verifyChecksums,
+    );
     for (const record of parseTableBlock(dataBlock, source)) {
       const internal = parseInternalKey(record.key, source);
       add(internal.key, internal.deleted ? undefined : record.value, internal.sequence, source);
@@ -355,21 +325,53 @@ export function parseInternalKey(internalKey: Uint8Array, source: string): Inter
  * Decompresses one table block read together with its five-byte trailer.
  * This lets seekable readers load a single block without the rest of the file.
  */
-export function readTableBlock(blockWithTrailer: Uint8Array, source: string): Uint8Array {
+export function readTableBlock(
+  blockWithTrailer: Uint8Array,
+  source: string,
+  verifyChecksums = false,
+): Uint8Array {
   const size = blockWithTrailer.length - TABLE_BLOCK_TRAILER_SIZE;
   if (size < 0) throw new Error(`${source}: truncated LevelDB block trailer`);
+  if (verifyChecksums) verifyTableBlockTrailer(blockWithTrailer, source);
   return decompressBlock(blockWithTrailer.subarray(0, size), blockWithTrailer[size], source);
 }
 
-function readBlock(bytes: Uint8Array, handle: BlockHandle, source: string): Uint8Array {
+/** Checks the compression tag and CRC of an encoded block before decoding it. */
+export function verifyTableBlockTrailer(blockWithTrailer: Uint8Array, source: string): void {
+  if (blockWithTrailer.length < TABLE_BLOCK_TRAILER_SIZE)
+    throw new Error(`${source}: truncated LevelDB block trailer`);
+  if (![0, 1, 2, 4].includes(blockWithTrailer[blockWithTrailer.length - TABLE_BLOCK_TRAILER_SIZE]!))
+    throw new Error(`${source}: unsupported LevelDB block compression`);
+  const dataEnd = blockWithTrailer.length - 4;
+  const checksum = new DataView(
+    blockWithTrailer.buffer,
+    blockWithTrailer.byteOffset + dataEnd,
+    4,
+  ).getUint32(0, true);
+  if (checksum !== maskedCrc32c(blockWithTrailer.subarray(0, dataEnd)))
+    throw new Error(`${source}: LevelDB table checksum mismatch`);
+}
+
+function readBlock(
+  bytes: Uint8Array,
+  handle: BlockHandle,
+  source: string,
+  verifyChecksums: boolean,
+): Uint8Array {
   if (
     handle.offset < 0 ||
     handle.size < 0 ||
-    handle.offset + handle.size > bytes.length - TABLE_FOOTER_SIZE
+    handle.offset + handle.size + (verifyChecksums ? TABLE_BLOCK_TRAILER_SIZE : 0) >
+      bytes.length - TABLE_FOOTER_SIZE
   ) {
     throw new Error(`${source}: LevelDB block handle is outside the table`);
   }
   const raw = bytes.subarray(handle.offset, handle.offset + handle.size);
+  if (verifyChecksums)
+    verifyTableBlockTrailer(
+      bytes.subarray(handle.offset, handle.offset + handle.size + TABLE_BLOCK_TRAILER_SIZE),
+      source,
+    );
   const compression =
     handle.offset + handle.size + TABLE_BLOCK_TRAILER_SIZE <= bytes.length
       ? bytes[handle.offset + handle.size]
@@ -553,17 +555,6 @@ function fixed64(bytes: Uint8Array, offset: number): bigint {
   let value = 0n;
   for (let index = 7; index >= 0; index--) value = (value << 8n) | BigInt(bytes[offset + index]!);
   return value;
-}
-
-function join(parts: Uint8Array[]): Uint8Array {
-  const length = parts.reduce((total, part) => total + part.length, 0);
-  const joined = new Uint8Array(length);
-  let offset = 0;
-  for (const part of parts) {
-    joined.set(part, offset);
-    offset += part.length;
-  }
-  return joined;
 }
 
 function hex(bytes: Uint8Array): string {

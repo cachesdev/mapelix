@@ -254,5 +254,14 @@ export async function writeFixtureWorld(
   }
   await mkdir(join(directory, "db"), { recursive: true });
   await writeFile(join(directory, "db", "000001.log"), Buffer.concat(fragments));
+  const edit = new Uint8Array([2, 1, 3, 3, 4, ...varint(records.length)]);
+  const manifest = new Uint8Array(7 + edit.length);
+  manifest[6] = 1;
+  manifest.set(edit, 7);
+  const header = new DataView(manifest.buffer);
+  header.setUint16(4, edit.length, true);
+  header.setUint32(0, maskedCrc32c(manifest.subarray(6)), true);
+  await writeFile(join(directory, "db", "CURRENT"), "MANIFEST-000002\n");
+  await writeFile(join(directory, "db", "MANIFEST-000002"), manifest);
   await writeFile(join(directory, "levelname.txt"), "Dimension test world");
 }

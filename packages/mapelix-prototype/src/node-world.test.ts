@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 import { openBedrockWorld } from "./node-world.js";
+import { writeFixtureManifest, fixtureLog } from "../test/leveldb-fixture.js";
 
 const run = promisify(execFile);
 const lifecycleScript = fileURLToPath(new URL("../test/world-lifecycle.mjs", import.meta.url));
@@ -139,6 +140,7 @@ describe("openBedrockWorld", () => {
     try {
       const databaseDirectory = join(worldDirectory, "db");
       await mkdir(databaseDirectory);
+      await writeFixtureManifest(worldDirectory);
       const subchunk = singleBlockSubchunk(15, 0, 4, 15, 0);
       await writeFile(
         join(databaseDirectory, "000001.log"),
@@ -160,6 +162,7 @@ describe("openBedrockWorld", () => {
     try {
       const databaseDirectory = join(worldDirectory, "db");
       await mkdir(databaseDirectory);
+      await writeFixtureManifest(worldDirectory);
       await writeFile(
         join(databaseDirectory, "000001.log"),
         levelDbLog([singleBlockSubchunk(-16, 0, 4, 0, 0)]),
@@ -187,6 +190,7 @@ describe("openBedrockWorld", () => {
     try {
       const databaseDirectory = join(worldDirectory, "db");
       await mkdir(databaseDirectory);
+      await writeFixtureManifest(worldDirectory);
       await writeFile(
         join(databaseDirectory, "000001.log"),
         levelDbLog([singleBlockSubchunk(0, 0, 4, 0, 1), singleBlockSubchunk(-1, 0, 5, 15, 0, 1)]),
@@ -236,6 +240,7 @@ describe("openBedrockWorld", () => {
           entries.push(singleBlockSubchunk(chunkX, chunkZ, height, chunkX & 15, chunkZ & 15));
           entries.push(data2DChunk(chunkX, chunkZ, 1 + (chunkX & 3)));
         }
+        await writeFixtureManifest(worldDirectory);
         await writeFile(join(databaseDirectory, "000001.log"), levelDbLog(entries));
         const tiles = [
           { z: 0, x: 0, y: 0 },
@@ -288,6 +293,7 @@ async function runLifecycle(
   const directory = await mkdtemp(join(tmpdir(), "mapelix-lifecycle-"));
   try {
     await mkdir(join(directory, "db"));
+    await writeFixtureManifest(directory);
     await writeFile(
       join(directory, "db", "000001.log"),
       levelDbLog([singleBlockSubchunk(0, 0, 4, 0, 0), data2DChunk(0, 0, 1)]),
@@ -343,7 +349,7 @@ function levelDbLog(entries: Array<{ key: Uint8Array; value: Uint8Array }>): Uin
       ...value,
     ]),
   ]);
-  return new Uint8Array([0, 0, 0, 0, batch.byteLength & 0xff, batch.byteLength >>> 8, 1, ...batch]);
+  return fixtureLog([batch]);
 }
 
 function singleBlockSubchunk(

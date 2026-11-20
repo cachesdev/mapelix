@@ -8,6 +8,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    "./node/leveldb": {
+      "types": "./dist/node-leveldb.d.ts",
+      "import": "./dist/node-leveldb.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

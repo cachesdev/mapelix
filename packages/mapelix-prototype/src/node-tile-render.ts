@@ -1,7 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { readLevelDbRecords, type NamedLevelDbFile } from "./bedrock/record-source.js";
+import { readLevelDbSnapshotFile, type LevelDbSnapshotFile } from "./node-leveldb.js";
 import type { RenderedTile, TileCoordinates } from "./tile.js";
 import type { SurfaceRange } from "./surface-range.js";
 import type { SurfaceStyle } from "./surface-style.js";
@@ -21,8 +19,7 @@ export interface PackedKeyGroup {
   readonly keyLength: number;
 }
 
-export interface IndexedTileSource {
-  readonly name: string;
+export interface IndexedTileSource extends LevelDbSnapshotFile {
   readonly keyGroups: readonly PackedKeyGroup[];
 }
 
@@ -112,7 +109,7 @@ export async function renderIndexedTile(
     if (useCache) {
       const fileRecords = await cache!.fileRecords(
         job.databaseDirectory,
-        source.name,
+        source,
         keys,
         hex,
         signal,
@@ -125,11 +122,12 @@ export async function renderIndexedTile(
     }
     const file: NamedLevelDbFile = {
       name: source.name,
-      bytes: await readFile(join(job.databaseDirectory, source.name), { signal }),
+      bytes: await readLevelDbSnapshotFile(job.databaseDirectory, source, signal),
     };
     signal?.throwIfAborted();
     records.push(
       ...readLevelDbRecords([file], {
+        verifyChecksums: true,
         includeKey: (key) => keys.has(hex(key)),
       }),
     );

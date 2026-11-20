@@ -1,8 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { DATA_2D_TAG, isMapRecordKey } from "./bedrock/chunk-key.js";
 import { readLevelDbRecords } from "./bedrock/record-source.js";
+import { readLevelDbSnapshotFile, type LevelDbSnapshotFile } from "./node-leveldb.js";
 import type { ChunkSurface } from "./world.js";
 
 /** Default per-renderer budget shared by the record and chunk-surface caches. */
@@ -72,23 +70,25 @@ export class TileRenderCache {
    */
   async fileRecords(
     databaseDirectory: string,
-    name: string,
+    file: LevelDbSnapshotFile,
     requestedKeys: ReadonlySet<string>,
     hexKey: (key: Uint8Array) => string,
     signal?: AbortSignal,
   ): Promise<ReadonlyMap<string, Uint8Array>> {
+    const { name } = file;
     const cached = this.files.get(name);
     if (cached !== undefined) {
       this.stats.fileHits += 1;
       return cached;
     }
-    const bytes = await readFile(join(databaseDirectory, name), { signal });
+    const bytes = await readLevelDbSnapshotFile(databaseDirectory, file, signal);
     signal?.throwIfAborted();
     this.stats.fileParses += 1;
     const retain = bytes.byteLength <= this.files.budget;
     const records = new Map<string, Uint8Array>();
     let retainedBytes = 0;
     for (const record of readLevelDbRecords([{ name, bytes }], {
+      verifyChecksums: true,
       includeKey: retain
         ? (key) => isMapRecordKey(key) && key[key.byteLength <= 10 ? 8 : 12] !== DATA_2D_TAG
         : (key) => requestedKeys.has(hexKey(key)),

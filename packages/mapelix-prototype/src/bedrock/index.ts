@@ -37,6 +37,7 @@ export {
   readTableBlock,
   readTableFooter,
   visitLevelDbRecords,
+  verifyTableBlockTrailer,
   type BlockHandle,
   type InternalKey,
   type LevelDbRecord,
@@ -50,3 +51,16 @@ export {
   type DecodedSubchunk,
   type DecodedSubchunkStorage,
 } from "./subchunk.js";
+export { levelDbLogRecords, maskedCrc32c } from "./leveldb-log.js";
+export {
+  LevelDbSnapshotError,
+  readLevelDbCurrent,
+  readLevelDbManifest,
+  selectLevelDbFiles,
+  type LevelDbSnapshotErrorCode,
+  type LevelDbTableMetadata,
+  type LevelDbManifest,
+  type SelectedLevelDbFile,
+  type SelectedLevelDbTable,
+  type LevelDbFileSelection,
+} from "./leveldb-snapshot.js";

@@ -45,6 +45,10 @@ on the same Wi-Fi. Keep the window open while you use the map; close it to stop.
 
 Work on a copy of the world: Mapelix only reads it, but the game may change it while it runs.
 
+Both renderers follow `db/CURRENT` and its LevelDB manifest. Unreferenced tables are ignored,
+including unfinished files left by compaction. Invalid active files fail explicitly. See
+[snapshot selection and integrity](docs/leveldb-snapshots.md).
+
 1. **Install.** With [Mise](https://mise.jdx.dev/), which selects Node.js 24 and pnpm 11:
 
    ```sh
@@ -317,6 +321,7 @@ system `unzip` command to expand the committed `.mcworld` fixture into a tempora
   [block textures and resource packs](docs/texture-stack.md).
 - Discoveries: [labels](docs/discovery-labels.md), [navigation](docs/discovery-navigation.md).
 - Hosting: [scene server and handlers](packages/mapelix-viewer/README.md),
+  [snapshot selection and integrity](docs/leveldb-snapshots.md),
   [demo](apps/mapelix-demo/README.md), [on-demand viewer](apps/prototype-viewer/README.md).
 - Background: [`OPTIMIZATIONS.md`](OPTIMIZATIONS.md) (speed, memory and accuracy experiments),
   [`REWRITE.md`](REWRITE.md) (production rewrite ledger and open questions),

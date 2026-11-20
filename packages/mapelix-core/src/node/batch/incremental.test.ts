@@ -107,6 +107,44 @@ describe("dirtyTiles", () => {
 });
 
 describe("incremental batch export", () => {
+  it("keeps the publication and cached surfaces stable when inactive files appear", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mapelix-inactive-"));
+    roots.push(root);
+    const world = join(root, "world");
+    await writeFixtureWorld(world, [sectionRecord(0, 0, 0, 4, "minecraft:stone")]);
+    const options = {
+      world,
+      output: join(root, "export"),
+      zooms: [0],
+      shadows: "off" as const,
+      dimensions: ["overworld" as const],
+      incremental: true,
+      surfaceCacheMiB: 16,
+      limits: { workers: 1 },
+    };
+    const first = await renderBatch(options);
+    await writeFile(join(world, "db", "038514.ldb"), new Uint8Array(79383));
+    await writeFile(join(world, "db", "000000.log"), "obsolete broken journal");
+    const unchanged = await renderBatch(options);
+    expect(unchanged.update).toMatchObject({
+      mode: "incremental",
+      changedChunks: 0,
+      renderedTiles: 0,
+    });
+    expect(unchanged.manifest.generation).toBe(first.manifest.generation);
+    expect(unchanged.manifest.source).toEqual(first.manifest.source);
+    await writeFixtureWorld(world, [sectionRecord(0, 0, 0, 4, "minecraft:gold_block")]);
+    const updated = await renderBatch(options);
+    const full = await renderBatch({ ...options, output: join(root, "full"), incremental: false });
+    expect(updated.update).toMatchObject({
+      mode: "incremental",
+      changedChunks: 1,
+      renderedTiles: 1,
+    });
+    expect(updated.manifest.tiles).toEqual(full.manifest.tiles);
+    expect(updated.manifest.generation).toBe(full.manifest.generation);
+  }, 30_000);
+
   it("reuses unaffected tiles and matches a full render of the updated world", async () => {
     const root = await mkdtemp(join(tmpdir(), "mapelix-incremental-"));
     roots.push(root);

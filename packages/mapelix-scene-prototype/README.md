@@ -3,6 +3,11 @@
 This package turns a Bedrock world into 3D scene regions for the Mapelix 3D viewer. It reads the
 world's LevelDB tables on demand and builds regions in worker threads.
 
+Tables and recovery journals come from the same manifest-based selection as the 2D reader.
+Inactive tables are ignored without opening them. Active table blocks and journals are checked
+when read; startup keeps its seekable access strategy. See
+[snapshot selection and integrity](../../docs/leveldb-snapshots.md).
+
 ```ts
 import { openSceneWorld } from "@mapelix/scene-prototype";
 import { decodeSceneRegion } from "@mapelix/scene-prototype/format";

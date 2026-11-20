@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -9,6 +8,12 @@ import {
   isMapRecordKey,
 } from "./bedrock/chunk-key.js";
 import { createLevelDbRecordIndex, type LevelDbRecordIndexEntry } from "./bedrock/record-source.js";
+import {
+  openLevelDbSnapshot,
+  readLevelDbSnapshotFile,
+  levelDbFileError,
+  type LevelDbSnapshotFile,
+} from "./node-leveldb.js";
 import {
   DEFAULT_SURFACE_STORE_MIB,
   SURFACE_PACK_VERSION,
@@ -120,11 +125,13 @@ class IndexedBedrockWorld implements BedrockWorld {
   private readonly surfaceReader: SurfaceStoreReader | undefined;
   private readonly surfaceStats: SurfaceStoreStats = createSurfaceStoreStats();
   private readonly styleDigests = new WeakMap<SurfaceStyle, string>();
+  private readonly files: ReadonlyMap<string, LevelDbSnapshotFile>;
   private tileFingerprints: Map<string, Map<string, string>> | undefined;
 
   constructor(
     databaseDirectory: string,
     records: Iterable<LevelDbRecordIndexEntry>,
+    files: ReadonlyMap<string, LevelDbSnapshotFile>,
     renderConcurrency: number,
     forceWorkers: boolean,
     renderCacheMiB: number,
@@ -132,6 +139,7 @@ class IndexedBedrockWorld implements BedrockWorld {
     surfaceCache: SurfaceCacheOptions | undefined,
   ) {
     this.databaseDirectory = databaseDirectory;
+    this.files = files;
     this.forceWorkers = forceWorkers;
     if (surfaceCache !== undefined && renderCacheMiB > 0) {
       const maxMiB = surfaceCache.maxMiB ?? DEFAULT_SURFACE_STORE_MIB;
@@ -203,7 +211,7 @@ class IndexedBedrockWorld implements BedrockWorld {
     for (const [tileKey, tile] of buildingTiles) {
       this.tiles.set(tileKey, {
         sources: [...tile.sources].map(([name, groups]) => ({
-          name,
+          ...files.get(name)!,
           keyGroups: [...groups.values()].map((group) => group.finish()),
         })),
         biomeRecords: tile.biomeRecords,
@@ -431,7 +439,10 @@ class IndexedBedrockWorld implements BedrockWorld {
     return {
       coordinates,
       databaseDirectory: this.databaseDirectory,
-      sources: [...sourceGroups].map(([name, keyGroups]) => ({ name, keyGroups })),
+      sources: [...sourceGroups].map(([name, keyGroups]) => ({
+        ...this.files.get(name)!,
+        keyGroups,
+      })),
       biomeRecords,
       cacheKey: this.cacheKey(dimension, options),
       ...(surfaceStore === undefined ? {} : { surfaceStore }),
@@ -475,7 +486,7 @@ function filterSources(
     const keyGroups = source.keyGroups
       .map((group) => filterKeyGroup(group, minChunkX, minChunkZ, maxChunkX, maxChunkZ))
       .filter((group) => group.bytes.byteLength > 0);
-    if (keyGroups.length > 0) filtered.push({ name: source.name, keyGroups });
+    if (keyGroups.length > 0) filtered.push({ ...source, keyGroups });
   }
   return filtered;
 }
@@ -521,16 +532,13 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
     );
   }
   const databaseDirectory = join(input.directory, "db");
-  const entries = await readdir(databaseDirectory, { withFileTypes: true });
-  const databaseFiles = entries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        (entry.name.endsWith(".ldb") || entry.name.endsWith(".sst") || entry.name.endsWith(".log")),
-    )
-    .sort((left, right) => left.name.localeCompare(right.name));
+  const snapshot = openLevelDbSnapshot(
+    input.directory,
+    input.signal === undefined ? {} : { signal: input.signal },
+  );
 
   const index = createLevelDbRecordIndex({
+    verifyChecksums: true,
     includeKey: isMapRecordKey,
     retainValue: (key, value) => {
       const tagOffset = key.byteLength === 9 ? 8 : 12;
@@ -545,18 +553,21 @@ export async function openBedrockWorld(input: BedrockWorldDirectory): Promise<Be
         }
       : {}),
   });
-  for (const entry of databaseFiles) {
+  for (const file of snapshot.files) {
     input.signal?.throwIfAborted();
-    index.addFile({
-      name: entry.name,
-      bytes: await readFile(join(databaseDirectory, entry.name), { signal: input.signal }),
-    });
+    const bytes = await readLevelDbSnapshotFile(databaseDirectory, file, input.signal);
+    try {
+      index.addFile({ name: file.name, bytes });
+    } catch (cause) {
+      throw levelDbFileError(file, cause);
+    }
   }
 
   input.signal?.throwIfAborted();
   return new IndexedBedrockWorld(
     databaseDirectory,
     index.drainRecords(),
+    new Map(snapshot.files.map((file) => [file.name, file])),
     renderConcurrency,
     input.forceWorkers === true,
     input.renderCacheMiB ?? DEFAULT_RENDER_CACHE_MIB,

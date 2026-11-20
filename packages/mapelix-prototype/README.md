@@ -86,9 +86,9 @@ consecutive tiles; `0` disables them. Rendered pixels do not depend on it.
 - Uses uNmINeD-compatible classic biome colors for grass, foliage, and biome-family water. Biome tint is discrete by default; callers can request an artistic seam-safe transition with `biomeBlendRadius`.
 - Uses byte-exact water-depth composition, the uNmINeD Bedrock elevation color and lightness curves, a selective one-pixel contour on shared height edges, and native output-subpixel 3D-opacity shadows. The default shadow pass uses the published 120-degree sun direction, 45-degree altitude, 40% strength, ray-chord-smoothed water and foliage opacity, and compact vertical occupancy runs so light can pass below roof overhangs. Equal-height interiors stay flat. Paths and common village materials use distinct style colors. Callers can disable shadows or inject a `BlockStyleResolver`. Reference-renderer quirks remain enabled by default for clean-room image parity; pass `correctReferenceBugs: true` to opt into Mapelix corrections, currently a physical top-face shadow receiver.
 - Treats grass, flowers, ferns, and saplings as decorative cover supported by the ground below, so they do not create false terrain relief. The untextured renderer keeps a flat same-material region uniform; it does not use generated grain or resource-pack textures.
-- Does not validate LevelDB checksums yet.
+- Directory reads verify manifest and required journal CRCs, and the CRCs of table blocks they read.
 - Builds the index one database file at a time. It retains packed subchunk and Data3D keys and only the compact biome payload from Data2D records. Block and Data3D values load on demand. More workers increase throughput and temporary memory use.
-- Does not interpret `CURRENT` or `MANIFEST` yet. Point it at a clean world snapshot without orphaned LevelDB files.
+- Follows `CURRENT` and its manifest to select active tables and recovery journals. Unreferenced tables are never opened; invalid or unsupported manifests fail without a directory-scan fallback. See [snapshot integrity](../../docs/leveldb-snapshots.md).
 
 ## Color benchmark
 

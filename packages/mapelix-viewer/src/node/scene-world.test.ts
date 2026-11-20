@@ -18,6 +18,7 @@ import {
 } from "../../../mapelix-scene-prototype/test/synthetic-pack.js";
 import { NotCachedError, InvalidRegionError } from "./region-service";
 import { MissingWorldError, createSceneServer, type SceneServerOptions } from "./scene-world";
+import { writeFixtureManifest } from "../../../mapelix-prototype/test/leveldb-fixture.js";
 
 const mocks = vi.hoisted(() => ({ opened: vi.fn(), built: vi.fn(), discovered: vi.fn() }));
 
@@ -52,6 +53,7 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "mapelix-scene-"));
   const world = join(root, "world");
   await mkdir(join(world, "db"), { recursive: true });
+  await writeFixtureManifest(world);
   await writeFile(join(world, "level.dat"), "level");
   await writeFile(join(world, "db", "000001.ldb"), "table");
   options = {
