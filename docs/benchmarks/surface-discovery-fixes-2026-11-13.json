@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-13",
+  "base": "fe82288978702e281094673276440b14db4d9117",
+  "branch": "feature/cave-navigation",
+  "contracts": {
+    "embed": 3,
+    "http": 3,
+    "regionFormat": 2,
+    "discoverySchema": 1,
+    "engineOrServerChanged": false,
+    "cacheIdentityChanged": false,
+    "newPublicMethods": [],
+    "newPublicOptions": []
+  },
+  "tests": {
+    "viewerTests": 52,
+    "engineTests": 182,
+    "engineTestsCached": true,
+    "buildTypeLintPassed": true,
+    "fullBrowser": {
+      "startTime": "2026-11-13T22:23:02.551Z",
+      "duration": 348903.88899999997,
+      "expected": 40,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "finalFocusedBrowser": {
+      "startTime": "2026-11-13T22:30:30.947Z",
+      "duration": 34467.753,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "finalFocusedReason": "Representative exposure for mixed groups and avoiding all-height regrouping on terrain arrivals"
+  },
+  "lifecycle": [
+    {
+      "backend": "WebGPU",
+      "switches": 104,
+      "uniformBuffers": [75, 70],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [153955841, 153901169],
+      "collectedHeapBytes": [10009360, 11188864],
+      "final36SwitchHeapGrowthBytes": 249964,
+      "errors": []
+    },
+    {
+      "backend": "WebGL 2",
+      "switches": 104,
+      "uniformBuffers": [77, 72],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [153918925, 153869780],
+      "collectedHeapBytes": [10045260, 11343724],
+      "final36SwitchHeapGrowthBytes": 272004,
+      "errors": []
+    }
+  ],
+  "policy": {
+    "surfaceVisibility": "Saved exposed voxel plus exact LOD-0 top or owned exterior side beside a known sky-open column",
+    "unknownAndCoarseHeight": "exclude",
+    "surfaceDepthToleranceBlocks": 0,
+    "markerHeight": "blockY + 0.5",
+    "sourceIndexReuse": true,
+    "extraDetailRequests": false,
+    "groupingBudgetMs": 2,
+    "cooperativeScanBatch": 256,
+    "descentKey": "KeyC",
+    "ascentKey": "Space",
+    "compatibleVerticalKeys": ["PageUp", "PageDown"],
+    "keyLeaseMs": 600,
+    "horizontalSpeedCapsBlocksPerSecond": {
+      "surface": 96,
+      "caves": 32
+    },
+    "verticalSpeedBlocksPerSecond": 12,
+    "pointerMarkerFocus": "canvas",
+    "keyboardMarkerFocus": "button"
+  },
+  "limitations": [
+    "Surface certification is conservative and needs already loaded exact terrain; zoom in if only coarse terrain is available.",
+    "Fully enclosed source blocks remain markers/index entries when the mesh has no exposed face.",
+    "At shallow pitch the bounded cave orbit may not clear every surrounding rock face; Recover view remains available.",
+    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or process RSS.",
+    "Browser tests use generated disposable worlds."
+  ]
+}

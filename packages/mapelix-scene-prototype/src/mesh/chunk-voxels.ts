@@ -1,4 +1,5 @@
-import { Face, WORLD_MAX_Y, WORLD_MIN_Y } from "../format.js";
+import { Face, WORLD_MIN_Y } from "../format.js";
+import { paddedBounds, type VerticalBounds } from "../dimensions.js";
 import { decodeSection, type ChunkSource } from "../world/chunk-source.js";
 import { biomeTints } from "./biome-tints.js";
 import {
@@ -45,6 +46,9 @@ interface StoredSection {
 
 /** Reads chunks into voxels, decoding subchunks from the top down only as deep as needed. */
 export class ChunkVoxelReader {
+  get geometry() {
+    return this.chunks.config.geometry;
+  }
   private readonly chunks: ChunkSource;
   private readonly palette: BlockPalette;
   /** Boxes that live only until they are halved, reused to spare the garbage collector. */
@@ -53,6 +57,7 @@ export class ChunkVoxelReader {
   private readonly layerColor = new Int32Array(256);
   /** Per column while writing: 1 when the block above is water. */
   private readonly waterAbove = new Uint8Array(256);
+  private readonly lavaAbove = new Uint8Array(256);
 
   constructor(chunks: ChunkSource, palette: BlockPalette) {
     this.chunks = chunks;
@@ -60,37 +65,73 @@ export class ChunkVoxelReader {
   }
 
   /** Reads a chunk as voxels `voxelSize` blocks wide, a power of two up to 16. */
-  read(chunkX: number, chunkZ: number, voxelSize: number): ChunkVoxels | undefined {
+  read(
+    chunkX: number,
+    chunkZ: number,
+    voxelSize: number,
+    ceilingY = this.chunks.config.maxY,
+    window?: VerticalBounds,
+    lighting = false,
+  ): ChunkVoxels | undefined {
     const records = this.chunks.records(chunkX, chunkZ);
     if (records === undefined) return undefined;
 
     const sections: StoredSection[] = [];
+    const allocated =
+      window === undefined ? undefined : paddedBounds(window, this.chunks.config.dimension);
     // Leaves are not ground: the air under a canopy must be read.
     const ground = new Int16Array(256).fill(WORLD_MIN_Y - 1);
     const depth = voxelSize >= COARSE_VOXEL ? COARSE_DEPTH : COVER_DEPTH;
     let open = 256;
     for (const record of records.sections) {
+      if (
+        allocated === undefined
+          ? record.y * 16 >= ceilingY
+          : record.y * 16 < allocated.minY || record.y * 16 >= allocated.maxY
+      )
+        continue;
       const section = decodeSection(record);
-      if (section === undefined || section.y < WORLD_MIN_Y / 16 || section.y >= WORLD_MAX_Y / 16) {
+      if (
+        section === undefined ||
+        section.y < this.chunks.config.minY / 16 ||
+        section.y >= (allocated?.maxY ?? ceilingY) / 16
+      ) {
         continue;
       }
-      const cells = sectionCells(section, this.palette);
-      const top = this.highestFilled(cells);
+      const cells = sectionCells(
+        section,
+        this.palette,
+        records.bedColors.get(section.y),
+        records.bannerColors.get(section.y),
+      );
+      const top = this.highestFilled(cells, lighting);
       if (top === -1) continue;
       sections.push({ y: section.y, cells, top });
       open -= this.findGround(cells, section.y * 16, ground);
-      if (open === 0 && section.y * 16 <= Math.min(...ground) - depth - 1) break;
+      if (
+        this.chunks.config.geometry === "surface" &&
+        window === undefined &&
+        open === 0 &&
+        section.y * 16 <= Math.min(...ground) - depth - 1
+      )
+        break;
     }
     if (sections.length === 0) return undefined;
 
     const low = sections.at(-1)!.y * 16;
     const layers = (sections[0]!.y + 1) * 16 - low;
-    let box = this.box(16, layers, voxelSize === 1);
+    let box = this.box(16, layers, voxelSize === 1, lighting);
     const tints = Array.from({ length: 256 }, (_, column) => {
       const surface = ground[column]! < WORLD_MIN_Y ? 64 : ground[column]!;
       return biomeTints(records.biomes.at(column & 15, surface, column >> 4));
     });
-    this.writeSections(box, sections, low, tints);
+    this.writeSections(
+      box,
+      sections,
+      low,
+      tints,
+      window === undefined ? undefined : (x, y, z) => biomeTints(records.biomes.at(x, y, z)),
+    );
     box.filled = sections[0]!.y * 16 + sections[0]!.top + 1 - low;
     for (let size = 2; size <= voxelSize; size *= 2) {
       box = halveVoxels(box, this.box(16 / size, layers / size, size === voxelSize));
@@ -99,8 +140,8 @@ export class ChunkVoxelReader {
   }
 
   /** A new box when the caller keeps it, or an emptied scratch box otherwise. */
-  private box(width: number, layers: number, kept: boolean): VoxelBox {
-    if (kept) return new VoxelBox(width, layers);
+  private box(width: number, layers: number, kept: boolean, lighting = false): VoxelBox {
+    if (kept) return new VoxelBox(width, layers, lighting);
     const key = width * 1024 + layers;
     const reused = this.scratch.get(key);
     if (reused === undefined) {
@@ -146,22 +187,25 @@ export class ChunkVoxelReader {
     sections: readonly StoredSection[],
     low: number,
     tints: readonly Uint32Array[],
+    tintsAt?: (x: number, y: number, z: number) => Uint32Array,
   ): void {
     const { voxel, covered } = this.palette;
     const { kind: kinds, top: tops, side: sides, fill, covered: soils } = box;
-    const { layerColor, waterAbove } = this;
+    const { layerColor, waterAbove, lavaAbove } = this;
     let previous = Number.POSITIVE_INFINITY;
     for (const section of sections) {
       // A missing subchunk is air, which ends any layer or water above it.
       if (section.y !== previous - 1) {
         layerColor.fill(-1);
         waterAbove.fill(0);
+        lavaAbove.fill(0);
       }
       previous = section.y;
       const { cells } = section;
       if (section.top < 15) {
         layerColor.fill(-1);
         waterAbove.fill(0);
+        lavaAbove.fill(0);
       }
       for (let y = section.top; y >= 0; y -= 1) {
         let index = (section.y * 16 + y - low) * 256;
@@ -169,48 +213,58 @@ export class ChunkVoxelReader {
           // Box columns run z * 16 + x; Bedrock stores blocks as x * 256 + z * 16 + y.
           const cell = cells[((column & 15) << 8) | ((column >> 4) << 4) | y]!;
           const id = cell & PALETTE_ID_MASK;
+          if (box.emission !== undefined) box.emission[index] = this.palette.emission[id]!;
+          if (box.lightOpaque !== undefined)
+            box.lightOpaque[index] = this.palette.isOpaque(id) ? 1 : 0;
+          const tint = tintsAt?.(column & 15, section.y * 16 + y, column >> 4) ?? tints[column]!;
           let kind = voxel[id]!;
           // Water fills the gaps of waterlogged plants, fences, and other open blocks.
           if ((cell & WATERLOGGED) !== 0 && (kind === VoxelKind.Air || kind === VoxelKind.Layer)) {
             kind = VoxelKind.Water;
           }
           if (kind === VoxelKind.Layer) {
-            layerColor[column] = this.faceColor(id, Face.PositiveY, tints[column]!);
+            layerColor[column] = this.faceColor(id, Face.PositiveY, tint);
             waterAbove[column] = 0;
+            lavaAbove[column] = 0;
             continue;
           }
           if (kind === VoxelKind.Water) {
-            const water = tints[column]![TintCode.Water]!;
+            const water = tint[TintCode.Water]!;
             tops[index] = water;
             sides[index] = water;
             fill[index] = waterAbove[column] === 1 ? 16 : WATER_SURFACE_FILL;
           } else if (kind !== VoxelKind.Air) {
             const soil = covered[id]!;
             const layered = layerColor[column]!;
-            const top =
-              layered === -1 ? this.faceColor(id, Face.PositiveY, tints[column]!) : layered;
+            const top = layered === -1 ? this.faceColor(id, Face.PositiveY, tint) : layered;
             tops[index] = top;
             // Covered sides keep the color of their strip; the shader draws the soil below it.
-            sides[index] = soil === 1 ? top : this.faceColor(id, Face.PositiveX, tints[column]!);
+            sides[index] = soil === 1 ? top : this.faceColor(id, Face.PositiveX, tint);
             soils[index] = soil;
-            fill[index] = 16;
+            fill[index] =
+              kind === VoxelKind.Lava && lavaAbove[column] === 0 ? this.palette.boxSize[id]! : 16;
           }
           kinds[index] = kind;
           layerColor[column] = -1;
           waterAbove[column] = kind === VoxelKind.Water ? 1 : 0;
+          lavaAbove[column] = kind === VoxelKind.Lava ? 1 : 0;
         }
       }
     }
   }
 
   /** The highest local y of a subchunk that holds anything but air, or -1 when it is empty. */
-  private highestFilled(cells: Uint16Array): number {
+  private highestFilled(cells: Uint16Array, lighting: boolean): number {
     const { voxel } = this.palette;
     let top = -1;
     for (let index = 0; index < 4096; index += 1) {
       const cell = cells[index]!;
       if (cell === 0 || (index & 15) <= top) continue;
-      if ((cell & WATERLOGGED) !== 0 || voxel[cell & PALETTE_ID_MASK] !== VoxelKind.Air) {
+      if (
+        (cell & WATERLOGGED) !== 0 ||
+        voxel[cell & PALETTE_ID_MASK] !== VoxelKind.Air ||
+        (lighting && this.palette.emission[cell & PALETTE_ID_MASK]! > 0)
+      ) {
         top = index & 15;
       }
     }

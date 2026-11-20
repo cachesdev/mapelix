@@ -1,0 +1,64 @@
+{
+  "name": "@mapelix/viewer",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./controls": {
+      "types": "./dist/controls/index.d.ts",
+      "import": "./dist/controls/index.js"
+    },
+    "./three": {
+      "types": "./dist/three/world-viewer.d.ts",
+      "import": "./dist/three/world-viewer.js"
+    },
+    "./three/*": {
+      "types": "./dist/three/*.d.ts",
+      "import": "./dist/three/*.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "build:embed": "vite build --config vite.embed.config.ts && node scripts/embed-css.mjs",
+    "check": "tsc --noEmit --project tsconfig.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --type-aware --type-check .",
+    "pack:release": "node scripts/pack-release.mjs",
+    "quality": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
+    "test": "vitest run src",
+    "test:unit": "vitest run src",
+    "transit": "node -e \"\""
+  },
+  "dependencies": {
+    "@mapelix/core": "workspace:*",
+    "@mapelix/prototype": "workspace:*",
+    "@mapelix/scene-prototype": "workspace:*",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "@types/three": "0.186.0",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

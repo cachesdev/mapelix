@@ -1,4 +1,4 @@
-import { closeSync, fstatSync, openSync, readFileSync, readSync, readdirSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { inflateRawSync, inflateSync } from "node:zlib";
 
@@ -6,7 +6,9 @@ import {
   TABLE_BLOCK_TRAILER_SIZE,
   readTableBlock,
   visitLevelDbRecords,
+  verifyTableBlockTrailer,
 } from "@mapelix/prototype/bedrock";
+import { openLevelDbSnapshot, levelDbFileError } from "@mapelix/prototype/node/leveldb";
 
 import {
   BlockCache,
@@ -50,38 +52,62 @@ export class WorldDatabase {
 
   static open(worldDirectory: string, options: WorldDatabaseOptions = {}): WorldDatabase {
     const directory = join(worldDirectory, "db");
-    const names = readdirSync(directory).sort((left, right) => left.localeCompare(right));
+    const snapshot = openLevelDbSnapshot(worldDirectory);
     const blocks = new BlockCache(options.blockCacheBytes ?? 64 * 1024 * 1024);
     const descriptors: number[] = [];
     const tables: SeekableTable[] = [];
-    for (const name of names.filter((entry) => /\.(?:ldb|sst)$/i.test(entry))) {
-      const descriptor = openSync(join(directory, name), "r");
-      descriptors.push(descriptor);
-      const table = SeekableTable.open(
-        {
-          name,
-          size: fstatSync(descriptor).size,
-          read: (offset, size) => readAt(descriptor, offset, size),
-        },
-        blocks,
-        decodeTableBlockNatively,
-      );
-      if (table !== undefined) tables.push(table);
-    }
-
     const log: RecordVersion[] = [];
-    for (const name of names.filter((entry) => /\.log$/i.test(entry))) {
-      visitLevelDbRecords(
-        { name, bytes: readFileSync(join(directory, name)) },
-        (key, value, sequence) => {
-          log.push({
-            key: key.slice(),
-            value: value?.slice() ?? new Uint8Array(),
-            sequence,
-            deleted: value === undefined,
-          });
-        },
-      );
+    try {
+      for (const file of snapshot.files) {
+        try {
+          const descriptor = openSync(join(directory, file.name), "r");
+          descriptors.push(descriptor);
+          const details = fstatSync(descriptor);
+          if (!details.isFile() || details.size < file.size)
+            throw new Error("active file is shorter than its logical length");
+          if (file.kind === "table") {
+            const table = SeekableTable.open(
+              {
+                name: file.name,
+                size: file.size,
+                read: (offset, size) => {
+                  try {
+                    return readAt(descriptor, offset, size, file.size);
+                  } catch (cause) {
+                    throw levelDbFileError(file, cause);
+                  }
+                },
+              },
+              blocks,
+              decodeTableBlockNatively,
+            );
+            if (table !== undefined) tables.push(table);
+          } else {
+            try {
+              visitLevelDbRecords(
+                { name: file.name, bytes: readAt(descriptor, 0, file.size, file.size) },
+                (key, value, sequence) => {
+                  log.push({
+                    key: key.slice(),
+                    value: value?.slice() ?? new Uint8Array(),
+                    sequence,
+                    deleted: value === undefined,
+                  });
+                },
+                { verifyChecksums: true },
+              );
+            } finally {
+              descriptors.pop();
+              closeSync(descriptor);
+            }
+          }
+        } catch (cause) {
+          throw levelDbFileError(file, cause);
+        }
+      }
+    } catch (cause) {
+      for (const descriptor of descriptors) closeSync(descriptor);
+      throw cause;
     }
     log.sort((left, right) => compareBytes(left.key, right.key));
     return new WorldDatabase(tables, log, descriptors);
@@ -98,7 +124,13 @@ export class WorldDatabase {
       }
     };
 
-    for (const table of this.tables) table.scanPrefix(prefix, keep);
+    for (const table of this.tables) {
+      try {
+        table.scanPrefix(prefix, keep);
+      } catch (cause) {
+        throw levelDbFileError({ name: table.name, number: 0n, kind: "table" }, cause);
+      }
+    }
     for (let index = this.firstLogIndex(prefix); index < this.log.length; index += 1) {
       const version = this.log[index]!;
       if (comparePrefix(version.key, prefix) !== 0) break;
@@ -137,6 +169,7 @@ const RAW_DEFLATE = 4;
  * faster than the portable decoder. Anything unusual falls back to that decoder.
  */
 function decodeTableBlockNatively(blockWithTrailer: Uint8Array, source: string): Uint8Array {
+  verifyTableBlockTrailer(blockWithTrailer, source);
   const size = blockWithTrailer.length - TABLE_BLOCK_TRAILER_SIZE;
   const compression = blockWithTrailer[size];
   const raw = blockWithTrailer.subarray(0, size);
@@ -149,10 +182,22 @@ function decodeTableBlockNatively(blockWithTrailer: Uint8Array, source: string):
   return readTableBlock(blockWithTrailer, source);
 }
 
-function readAt(descriptor: number, offset: number, size: number): Uint8Array {
+function readAt(descriptor: number, offset: number, size: number, logicalSize: number): Uint8Array {
+  if (
+    !Number.isSafeInteger(offset) ||
+    !Number.isSafeInteger(size) ||
+    offset < 0 ||
+    size < 0 ||
+    offset + size > logicalSize
+  )
+    throw new Error("LevelDB read is outside the logical file");
   const bytes = new Uint8Array(size);
-  const read = readSync(descriptor, bytes, 0, size, offset);
-  if (read !== size) throw new Error(`Short LevelDB read: ${read} of ${size} bytes`);
+  let position = 0;
+  while (position < size) {
+    const count = readSync(descriptor, bytes, position, size - position, offset + position);
+    if (count === 0) throw new Error(`Short LevelDB read: ${position} of ${size} bytes`);
+    position += count;
+  }
   return bytes;
 }
 

@@ -12,9 +12,29 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./dimensions": {
+      "types": "./dist/dimensions.d.ts",
+      "import": "./dist/dimensions.js"
+    },
+    "./discoveries": {
+      "types": "./dist/discoveries.d.ts",
+      "import": "./dist/discoveries.js"
+    },
+    "./selection": {
+      "types": "./dist/selection.d.ts",
+      "import": "./dist/selection.js"
+    },
     "./format": {
       "types": "./dist/format.d.ts",
       "import": "./dist/format.js"
+    },
+    "./textures": {
+      "types": "./dist/textures/index.d.ts",
+      "import": "./dist/textures/index.js"
+    },
+    "./texture-format": {
+      "types": "./dist/textures/atlas-format.d.ts",
+      "import": "./dist/textures/atlas-format.js"
     }
   },
   "scripts": {
@@ -30,6 +50,7 @@
     "transit": "node -e \"\""
   },
   "dependencies": {
+    "@mapelix/core": "workspace:*",
     "@mapelix/prototype": "workspace:*"
   },
   "devDependencies": {

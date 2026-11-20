@@ -1,0 +1,370 @@
+{
+  "baseline": "f3ab898",
+  "regionFormatVersion": [
+    3,
+    4
+  ],
+  "node": "v24.14.1",
+  "workers": 0,
+  "method": "same read-only copied snapshot; alternating seven in-process builds per version, discard first two, median of five",
+  "storage": {
+    "geometryBytesPerQuad": 12,
+    "textureBytesPerQuad": 4,
+    "lightBytesPerQuad": 1,
+    "lightPlaneOmittedWhenUnlit": true,
+    "gpu": "reuse bits 27..30 of existing texture word; lit plain faces add a uint32; unlit/distant plain faces add no buffer"
+  },
+  "rows": [
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        6113,
+        6687
+      ],
+      "bytes": [
+        81588,
+        95163
+      ],
+      "lightBytes": [
+        0,
+        6687
+      ],
+      "warmMedianMs": [
+        33.91,
+        39.65
+      ],
+      "quadChangePercent": 9.4,
+      "byteChangePercent": 16.6,
+      "timeChangePercent": 16.9
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": true,
+      "quads": [
+        6113,
+        6687
+      ],
+      "bytes": [
+        106040,
+        121911
+      ],
+      "lightBytes": [
+        0,
+        6687
+      ],
+      "warmMedianMs": [
+        37.85,
+        38.11
+      ],
+      "quadChangePercent": 9.4,
+      "byteChangePercent": 15,
+      "timeChangePercent": 0.7
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        11021,
+        12033
+      ],
+      "bytes": [
+        140484,
+        164661
+      ],
+      "lightBytes": [
+        0,
+        12033
+      ],
+      "warmMedianMs": [
+        38.05,
+        45.04
+      ],
+      "quadChangePercent": 9.2,
+      "byteChangePercent": 17.2,
+      "timeChangePercent": 18.4
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": true,
+      "quads": [
+        11077,
+        12156
+      ],
+      "bytes": [
+        185464,
+        214884
+      ],
+      "lightBytes": [
+        0,
+        12156
+      ],
+      "warmMedianMs": [
+        39.56,
+        43
+      ],
+      "quadChangePercent": 9.7,
+      "byteChangePercent": 15.9,
+      "timeChangePercent": 8.7
+    },
+    {
+      "dimension": "overworld",
+      "level": 1,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        29349,
+        31123
+      ],
+      "bytes": [
+        384996,
+        437407
+      ],
+      "lightBytes": [
+        0,
+        31123
+      ],
+      "warmMedianMs": [
+        214.23,
+        245.32
+      ],
+      "quadChangePercent": 6,
+      "byteChangePercent": 13.6,
+      "timeChangePercent": 14.5
+    },
+    {
+      "dimension": "nether",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        8259,
+        10143
+      ],
+      "bytes": [
+        107340,
+        140091
+      ],
+      "lightBytes": [
+        0,
+        10143
+      ],
+      "warmMedianMs": [
+        44.62,
+        54.59
+      ],
+      "quadChangePercent": 22.8,
+      "byteChangePercent": 30.5,
+      "timeChangePercent": 22.3
+    },
+    {
+      "dimension": "nether",
+      "level": 0,
+      "x": 0,
+      "z": 0,
+      "textured": true,
+      "quads": [
+        8277,
+        10159
+      ],
+      "bytes": [
+        140664,
+        180935
+      ],
+      "lightBytes": [
+        0,
+        10159
+      ],
+      "warmMedianMs": [
+        45.4,
+        55.16
+      ],
+      "quadChangePercent": 22.7,
+      "byteChangePercent": 28.6,
+      "timeChangePercent": 21.5
+    },
+    {
+      "dimension": "nether",
+      "level": 1,
+      "x": 0,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        21053,
+        27877
+      ],
+      "bytes": [
+        285444,
+        395209
+      ],
+      "lightBytes": [
+        0,
+        27877
+      ],
+      "warmMedianMs": [
+        152.92,
+        186.9
+      ],
+      "quadChangePercent": 32.4,
+      "byteChangePercent": 38.5,
+      "timeChangePercent": 22.2
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "mode": "caves",
+      "minY": -32,
+      "maxY": 0,
+      "quads": [
+        7020,
+        9090
+      ],
+      "bytes": [
+        92472,
+        126402
+      ],
+      "lightBytes": [
+        0,
+        9090
+      ],
+      "warmMedianMs": [
+        40.86,
+        47.35
+      ],
+      "quadChangePercent": 29.5,
+      "byteChangePercent": 36.7,
+      "timeChangePercent": 15.9
+    },
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "x": -1,
+      "z": 0,
+      "textured": true,
+      "mode": "caves",
+      "minY": -32,
+      "maxY": 0,
+      "quads": [
+        7020,
+        9090
+      ],
+      "bytes": [
+        120552,
+        162762
+      ],
+      "lightBytes": [
+        0,
+        9090
+      ],
+      "warmMedianMs": [
+        38.97,
+        43.33
+      ],
+      "quadChangePercent": 29.5,
+      "byteChangePercent": 35,
+      "timeChangePercent": 11.2
+    },
+    {
+      "dimension": "overworld",
+      "level": 2,
+      "x": -1,
+      "z": 0,
+      "textured": false,
+      "quads": [
+        46115,
+        46115
+      ],
+      "bytes": [
+        586188,
+        586188
+      ],
+      "lightBytes": [
+        0,
+        0
+      ],
+      "warmMedianMs": [
+        288.88,
+        292.21
+      ],
+      "quadChangePercent": 0,
+      "byteChangePercent": 0,
+      "timeChangePercent": 1.2
+    }
+  ],
+  "desktop": {
+    "method": "same Overworld view and settings, Edge headless, 1200x800, DPR 1; three one-second FPS windows after streaming settled",
+    "view": {
+      "x": -30,
+      "y": 69,
+      "z": 20,
+      "distance": 71.48356401698526,
+      "heading": 0,
+      "pitch": 1.5307963267948965
+    },
+    "limitation": "results cluster near 144 FPS; not a stress test or a physical-phone measurement",
+    "phone": "pending physical-device access",
+    "rows": [
+      {
+        "textured": false,
+        "backend": "WebGPU",
+        "medianFps": [
+          143.98560143964147,
+          143.9712057594917
+        ],
+        "streamedGpuMiB": [
+          8.781852722167969,
+          11.242935180664062
+        ],
+        "gpuErrors": []
+      },
+      {
+        "textured": true,
+        "backend": "WebGPU",
+        "medianFps": [
+          143.98560144071416,
+          143.97120575841925
+        ],
+        "streamedGpuMiB": [
+          11.531658172607422,
+          14.159809112548828
+        ],
+        "gpuErrors": []
+      }
+    ]
+  },
+  "validation": {
+    "targetedUnitTests": 82,
+    "targetedBrowserTests": 5,
+    "checks": [
+      "engine/viewer builds",
+      "engine/viewer TypeScript checks",
+      "changed-source typed lint",
+      "targeted formatting",
+      "night demos in plain/textured modes"
+    ],
+    "existingLintWarnings": 7,
+    "browserCases": [
+      "light pixels in both modes on automatic WebGPU and forced WebGL 2",
+      "models and animated lava",
+      "rain, lightning, wet ground and dimension suspension",
+      "weather controls"
+    ]
+  }
+}

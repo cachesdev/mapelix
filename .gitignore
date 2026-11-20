@@ -3,8 +3,11 @@ node_modules/
 .svelte-kit/
 build/
 dist/
+dist-embed/
 coverage/
 playwright-report/
 test-results/
 generated-tiles/
 .local/
+mapelix-start.json
+mapelix-data/

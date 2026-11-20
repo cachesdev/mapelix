@@ -173,6 +173,14 @@ function compareUserKey(internalKey: Uint8Array, prefix: Uint8Array): number {
 }
 
 function readHandle(file: TableFile, handle: BlockHandle, decode: DecodeTableBlock): Uint8Array {
+  if (
+    !Number.isSafeInteger(handle.offset) ||
+    !Number.isSafeInteger(handle.size) ||
+    handle.offset < 0 ||
+    handle.size < 0 ||
+    handle.offset + handle.size + TABLE_BLOCK_TRAILER_SIZE > file.size - TABLE_FOOTER_SIZE
+  )
+    throw new Error(`${file.name}: LevelDB block handle is outside the table`);
   return decode(file.read(handle.offset, handle.size + TABLE_BLOCK_TRAILER_SIZE), file.name);
 }
 

@@ -3,6 +3,35 @@ import { describe, expect, it } from "vitest";
 import { canonicalBiomeId, legacyBiomeStyle } from "./biome-style.js";
 
 describe("legacyBiomeStyle", () => {
+  it.each([
+    [48, 21, [20, 162, 197]],
+    [49, 22, [27, 158, 216]],
+  ] as const)(
+    "uses jungle climate and explicit client water for bamboo biome %i",
+    (id, jungle, rgb) => {
+      const profile = legacyBiomeStyle(id);
+      expect(profile.groundGrass).toEqual(legacyBiomeStyle(jungle).groundGrass);
+      expect(profile.foliage).toEqual(legacyBiomeStyle(jungle).foliage);
+      expect([profile.water.red, profile.water.green, profile.water.blue]).toEqual(rgb);
+    },
+  );
+
+  it("uses the pale garden's explicit desaturated grass, foliage and water", () => {
+    expect(legacyBiomeStyle(193)).toMatchObject({
+      groundGrass: { red: 104, green: 114, blue: 100 },
+      foliage: { red: 76, green: 79, blue: 66 },
+      water: { red: 118, green: 136, blue: 157 },
+    });
+  });
+
+  it("assigns registry-only ice caves an explicit frozen-family fallback", () => {
+    expect(legacyBiomeStyle(196)).toEqual(legacyBiomeStyle(12));
+  });
+
+  it("retains neutral tints for dimension-specific Nether and End atmospheres", () => {
+    expect(legacyBiomeStyle(8)).toEqual(legacyBiomeStyle(9999));
+    expect(legacyBiomeStyle(9)).toEqual(legacyBiomeStyle(9999));
+  });
   it("matches the published classic plains colors", () => {
     expect(legacyBiomeStyle(1)).toMatchObject({
       groundGrass: { red: 127, green: 166, blue: 78 },
@@ -55,6 +84,25 @@ describe("legacyBiomeStyle", () => {
       groundGrass: { red: 159, green: 192, blue: 85 },
       foliage: { red: 102, green: 123, blue: 54 },
       water: { red: 25, green: 107, blue: 229 },
+    });
+  });
+
+  it("uses explicit dappled-forest grass, foliage and water from the client biome", () => {
+    expect(canonicalBiomeId(195)).toBe(195);
+    expect(legacyBiomeStyle(195)).toMatchObject({
+      groundGrass: { red: 195, green: 91, blue: 34 },
+      grass: { red: 195, green: 91, blue: 34 },
+      foliage: { red: 129, green: 80, blue: 27 },
+      water: { red: 55, green: 81, blue: 84 },
+    });
+  });
+
+  it("uses sulfur-cave grass and water without inventing an unspecified foliage override", () => {
+    expect(canonicalBiomeId(194)).toBe(194);
+    expect(legacyBiomeStyle(194)).toMatchObject({
+      grass: { red: 150, green: 145, blue: 69 },
+      foliage: { red: 63, green: 94, blue: 43 },
+      water: { red: 52, green: 191, blue: 137 },
     });
   });
 });

@@ -1,0 +1,817 @@
+{
+  "validation": {
+    "legacyPrototypeTests": 145,
+    "engineTests": 69,
+    "viewerUnitTests": 6,
+    "browserCases": 8,
+    "committedVisualScenes": 10,
+    "focusedQualityPassed": true,
+    "rootTypeLintUnitPassed": true,
+    "rootQualityLimitation": "Pre-existing CRLF formatting in untouched 2D visual-check package"
+  },
+  "date": "2026-11-12",
+  "base": "da1c879",
+  "branch": "feature/native-dimensions",
+  "node": "v24.14.1",
+  "pnpm": "11.21.0",
+  "platform": "Windows",
+  "snapshot": {
+    "databaseFileCount": 13,
+    "databaseBytes": 15457500,
+    "levelDatSha256": "7a66069b5809550189730bd9692c6906cb2869c99cccf8e6f6ae40c1d4d824a6",
+    "databaseMetadataSha256": "3f23272665ff7dbba3f235ee7cd928d2ab62361074a78519b4c92d2a72f0eb09",
+    "unchangedAfterValidation": true,
+    "availableDimensions": [
+      "overworld",
+      "nether"
+    ]
+  },
+  "overworldPairedFinal": {
+    "node": "v24.14.1",
+    "workers": 1,
+    "warmup": 3,
+    "samples": 10,
+    "alternating": true,
+    "rows": [
+      {
+        "level": 0,
+        "baseline": [
+          85.34,
+          46.98,
+          33.41,
+          35.28,
+          33.91,
+          32.42,
+          31.68,
+          29.93,
+          29.53,
+          32.34,
+          30.2,
+          31.32,
+          32.16
+        ],
+        "candidate": [
+          89.55,
+          50.74,
+          32.09,
+          33.63,
+          37.04,
+          32.8,
+          31.86,
+          31.72,
+          31.85,
+          30.92,
+          30.25,
+          30.18,
+          32.68
+        ],
+        "warmMedians": [
+          31.919999999999998,
+          31.855
+        ],
+        "changePercent": -0.2036340852130225,
+        "hashes": [
+          "6f3da76902594d1f941330745261041f560a23c8384f6bfc0d1b0ae925d572d3",
+          "59134504b6486529dcef0b36aa90c9453d48f8bdbd7dddd26b395a33d6ac5d41"
+        ]
+      },
+      {
+        "level": 1,
+        "baseline": [
+          264.89,
+          211.58,
+          208.69,
+          209.43,
+          215.13,
+          190.1,
+          186.29,
+          192.53,
+          190.38,
+          186.55,
+          191.3,
+          182.18,
+          186.75
+        ],
+        "candidate": [
+          256.52,
+          206.88,
+          210.42,
+          213.42,
+          208.06,
+          205.8,
+          200.22,
+          205.19,
+          202.39,
+          196.62,
+          205.46,
+          202.11,
+          198.64
+        ],
+        "warmMedians": [
+          190.24,
+          203.79
+        ],
+        "changePercent": 7.122582001682076,
+        "hashes": [
+          "5608ba1dbbee30a02e7b728ce84a3928a85738a5a9f35dd0fca1ff4a226db3c9",
+          "71bb512b6536b6400650ecf2eaeb9806db40c8af593ba7058ccc9d4d74ceedb9"
+        ]
+      },
+      {
+        "level": 3,
+        "baseline": [
+          587.42,
+          637.32,
+          500.26,
+          492.58,
+          489.98,
+          491.74,
+          516.24,
+          521.8,
+          517.07,
+          547.61,
+          509.91,
+          510.89,
+          505.37
+        ],
+        "candidate": [
+          566.07,
+          528.19,
+          535.02,
+          499.72,
+          507.19,
+          493.68,
+          517.03,
+          538.4,
+          521.34,
+          551.72,
+          514.01,
+          520.65,
+          507.81
+        ],
+        "warmMedians": [
+          510.4,
+          515.52
+        ],
+        "changePercent": 1.0031347962382364,
+        "hashes": [
+          "730695f907e2b9d4e0f1460cfc1ec1f25b48be2e46c2e7d004224788032e5563",
+          "54b6ea62383caab529cb8e89ad95440d2f149e28d5a846427eacb349c21691a1"
+        ]
+      },
+      {
+        "level": 5,
+        "baseline": [
+          580.67,
+          533.8,
+          536.46,
+          542.05,
+          550.43,
+          575.54,
+          575.85,
+          563.45,
+          569.89,
+          660.68,
+          628.22,
+          568.92,
+          570.98
+        ],
+        "candidate": [
+          570.35,
+          535.61,
+          526.1,
+          529.17,
+          581.89,
+          578.64,
+          561.03,
+          561.12,
+          578.73,
+          555.92,
+          634.93,
+          577.73,
+          576.2
+        ],
+        "warmMedians": [
+          570.435,
+          576.965
+        ],
+        "changePercent": 1.1447404174007803,
+        "hashes": [
+          "a1d4f301442a404b544669b2cf2f1c5b291e47df3006d1228f6868dc63e9d653",
+          "6d6a2e4bf96acee9921087d09bb4f6c6b539b45b6a8d151ad1038b2eb2647cd0"
+        ]
+      }
+    ]
+  },
+  "dimensionOnlyOverworldPaired": {
+    "node": "v24.14.1",
+    "workers": 1,
+    "warmup": 3,
+    "samples": 10,
+    "alternating": true,
+    "rows": [
+      {
+        "level": 0,
+        "baseline": [
+          114.26,
+          65.75,
+          53.69,
+          35.14,
+          33.49,
+          39.25,
+          37.77,
+          32.49,
+          32.56,
+          32.58,
+          29.57,
+          30.71,
+          31.6
+        ],
+        "candidate": [
+          105.06,
+          66.98,
+          36.94,
+          37.22,
+          38.26,
+          42.73,
+          34.21,
+          35.01,
+          33.81,
+          31.13,
+          31.84,
+          31.87,
+          31.7
+        ],
+        "warmMedians": [
+          32.57,
+          34.010000000000005
+        ],
+        "changePercent": 4.421246545901147,
+        "hashes": [
+          "6f3da76902594d1f941330745261041f560a23c8384f6bfc0d1b0ae925d572d3",
+          "6f3da76902594d1f941330745261041f560a23c8384f6bfc0d1b0ae925d572d3"
+        ]
+      },
+      {
+        "level": 1,
+        "baseline": [
+          267.36,
+          214.27,
+          209.93,
+          206.25,
+          205.66,
+          212.46,
+          204.47,
+          200.39,
+          206.03,
+          194.85,
+          191,
+          182.52,
+          196.05
+        ],
+        "candidate": [
+          269.83,
+          216.79,
+          202.23,
+          196.12,
+          198.25,
+          192.6,
+          196.89,
+          195.47,
+          221.71,
+          186.94,
+          188.87,
+          189.43,
+          192.83
+        ],
+        "warmMedians": [
+          202.43,
+          194.15
+        ],
+        "changePercent": -4.090302820728153,
+        "hashes": [
+          "5608ba1dbbee30a02e7b728ce84a3928a85738a5a9f35dd0fca1ff4a226db3c9",
+          "5608ba1dbbee30a02e7b728ce84a3928a85738a5a9f35dd0fca1ff4a226db3c9"
+        ]
+      },
+      {
+        "level": 3,
+        "baseline": [
+          567.14,
+          503.44,
+          483.35,
+          487.92,
+          490.43,
+          481.22,
+          516.33,
+          519.95,
+          523.36,
+          519.84,
+          515.18,
+          522.56,
+          518.96
+        ],
+        "candidate": [
+          605.75,
+          506.32,
+          483.73,
+          498.06,
+          482.2,
+          492.1,
+          523.15,
+          529.58,
+          505.99,
+          506.57,
+          516.94,
+          566.55,
+          511.3
+        ],
+        "warmMedians": [
+          517.645,
+          508.935
+        ],
+        "changePercent": -1.682620328603579,
+        "hashes": [
+          "730695f907e2b9d4e0f1460cfc1ec1f25b48be2e46c2e7d004224788032e5563",
+          "730695f907e2b9d4e0f1460cfc1ec1f25b48be2e46c2e7d004224788032e5563"
+        ]
+      },
+      {
+        "level": 5,
+        "baseline": [
+          688.03,
+          577.51,
+          608.35,
+          665.57,
+          625.81,
+          729.94,
+          645.69,
+          715.8,
+          588.03,
+          613.52,
+          577.06,
+          633.85,
+          645.75
+        ],
+        "candidate": [
+          631.95,
+          569.14,
+          661.43,
+          706.54,
+          627.28,
+          699.88,
+          642.53,
+          664.17,
+          657.21,
+          775.56,
+          568.47,
+          587.72,
+          620.53
+        ],
+        "warmMedians": [
+          639.77,
+          649.87
+        ],
+        "changePercent": 1.5786923425606059,
+        "hashes": [
+          "a1d4f301442a404b544669b2cf2f1c5b291e47df3006d1228f6868dc63e9d653",
+          "a1d4f301442a404b544669b2cf2f1c5b291e47df3006d1228f6868dc63e9d653"
+        ]
+      }
+    ]
+  },
+  "realRegionBaseline": {
+    "node": "v24.14.1",
+    "workers": 1,
+    "baseline": true,
+    "rows": [
+      {
+        "dimension": "overworld",
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.7098000000000013,
+        "times": [
+          90.65,
+          50.44,
+          31.99,
+          34.3,
+          33.43,
+          31.68,
+          31.23
+        ],
+        "sha256": "6f3da76902594d1f941330745261041f560a23c8384f6bfc0d1b0ae925d572d3",
+        "bytes": 71616,
+        "quads": 5282,
+        "minY": 64,
+        "maxY": 97
+      },
+      {
+        "dimension": "overworld",
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.7098000000000013,
+        "times": [
+          262.35,
+          210.25,
+          208.32,
+          206.06,
+          200.39,
+          202.86,
+          202.06
+        ],
+        "sha256": "5608ba1dbbee30a02e7b728ce84a3928a85738a5a9f35dd0fca1ff4a226db3c9",
+        "bytes": 384240,
+        "quads": 29286,
+        "minY": 18,
+        "maxY": 97
+      },
+      {
+        "dimension": "overworld",
+        "level": 3,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.7098000000000013,
+        "times": [
+          574.62,
+          499.32,
+          533.48,
+          544.21,
+          531.87,
+          528,
+          561.88
+        ],
+        "sha256": "730695f907e2b9d4e0f1460cfc1ec1f25b48be2e46c2e7d004224788032e5563",
+        "bytes": 413424,
+        "quads": 31718,
+        "minY": 0,
+        "maxY": 140
+      },
+      {
+        "dimension": "overworld",
+        "level": 5,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.7098000000000013,
+        "times": [
+          647.65,
+          592.57,
+          583.76,
+          592.95,
+          611.97,
+          627.69,
+          650.23
+        ],
+        "sha256": "a1d4f301442a404b544669b2cf2f1c5b291e47df3006d1228f6868dc63e9d653",
+        "bytes": 55140,
+        "quads": 1861,
+        "minY": 0,
+        "maxY": 144
+      },
+      {
+        "dimension": "nether",
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.2014999999992142,
+        "times": [
+          67.2,
+          44.35,
+          25.3,
+          20.92,
+          21.71,
+          20.63,
+          20.44
+        ],
+        "sha256": "ef9e97d90fd6f462079527e5c340cd90c572fa5d0ddd57b746ff7cf853e42c8a",
+        "bytes": 8244,
+        "quads": 1,
+        "minY": 127,
+        "maxY": 128
+      },
+      {
+        "dimension": "nether",
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.2014999999992142,
+        "times": [
+          226.86,
+          178.15,
+          188.01,
+          173.97,
+          179.21,
+          183.79,
+          160.12
+        ],
+        "sha256": "dac8750ef7a175572a48bd1d1dc7647275aa73843eadff26964336988969ade9",
+        "bytes": 226692,
+        "quads": 16157,
+        "minY": 94,
+        "maxY": 128
+      },
+      {
+        "dimension": "nether",
+        "level": 3,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.2014999999992142,
+        "times": [
+          164.98,
+          100.81,
+          77.28,
+          75.98,
+          74.19,
+          71.47,
+          70.71
+        ],
+        "sha256": "a4318cb3d1f86c837607a1ee4b3f133f951bedce74bb6ae85ec2574f000ca5f6",
+        "bytes": 83592,
+        "quads": 4232,
+        "minY": 92,
+        "maxY": 128
+      },
+      {
+        "dimension": "nether",
+        "level": 5,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.2014999999992142,
+        "times": [
+          115.25,
+          108.06,
+          102.5,
+          108.95,
+          128.08,
+          104.5,
+          107.89
+        ],
+        "sha256": "53e67074855854fc3869e25a0b06e57edecd5aff7d1d7e9b68893a7ad477191b",
+        "bytes": 36588,
+        "quads": 315,
+        "minY": 96,
+        "maxY": 128
+      }
+    ],
+    "rss": 155275264,
+    "peakRss": 254924
+  },
+  "realRegionDimensionsBeforeFoliageFix": {
+    "node": "v24.14.1",
+    "workers": 1,
+    "baseline": false,
+    "rows": [
+      {
+        "dimension": "overworld",
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.825899999999997,
+        "times": [
+          88.56,
+          50.84,
+          35.59,
+          32.77,
+          34.9,
+          35.87,
+          31.89
+        ],
+        "sha256": "6f3da76902594d1f941330745261041f560a23c8384f6bfc0d1b0ae925d572d3",
+        "bytes": 71616,
+        "quads": 5282,
+        "minY": 64,
+        "maxY": 97
+      },
+      {
+        "dimension": "overworld",
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.825899999999997,
+        "times": [
+          296.25,
+          250.31,
+          240.24,
+          204,
+          200,
+          202.81,
+          199.24
+        ],
+        "sha256": "5608ba1dbbee30a02e7b728ce84a3928a85738a5a9f35dd0fca1ff4a226db3c9",
+        "bytes": 384240,
+        "quads": 29286,
+        "minY": 18,
+        "maxY": 97
+      },
+      {
+        "dimension": "overworld",
+        "level": 3,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.825899999999997,
+        "times": [
+          595.07,
+          529,
+          573.68,
+          552.2,
+          539.7,
+          563.39,
+          571.12
+        ],
+        "sha256": "730695f907e2b9d4e0f1460cfc1ec1f25b48be2e46c2e7d004224788032e5563",
+        "bytes": 413424,
+        "quads": 31718,
+        "minY": 0,
+        "maxY": 140
+      },
+      {
+        "dimension": "overworld",
+        "level": 5,
+        "x": -1,
+        "z": 0,
+        "openMs": 3.825899999999997,
+        "times": [
+          654.16,
+          609.85,
+          597.88,
+          559.92,
+          600.39,
+          577.52,
+          593.9
+        ],
+        "sha256": "a1d4f301442a404b544669b2cf2f1c5b291e47df3006d1228f6868dc63e9d653",
+        "bytes": 55140,
+        "quads": 1861,
+        "minY": 0,
+        "maxY": 144
+      },
+      {
+        "dimension": "nether",
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.1871999999984837,
+        "times": [
+          90.8,
+          58.39,
+          43.7,
+          45.57,
+          55.38,
+          43.35,
+          43.18
+        ],
+        "sha256": "93f6a941c45a650b5a7554ab70ebdaa69e474f6aa1d62ff83c9364b669f4db75",
+        "bytes": 136308,
+        "quads": 10673,
+        "minY": 0,
+        "maxY": 96
+      },
+      {
+        "dimension": "nether",
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.1871999999984837,
+        "times": [
+          256.74,
+          197.32,
+          192.14,
+          199.21,
+          190.44,
+          183.79,
+          191.86
+        ],
+        "sha256": "cd92f46cff387b2456a1e66dc65bf9f19c06f65bd851dd069c733cf14e9b6c0a",
+        "bytes": 667464,
+        "quads": 52888,
+        "minY": 0,
+        "maxY": 96
+      },
+      {
+        "dimension": "nether",
+        "level": 3,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.1871999999984837,
+        "times": [
+          206.54,
+          152.86,
+          147.27,
+          146.44,
+          149.48,
+          147.63,
+          172.95
+        ],
+        "sha256": "302307aac2f6fa1c853d7173fc25a4874ba0f8ff98536d62bba16d52ee80021c",
+        "bytes": 202572,
+        "quads": 14147,
+        "minY": 0,
+        "maxY": 96
+      },
+      {
+        "dimension": "nether",
+        "level": 5,
+        "x": -1,
+        "z": 0,
+        "openMs": 1.1871999999984837,
+        "times": [
+          227.36,
+          199.76,
+          181.3,
+          198.59,
+          189.67,
+          192.08,
+          219.2
+        ],
+        "sha256": "bece6b8af69c31b44f8b288b56a38d78902e884285a1c02e859aec5f862851e2",
+        "bytes": 45420,
+        "quads": 1051,
+        "minY": 0,
+        "maxY": 96
+      }
+    ],
+    "rss": 174800896,
+    "peakRss": 249200
+  },
+  "browserOverworldBeforeFoliageFix": [
+    {
+      "name": "baseline",
+      "metrics": {
+        "Renderer": "WebGPU",
+        "Frame rate": "144 fps",
+        "Regions drawn": "89",
+        "Regions cached": "362",
+        "Quads drawn": "1.43 M",
+        "Loading": "0 of 0",
+        "Quad memory": "16.3 MiB",
+        "Camera distance": "160 blocks"
+      },
+      "errors": [],
+      "frameTimingMs": {
+        "median": 6.900000000000546,
+        "mean": 6.945251396648044,
+        "p95": 7
+      }
+    },
+    {
+      "name": "candidate",
+      "metrics": {
+        "Renderer": "WebGPU",
+        "Frame rate": "144 fps",
+        "Regions drawn": "89",
+        "Regions cached": "362",
+        "Quads drawn": "1.43 M",
+        "Loading": "0 of 0",
+        "Quad memory": "16.3 MiB",
+        "Camera distance": "160 blocks"
+      },
+      "errors": [],
+      "frameTimingMs": {
+        "median": 6.900000000001455,
+        "mean": 6.946368715083797,
+        "p95": 7
+      }
+    }
+  ],
+  "rasterBeforeFoliageFix": {
+    "mean_absolute_rgb_error": 0.3446180555555556,
+    "pixels_equal_percent": 91.28854166666666,
+    "pixels_within_5_percent": 97.7225,
+    "pixels_within_16_percent": 99.1565625
+  },
+  "realNetherCapture": {
+    "status": " All nearby terrain loaded",
+    "errors": [],
+    "metrics": {
+      "Renderer": "WebGPU",
+      "Frame rate": "144 fps",
+      "Regions drawn": "48",
+      "Regions cached": "389",
+      "Quads drawn": "0.72 M",
+      "Loading": "0 of 0",
+      "Quad memory": "8.3 MiB",
+      "Camera distance": "160 blocks"
+    }
+  },
+  "realFoliageCapture": {
+    "status": " All nearby terrain loaded",
+    "errors": [],
+    "metrics": {
+      "Renderer": "WebGPU",
+      "Frame rate": "144 fps",
+      "Regions drawn": "85",
+      "Regions cached": "413",
+      "Quads drawn": "1.36 M",
+      "Loading": "0 of 0",
+      "Quad memory": "15.6 MiB",
+      "Camera distance": "170 blocks"
+    }
+  },
+  "mojangFixtureSha256": "9f102af4e5ba617820c8da723956745450b4ebf7c31d676d8db038038367b35b",
+  "notes": [
+    "Browser timing is display-limited and is not an uncapped GPU benchmark.",
+    "Poplar and pale oak colors are intentional appearance corrections; do not expect the supplied world to remain byte-identical to main.",
+    "No real End terrain was available; End island geometry is tested using generated LevelDB records."
+  ]
+}

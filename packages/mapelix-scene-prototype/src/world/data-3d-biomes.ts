@@ -1,6 +1,4 @@
 const HEIGHTMAP_BYTES = 512;
-const SECTION_COUNT = 24;
-const LOWEST_SECTION = -4;
 const BIOMES_PER_SECTION = 4096;
 /** A storage header that repeats the storage of the subchunk below. */
 const REPEAT_BELOW = 0xff;
@@ -9,7 +7,7 @@ const REPEAT_BELOW = 0xff;
  * Biome lookups read straight from a Data3D record, without unpacking it.
  *
  * The record holds a 512-byte heightmap, then one biome storage per subchunk from
- * y = -64 upward. Each storage is a header byte, packed palette indexes, and a
+ * the dimension's minimum y upward. Each storage is a header byte, packed palette indexes, and a
  * palette of biome ids. Surface scans need only a few voxels per chunk, so each
  * lookup reads one packed word and one palette entry.
  */
@@ -17,11 +15,15 @@ export class Data3DBiomes {
   private readonly view: DataView;
   /** Byte offset of each subchunk's storage, from the bottom of the world up. */
   private readonly offsets: number[] = [];
+  private readonly minY: number;
+  private readonly maxY: number;
 
-  constructor(value: Uint8Array) {
+  constructor(value: Uint8Array, minY = -64, maxY = 320) {
+    this.minY = minY;
+    this.maxY = maxY;
     this.view = new DataView(value.buffer, value.byteOffset, value.byteLength);
     let offset = HEIGHTMAP_BYTES;
-    while (offset < value.byteLength && this.offsets.length < SECTION_COUNT) {
+    while (offset < value.byteLength && this.offsets.length < (maxY - minY) / 16) {
       const header = value[offset]!;
       if (header === REPEAT_BELOW) {
         const below = this.offsets.at(-1);
@@ -38,7 +40,8 @@ export class Data3DBiomes {
   }
 
   at(localX: number, y: number, localZ: number): number | undefined {
-    const offset = this.offsets[Math.floor(y / 16) - LOWEST_SECTION];
+    if (y < this.minY || y >= this.maxY) return undefined;
+    const offset = this.offsets[Math.floor((y - this.minY) / 16)];
     if (offset === undefined) return undefined;
     const bits = this.view.getUint8(offset) >>> 1;
     // A storage with zero bits holds a single biome and no length.

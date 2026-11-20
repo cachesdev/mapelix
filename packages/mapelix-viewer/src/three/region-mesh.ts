@@ -1,0 +1,263 @@
+import {
+  QuadMaterial,
+  unpackQuad,
+  isLavaQuad,
+  type DecodedSceneRegion,
+} from "@mapelix/scene-prototype/format";
+import { QUAD_BLOCK_LIGHT_SHIFT } from "@mapelix/scene-prototype/texture-format";
+import {
+  Box3,
+  BufferAttribute,
+  Group,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
+  Sphere,
+  Vector2,
+  Vector3,
+} from "three/webgpu";
+
+import { QuadCollider } from "./quad-collider";
+import { RENDER_ORDER } from "./render-order";
+import type { MaterialPair, SceneMaterials } from "./shaders/materials";
+
+// Every quad instance reuses one unit square. The shader turns its corners into the face.
+const corners = new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]), 3);
+const normals = new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]), 3);
+const triangles = new BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1);
+
+interface Layer {
+  readonly mesh: Mesh;
+  readonly materials: MaterialPair;
+}
+
+/** Renderer-owned, bounded shell reuse. Old region arrays and geometry buffers are released. */
+export class RegionMeshPool {
+  // Renderer state is cached by mesh/material. Its vertex layout must survive reuse;
+  // plain unlit geometry lacks the texture/light buffer that lit geometry requires.
+  private readonly pools = new Map<MaterialPair, [Mesh[], Mesh[]]>();
+  constructor(private readonly capacity = 64) {}
+
+  acquire(materials: MaterialPair, geometry: InstancedBufferGeometry): Mesh {
+    const layout = geometry.hasAttribute("texture") ? 1 : 0;
+    const mesh = this.pools.get(materials)?.[layout].pop();
+    if (mesh === undefined) return new Mesh(geometry, materials.steady);
+    mesh.geometry = geometry;
+    mesh.material = materials.steady;
+    return mesh;
+  }
+
+  release(mesh: Mesh, materials: MaterialPair): void {
+    const layout = mesh.geometry.hasAttribute("texture") ? 1 : 0;
+    mesh.geometry.dispose();
+    // A disposed geometry can still retain its typed array through a cached render object.
+    for (const name of ["quad", "texture"]) {
+      const attribute = mesh.geometry.getAttribute(name) as InstancedBufferAttribute | undefined;
+      if (attribute !== undefined) attribute.array = new Uint32Array(0);
+    }
+
+    let pool = this.pools.get(materials);
+    if (pool === undefined) {
+      pool = [[], []];
+      this.pools.set(materials, pool);
+    }
+    if (pool[0].length + pool[1].length < this.capacity) pool[layout].push(mesh);
+    else mesh.dispose();
+  }
+
+  get retained(): number {
+    let count = 0;
+    for (const pool of this.pools.values()) count += pool[0].length + pool[1].length;
+    return count;
+  }
+
+  dispose(): void {
+    for (const pool of this.pools.values())
+      for (const layout of pool) for (const mesh of layout) mesh.dispose();
+    this.pools.clear();
+  }
+}
+
+/** One streamed region: shared terrain, lava, plants, water and glass materials. */
+export class RegionMesh {
+  readonly region: DecodedSceneRegion;
+  readonly group = new Group();
+  /** GPU bytes held by the quad buffers, for the streaming memory budget. */
+  readonly byteLength: number;
+  /** Actual geometry count, independent of texture and light buffer sizes. */
+  readonly quadCount: number;
+  /** The screen noise range this region draws while fading. See `SceneMaterials`. */
+  private readonly fade = new Vector2(0, 1);
+  private readonly layers: Layer[] = [];
+  private quadCollider: QuadCollider | undefined;
+  private readonly pool: RegionMeshPool | undefined;
+
+  constructor(region: DecodedSceneRegion, materials: SceneMaterials, pool?: RegionMeshPool) {
+    this.region = region;
+    this.pool = pool;
+    this.quadCount = (region.opaque.length + region.plants.length + region.translucent.length) / 3;
+    // Quads count in cells, and cells are cubes, so one scale places every axis.
+    this.group.position.set(region.originX, 0, region.originZ);
+    this.group.scale.setScalar(region.cellSize);
+    this.group.matrixAutoUpdate = false;
+    this.group.updateMatrix();
+
+    const low = region.minY / region.cellSize;
+    const high = Math.max(region.maxY, region.minY + 1) / region.cellSize;
+    const bounds = new Box3(
+      new Vector3(0, low, 0),
+      new Vector3(region.gridSize, high, region.gridSize),
+    );
+    const lavaStart = firstLavaQuad(region.opaque);
+    // Textured regions add one texture word per quad, read by the textured terrain and plants.
+    const textures = region.textures;
+    this.add(region.opaque.subarray(0, lavaStart), materials.terrain, bounds, {
+      castShadow: true,
+      renderOrder: RENDER_ORDER.terrain,
+      textures: textures?.opaque.subarray(0, lavaStart / 3),
+      blockLight: region.blockLight?.opaque.subarray(0, lavaStart / 3),
+    });
+    this.add(region.opaque.subarray(lavaStart), materials.lava, bounds, {
+      castShadow: true,
+      renderOrder: RENDER_ORDER.terrain,
+    });
+    // Grass and flowers do not cast shadows in Minecraft, and skipping them keeps shadows cheap.
+    this.add(region.plants, materials.plants, bounds, {
+      castShadow: false,
+      renderOrder: RENDER_ORDER.plants,
+      textures: textures?.plants,
+      blockLight: region.blockLight?.plants,
+    });
+    const { water, glass, waterLight, glassLight } = splitGlass(
+      region.translucent,
+      region.blockLight?.translucent,
+    );
+    this.add(water, materials.water, bounds, {
+      castShadow: false,
+      renderOrder: RENDER_ORDER.water,
+      blockLight: waterLight,
+    });
+    // Glass draws after all water, so the water behind it shows through.
+    this.add(glass, materials.glass, bounds, {
+      castShadow: false,
+      renderOrder: RENDER_ORDER.glass,
+      blockLight: glassLight,
+    });
+    this.byteLength = this.layers.reduce(
+      (bytes, { mesh }) =>
+        bytes +
+        mesh.geometry.getAttribute("quad").array.byteLength +
+        (mesh.geometry.getAttribute("texture")?.array.byteLength ?? 0),
+      0,
+    );
+  }
+
+  get isEmpty(): boolean {
+    return this.layers.length === 0;
+  }
+
+  /** Ray tests against this region's quads, built the first time a ray reaches the region. */
+  get collider(): QuadCollider {
+    this.quadCollider ??= new QuadCollider(this.region);
+    return this.quadCollider;
+  }
+
+  /** Draws only the part of the screen noise from `low` to `high`, or everything when unset. */
+  setFade(range?: { readonly low: number; readonly high: number }): void {
+    this.fade.set(range?.low ?? 0, range?.high ?? 1);
+    for (const { mesh, materials } of this.layers) {
+      mesh.material = range === undefined ? materials.steady : materials.fading;
+    }
+  }
+
+  dispose(): void {
+    for (const { mesh, materials } of this.layers) {
+      if (this.pool !== undefined) this.pool.release(mesh, materials);
+      else {
+        mesh.geometry.dispose();
+        mesh.dispose();
+      }
+    }
+    this.layers.length = 0;
+    this.group.clear();
+    this.quadCollider = undefined;
+  }
+
+  private add(
+    quads: Uint32Array,
+    materials: MaterialPair,
+    bounds: Box3,
+    options: {
+      readonly castShadow: boolean;
+      readonly renderOrder: number;
+      readonly textures?: Uint32Array | undefined;
+      readonly blockLight?: Uint8Array | undefined;
+    },
+  ): void {
+    if (quads.length === 0) return;
+    const geometry = new InstancedBufferGeometry();
+    geometry.setIndex(triangles);
+    geometry.setAttribute("position", corners);
+    geometry.setAttribute("normal", normals);
+    geometry.setAttribute("quad", new InstancedBufferAttribute(quads, 3));
+    // The GPU word exists in both modes. Bits 0..26 retain every texture flag and sheet
+    // offset; 27..30 carry light. Distant/unlit plain geometry has no auxiliary buffer.
+    const lit = options.blockLight?.some((level) => level > 0) === true;
+    let data = options.textures;
+    if (lit) {
+      data = new Uint32Array(quads.length / 3);
+      for (let i = 0; i < data.length; i++)
+        data[i] =
+          (options.textures?.[i] ?? 0) | (options.blockLight![i]! << QUAD_BLOCK_LIGHT_SHIFT);
+    }
+    if (data !== undefined) geometry.setAttribute("texture", new InstancedBufferAttribute(data, 1));
+    geometry.instanceCount = quads.length / 3;
+    geometry.boundingBox = bounds;
+    geometry.boundingSphere = bounds.getBoundingSphere(new Sphere());
+
+    const mesh = this.pool?.acquire(materials, geometry) ?? new Mesh(geometry, materials.steady);
+    mesh.castShadow = options.castShadow;
+    mesh.receiveShadow = true;
+    mesh.renderOrder = options.renderOrder;
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.fade = this.fade;
+    this.group.add(mesh);
+    this.layers.push({ mesh, materials });
+  }
+}
+
+/** Engine output groups lava at the end; old regions have none. Both layers share the input buffer. */
+export function firstLavaQuad(words: Uint32Array): number {
+  for (let offset = 0; offset < words.length; offset += 3) {
+    if (isLavaQuad(words[offset]!, words[offset + 1]!)) return offset;
+  }
+  return words.length;
+}
+
+/** Separates the glass quads of a translucent list from its water quads. */
+function splitGlass(
+  quads: Uint32Array,
+  light?: Uint8Array,
+): {
+  water: Uint32Array;
+  glass: Uint32Array;
+  waterLight: Uint8Array | undefined;
+  glassLight: Uint8Array | undefined;
+} {
+  const water: number[] = [];
+  const glass: number[] = [];
+  const waterLight: number[] = [],
+    glassLight: number[] = [];
+  for (let index = 0; index < quads.length / 3; index += 1) {
+    const isGlass = unpackQuad(quads, index).material === QuadMaterial.Glass;
+    const target = isGlass ? glass : water;
+    target.push(...quads.subarray(index * 3, index * 3 + 3));
+    if (light !== undefined) (isGlass ? glassLight : waterLight).push(light[index]!);
+  }
+  return {
+    water: Uint32Array.from(water),
+    glass: Uint32Array.from(glass),
+    waterLight: light === undefined ? undefined : Uint8Array.from(waterLight),
+    glassLight: light === undefined ? undefined : Uint8Array.from(glassLight),
+  };
+}

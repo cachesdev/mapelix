@@ -18,10 +18,13 @@ export class VoxelBox {
   readonly fill: Uint8Array;
   /** 1 where the sides are soil under a strip of the side color, like a grass block's. */
   readonly covered: Uint8Array;
+  /** Source data at LOD 1 only; distant reductions allocate neither array. */
+  readonly emission: Uint8Array | undefined;
+  readonly lightOpaque: Uint8Array | undefined;
   /** Layers from the bottom that may hold voxels. Everything above them is air. */
   filled: number;
 
-  constructor(width: number, layers: number) {
+  constructor(width: number, layers: number, lighting = false) {
     const count = width * width * layers;
     this.width = width;
     this.layers = layers;
@@ -30,6 +33,8 @@ export class VoxelBox {
     this.side = new Uint32Array(count);
     this.fill = new Uint8Array(count);
     this.covered = new Uint8Array(count);
+    this.emission = lighting ? new Uint8Array(count) : undefined;
+    this.lightOpaque = lighting ? new Uint8Array(count) : undefined;
     this.filled = layers;
   }
 
@@ -44,6 +49,8 @@ export class VoxelBox {
     this.side.fill(0);
     this.fill.fill(0);
     this.covered.fill(0);
+    this.emission?.fill(0);
+    this.lightOpaque?.fill(0);
     this.filled = this.layers;
   }
 
@@ -54,12 +61,19 @@ export class VoxelBox {
     this.side[to] = source.side[from]!;
     this.fill[to] = source.fill[from]!;
     this.covered[to] = source.covered[from]!;
+    if (this.emission !== undefined) this.emission[to] = source.emission?.[from] ?? 0;
+    if (this.lightOpaque !== undefined) this.lightOpaque[to] = source.lightOpaque?.[from] ?? 0;
   }
 }
 
 /** Solid, foliage, and emissive voxels hide what is behind them. */
 export function isOpaqueKind(kind: number): boolean {
-  return kind === VoxelKind.Solid || kind === VoxelKind.Foliage || kind === VoxelKind.Emissive;
+  return (
+    kind === VoxelKind.Solid ||
+    kind === VoxelKind.Foliage ||
+    kind === VoxelKind.Emissive ||
+    kind === VoxelKind.Lava
+  );
 }
 
 /** What a parent voxel becomes. Opaque parents then pick their kind by majority. */
@@ -152,7 +166,12 @@ function mergeChildren(source: VoxelBox, target: VoxelBox, parent: number): void
   // A covered side draws soil itself and keeps only the color of its strip.
   target.side[parent] = isCovered ? topColor : averageColor(red, green, blue, sides);
   target.covered[parent] = isCovered ? 1 : 0;
-  target.fill[parent] = group === Group.Water ? waterFill(source) : 16;
+  target.fill[parent] =
+    group === Group.Water
+      ? waterFill(source, VoxelKind.Water)
+      : target.kind[parent] === VoxelKind.Lava
+        ? waterFill(source, VoxelKind.Lava)
+        : 16;
 }
 
 function allOpaque(kind: Uint8Array): boolean {
@@ -231,23 +250,26 @@ function opaqueKind(kind: Uint8Array): number {
   let solid = 0;
   let foliage = 0;
   let emissive = 0;
+  let lava = 0;
   for (let index = 0; index < 8; index += 1) {
     const childKind = kind[children[index]!];
     if (childKind === VoxelKind.Solid) solid += 1;
     else if (childKind === VoxelKind.Foliage) foliage += 1;
     else if (childKind === VoxelKind.Emissive) emissive += 2;
+    else if (childKind === VoxelKind.Lava) lava += 2;
   }
-  if (solid >= foliage && solid >= emissive) return VoxelKind.Solid;
-  return foliage >= emissive ? VoxelKind.Foliage : VoxelKind.Emissive;
+  if (solid >= foliage && solid >= emissive && solid >= lava) return VoxelKind.Solid;
+  if (foliage >= emissive && foliage >= lava) return VoxelKind.Foliage;
+  return emissive >= lava ? VoxelKind.Emissive : VoxelKind.Lava;
 }
 
 /** Keeps the water surface at its height within the parent, in sixteenths. */
-function waterFill(source: VoxelBox): number {
+function waterFill(source: VoxelBox, fluid: number): number {
   let upper = 0;
   let lower = 0;
   for (let index = 0; index < 8; index += 1) {
     const child = children[index]!;
-    if (source.kind[child] !== VoxelKind.Water) continue;
+    if (source.kind[child] !== fluid) continue;
     if (index >= 4) upper = Math.max(upper, source.fill[child]!);
     else lower = Math.max(lower, source.fill[child]!);
   }

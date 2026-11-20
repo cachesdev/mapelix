@@ -12,7 +12,12 @@ port.on("message", (request: WorkerRequest) => {
   let reply: WorkerReply;
   try {
     const startedAt = performance.now();
-    const bytes = builder.build(request.region);
+    const bytes =
+      "discoveries" in request
+        ? builder.discoveries(request.discoveries)
+        : "block" in request
+          ? builder.block(request.block)
+          : builder.build(request.region);
     reply = { id: request.id, kind: "built", bytes, milliseconds: performance.now() - startedAt };
     port.postMessage(reply, [bytes.buffer as ArrayBuffer]);
   } catch (cause) {

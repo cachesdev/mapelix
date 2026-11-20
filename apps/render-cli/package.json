@@ -1,0 +1,37 @@
+{
+  "name": "@mapelix/render-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mapelix-render": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "check": "tsc --noEmit --project tsconfig.json",
+    "lint": "oxlint --type-aware --type-check .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run src",
+    "test:unit": "vitest run src",
+    "transit": "node -e \"\""
+  },
+  "dependencies": {
+    "@mapelix/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2",
+    "vitest": "4.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -3,16 +3,22 @@ import {
   Face,
   QuadList,
   QuadMaterial,
+  QUAD_LAVA_FLAG,
   SOIL_COLOR,
   packQuadWord0,
   packQuadWord1,
   packQuadWord2,
+  partitionLavaQuads,
+  finishBlockLight,
   type SceneRegion,
 } from "../format.js";
 import { VoxelKind } from "./block-palette.js";
+import type { GeometryMode } from "../dimensions.js";
 import {
   COVER_DEPTH,
   KEY_COVERED,
+  KEY_LAVA,
+  KEY_BLOCK_LIGHT_SHIFT,
   NORMAL_LAYER,
   cornerOcclusion,
   faceOf,
@@ -31,6 +37,8 @@ import {
 } from "./voxel-faces.js";
 import { isOpaqueKind, type VoxelBox } from "./voxel-box.js";
 import type { VoxelRegion } from "./voxel-region.js";
+import { lavaFlowDirection } from "./lava-flow.js";
+import { buildBlockLight } from "./block-light.js";
 
 /**
  * Border faces stay when a neighbor hides them this many layers below its top. A
@@ -49,17 +57,22 @@ const MATERIALS: Readonly<Record<number, QuadMaterial>> = {
   [VoxelKind.Emissive]: QuadMaterial.Emissive,
   [VoxelKind.Water]: QuadMaterial.Water,
   [VoxelKind.Glass]: QuadMaterial.Glass,
+  [VoxelKind.Lava]: QuadMaterial.Emissive,
 };
 
 /**
- * Turns a voxel region into packed quads, in voxel units. Like level 0, it keeps only
- * faces that touch air the sky can reach, merges equal faces, and shades corners.
+ * Turns a voxel region into packed quads, in voxel units. Surface mode retains the
+ * sky visibility optimization; dimension modes keep interior and island surfaces.
  */
-export function meshVoxelRegion(region: VoxelRegion): SceneRegion {
-  return new VoxelLevelMesher(region).mesh();
+export function meshVoxelRegion(
+  region: VoxelRegion,
+  geometry: GeometryMode = "surface",
+): SceneRegion {
+  return new VoxelLevelMesher(region, geometry).mesh();
 }
 
 class VoxelLevelMesher {
+  private readonly geometry: GeometryMode;
   private readonly region: VoxelRegion;
   private readonly box: VoxelBox;
   private readonly steps: FaceSteps;
@@ -75,8 +88,9 @@ class VoxelLevelMesher {
   private readonly columnLow: Int16Array;
   /** Layers of wall below a column's highest block where it faces unexplored land. */
   private readonly edgeLayers: number;
-  private readonly opaque = new QuadList();
-  private readonly translucent = new QuadList();
+  private readonly opaque: QuadList;
+  private readonly translucent: QuadList;
+  private readonly light: Uint8Array | undefined;
   /** World y of layer 0, in voxels. */
   private readonly baseLayer: number;
   private low = Number.POSITIVE_INFINITY;
@@ -84,28 +98,45 @@ class VoxelLevelMesher {
   private minLayer = Number.POSITIVE_INFINITY;
   private maxLayer = Number.NEGATIVE_INFINITY;
 
-  constructor(region: VoxelRegion) {
+  constructor(region: VoxelRegion, geometry: GeometryMode) {
+    this.geometry = geometry;
     this.region = region;
     this.box = region.box;
     this.steps = faceSteps(region.box.width);
     this.area = region.box.width ** 2;
+    this.opaque = new QuadList();
+    this.translucent = new QuadList();
     this.baseLayer = region.low / region.voxelSize;
     this.edgeLayers = Math.max(1, EDGE_DEPTH / region.voxelSize);
     this.roof = new Int16Array(this.area).fill(-1);
     this.top = new Int16Array(this.area).fill(-1);
     this.findColumnTops();
-    const open = findOpenAir(
-      {
-        size: this.box.width,
-        layers: this.box.layers,
-        roof: this.roof,
-        isOpaque: (index) => isOpaqueKind(this.box.kind[index]!),
-      },
-      Math.ceil(COVER_DEPTH / region.voxelSize),
-    );
+    const open =
+      geometry === "surface"
+        ? findOpenAir(
+            {
+              size: this.box.width,
+              layers: this.box.layers,
+              roof: this.roof,
+              isOpaque: (index) => isOpaqueKind(this.box.kind[index]!),
+            },
+            Math.ceil(COVER_DEPTH / region.voxelSize),
+          )
+        : { reached: new Uint8Array(0), lowest: new Int16Array(this.area) };
     this.reached = open.reached;
     this.lowestOpen = open.lowest;
     this.columnLow = this.findColumnRanges();
+    this.light =
+      region.level !== 1 || this.box.emission === undefined || this.high < this.low
+        ? undefined
+        : buildBlockLight({
+            width: this.box.width,
+            layers: this.box.layers,
+            minLayer: this.low - 15,
+            maxLayer: this.high + 16,
+            emission: (index) => this.box.emission![index]!,
+            opaque: (index) => this.box.lightOpaque![index] === 1,
+          });
   }
 
   mesh(): SceneRegion {
@@ -114,6 +145,7 @@ class VoxelLevelMesher {
     }
     const { voxelSize } = this.region;
     const empty = new Uint32Array(0);
+    const blockLight = finishBlockLight(this.opaque, new QuadList(), this.translucent);
     return {
       level: this.region.level,
       x: this.region.x,
@@ -121,9 +153,10 @@ class VoxelLevelMesher {
       heights: this.heights(),
       minY: Number.isFinite(this.minLayer) ? this.minLayer * voxelSize : 0,
       maxY: Number.isFinite(this.maxLayer) ? this.maxLayer * voxelSize : 0,
-      opaque: this.opaque.finish(),
+      opaque: partitionLavaQuads(this.opaque.finish(), undefined, blockLight?.opaque),
       plants: empty,
       translucent: this.translucent.finish(),
+      ...(blockLight === undefined ? {} : { blockLight }),
     };
   }
 
@@ -150,14 +183,20 @@ class VoxelLevelMesher {
     for (let z = 0; z < span; z += 1) {
       for (let x = 0; x < span; x += 1) {
         const column = (z + margin) * width + x + margin;
-        const top = this.top[column]!;
+        const top = this.columnTop(column);
         let low = this.edgeFloor(column);
         for (const neighbor of [column, column + 1, column - 1, column + width, column - width]) {
           if (this.region.explored[neighbor] === 1) {
             low = Math.min(low, this.lowestOpen[neighbor]! - 1);
           }
         }
-        low = Math.max(0, low);
+        low = Math.max(
+          0,
+          low,
+          this.region.window === undefined
+            ? 0
+            : (this.region.window.minY - this.region.low) / this.region.voxelSize,
+        );
         columnLow[z * span + x] = low;
         if (top === -1) continue;
         this.low = Math.min(this.low, low);
@@ -179,7 +218,7 @@ class VoxelLevelMesher {
       for (let x = 0; x < span; x += 1) {
         const column = (z + margin) * width + x + margin;
         const border = isBorderFace(face, x, z, span);
-        const top = this.top[column]!;
+        const top = this.columnTop(column);
         for (let layer = this.columnLow[z * span + x]!; layer <= top; layer += 1) {
           const slice = maskSlice(face, x, layer - this.low, z);
           const mask = slice * layout.area + maskOffset(face, span, x, layer - this.low, z);
@@ -231,7 +270,11 @@ class VoxelLevelMesher {
     const neighborLayer = layer + NORMAL_LAYER[face]!;
     const neighborColumn = column + this.steps.column[face]!;
     if (inner) {
-      if (isOpaqueKind(box.kind[neighbor] ?? VoxelKind.Air) || !this.isOpen(index, layer, column)) {
+      const open =
+        kind === VoxelKind.Lava
+          ? this.isOpen(neighbor, neighborLayer, neighborColumn)
+          : this.isOpen(index, layer, column);
+      if (isOpaqueKind(box.kind[neighbor] ?? VoxelKind.Air) || !open) {
         return false;
       }
     } else if (!this.region.explored[neighborColumn]) {
@@ -245,7 +288,29 @@ class VoxelLevelMesher {
       : this.occlusion(face, neighbor, neighborLayer);
     const covered = box.covered[index] === 1 && !isFlatFace(face);
     const key = mergeKey(MATERIALS[kind]!, fill, 0, false, face);
-    keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
+    let lava = 0;
+    if (kind === VoxelKind.Lava) {
+      const heightAt = (step: number) => {
+        const other = index + step;
+        return box.kind[other] === VoxelKind.Lava
+          ? box.fill[other]!
+          : isOpaqueKind(box.kind[other] ?? VoxelKind.Air)
+            ? fill
+            : 0;
+      };
+      lava =
+        KEY_LAVA |
+        (lavaFlowDirection(heightAt(1), heightAt(-1), heightAt(box.width), heightAt(-box.width)) <<
+          12);
+    }
+    const frontLayer = inner ? layer : neighborLayer;
+    // Glow and procedural lava ignore local fill, but still emit into the shared light field.
+    const light =
+      MATERIALS[kind] === QuadMaterial.Emissive || frontLayer < 0 || frontLayer >= this.box.layers
+        ? 0
+        : (this.light?.[inner ? index : neighbor] ?? 0);
+    keys[mask] =
+      ((covered ? key | KEY_COVERED : key) | lava | (light << KEY_BLOCK_LIGHT_SHIFT)) >>> 0;
     colors[mask] = packQuadWord2(this.faceColor(index, face), occlusion);
     return true;
   }
@@ -259,12 +324,15 @@ class VoxelLevelMesher {
     border: boolean,
   ): boolean {
     // Below the box is buried rock; above it is open sky.
-    if (neighborLayer < 0) return false;
+    if (neighborLayer < 0) return this.geometry === "islands";
     if (neighborLayer >= this.box.layers) return true;
     const neighborKind = this.box.kind[neighbor]!;
     if (isOpaqueKind(neighborKind)) {
       return (
-        border && isOpaqueKind(kind) && neighborLayer > this.roof[neighborColumn]! - SKIRT_LAYERS
+        this.region.window === undefined &&
+        border &&
+        isOpaqueKind(kind) &&
+        neighborLayer > this.roof[neighborColumn]! - SKIRT_LAYERS
       );
     }
     if (neighborKind !== VoxelKind.Air && neighborKind === kind) return false;
@@ -293,8 +361,11 @@ class VoxelLevelMesher {
     const translucent = material === QuadMaterial.Water || material === QuadMaterial.Glass;
     (translucent ? this.translucent : this.opaque).push(
       packQuadWord0(x, y, z, faceOf(face), material, (key & KEY_COVERED) !== 0),
-      packQuadWord1(width, height, keyBox(key), 0),
+      packQuadWord1(width, height, keyBox(key), 0) |
+        ((key & KEY_LAVA) !== 0 ? QUAD_LAVA_FLAG | (((key >>> 12) & 15) << 28) : 0),
       color,
+      0,
+      (key >>> KEY_BLOCK_LIGHT_SHIFT) & 15,
     );
     this.minLayer = Math.min(this.minLayer, y);
     this.maxLayer = Math.max(this.maxLayer, y + (isFlatFace(face) ? 1 : height));
@@ -307,7 +378,7 @@ class VoxelLevelMesher {
     const heights = new Int16Array(span * span);
     for (let z = 0; z < span; z += 1) {
       for (let x = 0; x < span; x += 1) {
-        const top = this.top[(z + margin) * width + x + margin]!;
+        const top = this.columnTop((z + margin) * width + x + margin);
         heights[z * span + x] = top === -1 ? EMPTY_HEIGHT : (this.baseLayer + top + 1) * voxelSize;
       }
     }
@@ -325,15 +396,25 @@ class VoxelLevelMesher {
     );
   }
 
+  private columnTop(column: number): number {
+    return Math.min(
+      this.top[column]!,
+      this.region.window === undefined
+        ? this.box.layers - 1
+        : (this.region.window.maxY - this.region.low) / this.region.voxelSize - 1,
+    );
+  }
+
   /** Lowest layer of the walls facing unexplored land. Over water, the walls reach below the floor. */
   private edgeFloor(column: number): number {
+    if (this.geometry !== "surface") return 0;
     const roof = this.roof[column]!;
     return (roof === -1 ? this.top[column]! : roof) - this.edgeLayers;
   }
 
   /** A voxel is open when the sky reaches it directly or through covered air. */
   private isOpen(index: number, layer: number, column: number): boolean {
-    return layer > this.roof[column]! || this.reached[index] === 1;
+    return this.geometry !== "surface" || layer > this.roof[column]! || this.reached[index] === 1;
   }
 }
 

@@ -11,6 +11,8 @@
       "outputs": [],
       "env": [
         "MAPELIX_BENCH_LEVEL",
+        "MAPELIX_BENCH_DIMENSION",
+        "MAPELIX_BENCH_CEILING_Y",
         "MAPELIX_BENCH_RADIUS",
         "MAPELIX_BENCH_WORKERS",
         "MAPELIX_BENCH_X",

@@ -1,0 +1,4413 @@
+{
+  "base": "e02cf7c51241170916eaf116c419a7d54c7c1916",
+  "branch": "experiment/underground-m0",
+  "date": "2026-11-13",
+  "scope": "Experimental M0 only; no public API or production modification",
+  "validation": {
+    "assertions": 162,
+    "legacyAlias": "maxY = ceilingY (exclusive), never +1",
+    "invalidCases": 8,
+    "passed": true
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           ",
+    "logicalCpus": 16,
+    "os": "Windows local development machine; not a production server"
+  },
+  "inventory": [
+    {
+      "dimension": "overworld",
+      "chunks": 1697,
+      "bounds": {
+        "minX": -560,
+        "minZ": -352,
+        "maxX": 303,
+        "maxZ": 607
+      },
+      "levels": [
+        {
+          "level": 0,
+          "occupied": 137,
+          "boundingRectangle": 224
+        },
+        {
+          "level": 1,
+          "occupied": 42,
+          "boundingRectangle": 64
+        },
+        {
+          "level": 2,
+          "occupied": 17,
+          "boundingRectangle": 25
+        },
+        {
+          "level": 3,
+          "occupied": 7,
+          "boundingRectangle": 9
+        },
+        {
+          "level": 4,
+          "occupied": 4,
+          "boundingRectangle": 4
+        },
+        {
+          "level": 5,
+          "occupied": 4,
+          "boundingRectangle": 4
+        }
+      ],
+      "windows163264": 68,
+      "windowsUpTo64": 90,
+      "variantsNearL0L1": {
+        "occupied": 12172,
+        "boundingRectangle": 19584
+      }
+    },
+    {
+      "dimension": "nether",
+      "chunks": 747,
+      "bounds": {
+        "minX": -304,
+        "minZ": -336,
+        "maxX": 255,
+        "maxZ": 255
+      },
+      "levels": [
+        {
+          "level": 0,
+          "occupied": 67,
+          "boundingRectangle": 90
+        },
+        {
+          "level": 1,
+          "occupied": 22,
+          "boundingRectangle": 25
+        },
+        {
+          "level": 2,
+          "occupied": 8,
+          "boundingRectangle": 9
+        },
+        {
+          "level": 3,
+          "occupied": 4,
+          "boundingRectangle": 4
+        },
+        {
+          "level": 4,
+          "occupied": 4,
+          "boundingRectangle": 4
+        },
+        {
+          "level": 5,
+          "occupied": 4,
+          "boundingRectangle": 4
+        }
+      ],
+      "windows163264": 20,
+      "windowsUpTo64": 26,
+      "variantsNearL0L1": {
+        "occupied": 1780,
+        "boundingRectangle": 2300
+      }
+    }
+  ],
+  "variants": {
+    "presets163264": {
+      "occupied": 13952,
+      "boundingRectangle": 21884
+    },
+    "presets1632": {
+      "occupied": 9748,
+      "boundingRectangle": 15261
+    },
+    "defaultPrewarmRegions": 466,
+    "defaultAllLegalCeilings": {
+      "occupied": 5936,
+      "boundingRectangle": 9008
+    },
+    "presets1632PlusOneDefault": {
+      "boundingRectangle": 15727
+    },
+    "presets163264PlusAllDefaultCeilings": {
+      "occupied": 19888,
+      "boundingRectangle": 30892
+    }
+  },
+  "matrix": {
+    "base": "e02cf7c",
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           ",
+    "logicalCpus": 16,
+    "method": "one worker per case; cold first build; ten additional builds, discard two, median/p95 of eight; app caches only, OS cache not purged",
+    "rows": [
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -56,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 40.01,
+        "warmMedianMs": 9.23,
+        "warmP95Ms": 13.7,
+        "payloadBytes": 10380,
+        "quads": 179,
+        "peakRssMiB": 216.19,
+        "cpuMs": 468,
+        "wallMs": 282.52,
+        "lastPhases": {
+          "volumeMs": 2.615799999999922,
+          "meshMs": 5.820400000000063,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -48,
+          "sectionHits": 360,
+          "sectionMisses": 36
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -56,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 106.89,
+        "warmMedianMs": 56.11,
+        "warmP95Ms": 63.66,
+        "payloadBytes": 32808,
+        "quads": 0,
+        "peakRssMiB": 185.45,
+        "cpuMs": 1047,
+        "wallMs": 823.51,
+        "lastPhases": {
+          "volumeMs": 21.919599999999946,
+          "meshMs": 31.22160000000008,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -56,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 155.36,
+        "warmMedianMs": 78.63,
+        "warmP95Ms": 83.3,
+        "payloadBytes": 33060,
+        "quads": 21,
+        "peakRssMiB": 215.06,
+        "cpuMs": 1546,
+        "wallMs": 1087.56,
+        "lastPhases": {
+          "volumeMs": 59.196899999999914,
+          "meshMs": 16.510400000000118,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -48,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 48.26,
+        "warmMedianMs": 13.77,
+        "warmP95Ms": 16.46,
+        "payloadBytes": 10380,
+        "quads": 179,
+        "peakRssMiB": 170.83,
+        "cpuMs": 422,
+        "wallMs": 312.96,
+        "lastPhases": {
+          "volumeMs": 3.3263999999999214,
+          "meshMs": 10.652399999999943,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -32,
+          "sectionHits": 720,
+          "sectionMisses": 72
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -48,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 155.85,
+        "warmMedianMs": 103.85,
+        "warmP95Ms": 118.84,
+        "payloadBytes": 53400,
+        "quads": 1716,
+        "peakRssMiB": 200.77,
+        "cpuMs": 1720,
+        "wallMs": 1349.94,
+        "lastPhases": {
+          "volumeMs": 36.64549999999963,
+          "meshMs": 69.03360000000066,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -48,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 227.05,
+        "warmMedianMs": 148.96,
+        "warmP95Ms": 155.04,
+        "payloadBytes": 52896,
+        "quads": 1674,
+        "peakRssMiB": 219.23,
+        "cpuMs": 2501,
+        "wallMs": 1858.82,
+        "lastPhases": {
+          "volumeMs": 110.8140999999996,
+          "meshMs": 36.90190000000075,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -32,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 68.78,
+        "warmMedianMs": 24.6,
+        "warmP95Ms": 27.93,
+        "payloadBytes": 22428,
+        "quads": 1183,
+        "peakRssMiB": 188.13,
+        "cpuMs": 609,
+        "wallMs": 448.62,
+        "lastPhases": {
+          "volumeMs": 5.42660000000069,
+          "meshMs": 19.524099999999635,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -16,
+          "sectionHits": 1080,
+          "sectionMisses": 108
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -32,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 233.27,
+        "warmMedianMs": 172.27,
+        "warmP95Ms": 181.44,
+        "payloadBytes": 112908,
+        "quads": 6675,
+        "peakRssMiB": 215.3,
+        "cpuMs": 2859,
+        "wallMs": 2094.72,
+        "lastPhases": {
+          "volumeMs": 61.46339999999873,
+          "meshMs": 106.74200000000019,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": -32,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 286.4,
+        "warmMedianMs": 220.87,
+        "warmP95Ms": 228.76,
+        "payloadBytes": 119496,
+        "quads": 7224,
+        "peakRssMiB": 226.97,
+        "cpuMs": 3359,
+        "wallMs": 2606,
+        "lastPhases": {
+          "volumeMs": 151.0578000000005,
+          "meshMs": 52.46280000000115,
+          "allocatedMinY": -64,
+          "allocatedMaxY": -16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": 0,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 117.41,
+        "warmMedianMs": 48.42,
+        "warmP95Ms": 54.82,
+        "payloadBytes": 106272,
+        "quads": 8170,
+        "peakRssMiB": 193.22,
+        "cpuMs": 1063,
+        "wallMs": 756.4,
+        "lastPhases": {
+          "volumeMs": 6.216300000000047,
+          "meshMs": 39.90560000000005,
+          "allocatedMinY": -64,
+          "allocatedMaxY": 16,
+          "sectionHits": 1800,
+          "sectionMisses": 180
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": 0,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 323.22,
+        "warmMedianMs": 265.16,
+        "warmP95Ms": 272.82,
+        "payloadBytes": 381084,
+        "quads": 29023,
+        "peakRssMiB": 236.54,
+        "cpuMs": 4171,
+        "wallMs": 3132.3,
+        "lastPhases": {
+          "volumeMs": 87.56950000000143,
+          "meshMs": 169.4413999999997,
+          "allocatedMinY": -64,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -64,
+        "maxY": 0,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 470.17,
+        "warmMedianMs": 369.5,
+        "warmP95Ms": 385.85,
+        "payloadBytes": 365508,
+        "quads": 27725,
+        "peakRssMiB": 226.26,
+        "cpuMs": 5157,
+        "wallMs": 4394.58,
+        "lastPhases": {
+          "volumeMs": 250.93439999999828,
+          "meshMs": 93.34100000000035,
+          "allocatedMinY": -64,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -24,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 53.75,
+        "warmMedianMs": 11.17,
+        "warmP95Ms": 14.45,
+        "payloadBytes": 44088,
+        "quads": 2988,
+        "peakRssMiB": 177.69,
+        "cpuMs": 515,
+        "wallMs": 300.4,
+        "lastPhases": {
+          "volumeMs": 3.8012999999991735,
+          "meshMs": 6.496399999999994,
+          "allocatedMinY": -48,
+          "allocatedMaxY": -16,
+          "sectionHits": 720,
+          "sectionMisses": 72
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -24,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 176.04,
+        "warmMedianMs": 112.8,
+        "warmP95Ms": 118.15,
+        "payloadBytes": 103812,
+        "quads": 5917,
+        "peakRssMiB": 212.01,
+        "cpuMs": 2234,
+        "wallMs": 1444.13,
+        "lastPhases": {
+          "volumeMs": 35.91359999999986,
+          "meshMs": 72.02890000000116,
+          "allocatedMinY": -48,
+          "allocatedMaxY": -16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -24,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 231.04,
+        "warmMedianMs": 148.99,
+        "warmP95Ms": 170.64,
+        "payloadBytes": 78876,
+        "quads": 3839,
+        "peakRssMiB": 222.57,
+        "cpuMs": 2578,
+        "wallMs": 1907.18,
+        "lastPhases": {
+          "volumeMs": 108.17840000000069,
+          "meshMs": 39.52859999999782,
+          "allocatedMinY": -48,
+          "allocatedMaxY": -16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -16,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 77.77,
+        "warmMedianMs": 18.49,
+        "warmP95Ms": 22.24,
+        "payloadBytes": 77004,
+        "quads": 5731,
+        "peakRssMiB": 183.66,
+        "cpuMs": 656,
+        "wallMs": 404.85,
+        "lastPhases": {
+          "volumeMs": 4.091400000001158,
+          "meshMs": 12.430599999999686,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 0,
+          "sectionHits": 1080,
+          "sectionMisses": 108
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -16,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 243.79,
+        "warmMedianMs": 167.45,
+        "warmP95Ms": 177.39,
+        "payloadBytes": 162756,
+        "quads": 10829,
+        "peakRssMiB": 221.22,
+        "cpuMs": 2703,
+        "wallMs": 2089.69,
+        "lastPhases": {
+          "volumeMs": 56.50710000000254,
+          "meshMs": 103.27109999999811,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 0,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": -16,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 300.12,
+        "warmMedianMs": 225.31,
+        "warmP95Ms": 323.39,
+        "payloadBytes": 124584,
+        "quads": 7648,
+        "peakRssMiB": 213.46,
+        "cpuMs": 3578,
+        "wallMs": 2793.25,
+        "lastPhases": {
+          "volumeMs": 157.94190000000162,
+          "meshMs": 57.561799999999494,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 0,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 0,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 86.67,
+        "warmMedianMs": 28.68,
+        "warmP95Ms": 33.55,
+        "payloadBytes": 92112,
+        "quads": 6990,
+        "peakRssMiB": 191.55,
+        "cpuMs": 766,
+        "wallMs": 512.74,
+        "lastPhases": {
+          "volumeMs": 5.590299999999843,
+          "meshMs": 24.148600000000442,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 16,
+          "sectionHits": 1440,
+          "sectionMisses": 144
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 0,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 274.69,
+        "warmMedianMs": 218.13,
+        "warmP95Ms": 222.84,
+        "payloadBytes": 301092,
+        "quads": 22357,
+        "peakRssMiB": 219.52,
+        "cpuMs": 3312,
+        "wallMs": 2613.14,
+        "lastPhases": {
+          "volumeMs": 74.16560000000027,
+          "meshMs": 138.7399000000005,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 0,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 366.2,
+        "warmMedianMs": 296.48,
+        "warmP95Ms": 304.41,
+        "payloadBytes": 279540,
+        "quads": 20561,
+        "peakRssMiB": 212.59,
+        "cpuMs": 4155,
+        "wallMs": 3477.92,
+        "lastPhases": {
+          "volumeMs": 205.40209999999934,
+          "meshMs": 76.8012000000017,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 32,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 118.02,
+        "warmMedianMs": 52.67,
+        "warmP95Ms": 63.11,
+        "payloadBytes": 151476,
+        "quads": 11937,
+        "peakRssMiB": 196.59,
+        "cpuMs": 1063,
+        "wallMs": 798.97,
+        "lastPhases": {
+          "volumeMs": 8.400200000003679,
+          "meshMs": 42.702299999997194,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 48,
+          "sectionHits": 2160,
+          "sectionMisses": 216
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 32,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 394.93,
+        "warmMedianMs": 355.99,
+        "warmP95Ms": 407.2,
+        "payloadBytes": 811368,
+        "quads": 64880,
+        "peakRssMiB": 242.75,
+        "cpuMs": 5188,
+        "wallMs": 4148.41,
+        "lastPhases": {
+          "volumeMs": 104.44499999999971,
+          "meshMs": 235.9164000000019,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": -32,
+        "maxY": 32,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 529.2,
+        "warmMedianMs": 447.52,
+        "warmP95Ms": 454.86,
+        "payloadBytes": 709740,
+        "quads": 56411,
+        "peakRssMiB": 233.07,
+        "cpuMs": 5844,
+        "wallMs": 5204.65,
+        "lastPhases": {
+          "volumeMs": 306.1110000000044,
+          "meshMs": 121.22839999999997,
+          "allocatedMinY": -48,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 8,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 44.86,
+        "warmMedianMs": 10.06,
+        "warmP95Ms": 12.84,
+        "payloadBytes": 12852,
+        "quads": 385,
+        "peakRssMiB": 169.4,
+        "cpuMs": 500,
+        "wallMs": 272.32,
+        "lastPhases": {
+          "volumeMs": 3.442699999999604,
+          "meshMs": 5.580500000003667,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 16,
+          "sectionHits": 720,
+          "sectionMisses": 72
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 8,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 174.43,
+        "warmMedianMs": 114.13,
+        "warmP95Ms": 120.29,
+        "payloadBytes": 115080,
+        "quads": 6856,
+        "peakRssMiB": 205.41,
+        "cpuMs": 2156,
+        "wallMs": 1462.83,
+        "lastPhases": {
+          "volumeMs": 37.074899999999616,
+          "meshMs": 68.47339999999531,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 8,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 262.37,
+        "warmMedianMs": 160.47,
+        "warmP95Ms": 167.11,
+        "payloadBytes": 150336,
+        "quads": 9794,
+        "peakRssMiB": 214.18,
+        "cpuMs": 2719,
+        "wallMs": 2024.47,
+        "lastPhases": {
+          "volumeMs": 113.3784999999989,
+          "meshMs": 39.87299999999959,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 16,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 53.93,
+        "warmMedianMs": 14.53,
+        "warmP95Ms": 17.58,
+        "payloadBytes": 19140,
+        "quads": 909,
+        "peakRssMiB": 169.03,
+        "cpuMs": 422,
+        "wallMs": 338.18,
+        "lastPhases": {
+          "volumeMs": 4.242600000005041,
+          "meshMs": 9.340499999998428,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 32,
+          "sectionHits": 1080,
+          "sectionMisses": 108
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 226.27,
+        "warmMedianMs": 171.23,
+        "warmP95Ms": 189.71,
+        "payloadBytes": 241584,
+        "quads": 17398,
+        "peakRssMiB": 219.14,
+        "cpuMs": 2750,
+        "wallMs": 2104.81,
+        "lastPhases": {
+          "volumeMs": 53.703300000001036,
+          "meshMs": 107.35410000000411,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 302.03,
+        "warmMedianMs": 234.73,
+        "warmP95Ms": 240.96,
+        "payloadBytes": 271212,
+        "quads": 19867,
+        "peakRssMiB": 205.28,
+        "cpuMs": 3313,
+        "wallMs": 2808.13,
+        "lastPhases": {
+          "volumeMs": 161.67569999999978,
+          "meshMs": 67.5515000000014,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 67.59,
+        "warmMedianMs": 24.26,
+        "warmP95Ms": 30.28,
+        "payloadBytes": 67596,
+        "quads": 4947,
+        "peakRssMiB": 148.31,
+        "cpuMs": 703,
+        "wallMs": 452.42,
+        "lastPhases": {
+          "volumeMs": 5.195400000004156,
+          "meshMs": 18.440599999994447,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 48,
+          "sectionHits": 1440,
+          "sectionMisses": 144
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 295.47,
+        "warmMedianMs": 241.33,
+        "warmP95Ms": 252.36,
+        "payloadBytes": 545700,
+        "quads": 42741,
+        "peakRssMiB": 195.02,
+        "cpuMs": 3484,
+        "wallMs": 2852.31,
+        "lastPhases": {
+          "volumeMs": 71.76870000000054,
+          "meshMs": 153.1834000000017,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 371.15,
+        "warmMedianMs": 305.58,
+        "warmP95Ms": 333.23,
+        "payloadBytes": 464664,
+        "quads": 35988,
+        "peakRssMiB": 196.24,
+        "cpuMs": 4438,
+        "wallMs": 3598.63,
+        "lastPhases": {
+          "volumeMs": 219.3417999999947,
+          "meshMs": 99.52490000000398,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 130.97,
+        "warmMedianMs": 52.9,
+        "warmP95Ms": 78.1,
+        "payloadBytes": 203640,
+        "quads": 16284,
+        "peakRssMiB": 178.68,
+        "cpuMs": 1171,
+        "wallMs": 837.52,
+        "lastPhases": {
+          "volumeMs": 8.057699999997567,
+          "meshMs": 38.51520000000164,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 80,
+          "sectionHits": 2160,
+          "sectionMisses": 216
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 387.39,
+        "warmMedianMs": 324.95,
+        "warmP95Ms": 339.35,
+        "payloadBytes": 1049088,
+        "quads": 84690,
+        "peakRssMiB": 259.87,
+        "cpuMs": 4344,
+        "wallMs": 3828.25,
+        "lastPhases": {
+          "volumeMs": 98.88409999999567,
+          "meshMs": 217.70100000000093,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 506.89,
+        "warmMedianMs": 445.9,
+        "warmP95Ms": 466.54,
+        "payloadBytes": 824880,
+        "quads": 66006,
+        "peakRssMiB": 233.08,
+        "cpuMs": 6171,
+        "wallMs": 5117.26,
+        "lastPhases": {
+          "volumeMs": 300.3837000000058,
+          "meshMs": 117.24330000000191,
+          "allocatedMinY": -16,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 40,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 45.91,
+        "warmMedianMs": 11.07,
+        "warmP95Ms": 14.08,
+        "payloadBytes": 50244,
+        "quads": 3501,
+        "peakRssMiB": 170.83,
+        "cpuMs": 485,
+        "wallMs": 284.07,
+        "lastPhases": {
+          "volumeMs": 3.591199999995297,
+          "meshMs": 5.928599999999278,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 48,
+          "sectionHits": 720,
+          "sectionMisses": 72
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 40,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 178.92,
+        "warmMedianMs": 123.34,
+        "warmP95Ms": 126.09,
+        "payloadBytes": 227304,
+        "quads": 16208,
+        "peakRssMiB": 209.79,
+        "cpuMs": 2172,
+        "wallMs": 1542.86,
+        "lastPhases": {
+          "volumeMs": 39.97380000000703,
+          "meshMs": 81.55000000000291,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 40,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 230.1,
+        "warmMedianMs": 160.76,
+        "warmP95Ms": 162.01,
+        "payloadBytes": 140904,
+        "quads": 9008,
+        "peakRssMiB": 213.89,
+        "cpuMs": 2530,
+        "wallMs": 1977.31,
+        "lastPhases": {
+          "volumeMs": 110.96779999999853,
+          "meshMs": 43.22400000000198,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 48,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 57.57,
+        "warmMedianMs": 16.46,
+        "warmP95Ms": 18.65,
+        "payloadBytes": 109644,
+        "quads": 8451,
+        "peakRssMiB": 186.9,
+        "cpuMs": 516,
+        "wallMs": 357.81,
+        "lastPhases": {
+          "volumeMs": 4.844500000006519,
+          "meshMs": 11.693999999988591,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 64,
+          "sectionHits": 1080,
+          "sectionMisses": 108
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 48,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 242.35,
+        "warmMedianMs": 171.95,
+        "warmP95Ms": 179.75,
+        "payloadBytes": 378384,
+        "quads": 28798,
+        "peakRssMiB": 217.26,
+        "cpuMs": 2578,
+        "wallMs": 2122.07,
+        "lastPhases": {
+          "volumeMs": 54.25909999999567,
+          "meshMs": 111.005799999999,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 64,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 48,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 310.57,
+        "warmMedianMs": 237.56,
+        "warmP95Ms": 247.47,
+        "payloadBytes": 228924,
+        "quads": 16343,
+        "peakRssMiB": 216.09,
+        "cpuMs": 3360,
+        "wallMs": 2829.19,
+        "lastPhases": {
+          "volumeMs": 160.42170000000624,
+          "meshMs": 63.0228999999963,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 64,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 64,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 71.42,
+        "warmMedianMs": 26.12,
+        "warmP95Ms": 35.79,
+        "payloadBytes": 144432,
+        "quads": 11350,
+        "peakRssMiB": 168.38,
+        "cpuMs": 736,
+        "wallMs": 479.86,
+        "lastPhases": {
+          "volumeMs": 5.189100000003236,
+          "meshMs": 19.0338999999949,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 80,
+          "sectionHits": 1440,
+          "sectionMisses": 144
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 64,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 264.14,
+        "warmMedianMs": 203.39,
+        "warmP95Ms": 210.14,
+        "payloadBytes": 537636,
+        "quads": 42069,
+        "peakRssMiB": 198.47,
+        "cpuMs": 3125,
+        "wallMs": 2437.53,
+        "lastPhases": {
+          "volumeMs": 71.37739999999758,
+          "meshMs": 132.07120000000577,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 64,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 364.64,
+        "warmMedianMs": 287.44,
+        "warmP95Ms": 336.72,
+        "payloadBytes": 394020,
+        "quads": 30101,
+        "peakRssMiB": 188.71,
+        "cpuMs": 4546,
+        "wallMs": 3555.81,
+        "lastPhases": {
+          "volumeMs": 225.81429999999818,
+          "meshMs": 75.26699999999255,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 96,
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 96.34,
+        "warmMedianMs": 42.16,
+        "warmP95Ms": 52.31,
+        "payloadBytes": 219348,
+        "quads": 17593,
+        "peakRssMiB": 181.52,
+        "cpuMs": 1078,
+        "wallMs": 682.73,
+        "lastPhases": {
+          "volumeMs": 6.285600000002887,
+          "meshMs": 30.559599999993225,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 112,
+          "sectionHits": 1550,
+          "sectionMisses": 155
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 96,
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 275.5,
+        "warmMedianMs": 212.77,
+        "warmP95Ms": 229,
+        "payloadBytes": 662712,
+        "quads": 52492,
+        "peakRssMiB": 215,
+        "cpuMs": 3063,
+        "wallMs": 2577.84,
+        "lastPhases": {
+          "volumeMs": 67.46470000001136,
+          "meshMs": 154.17009999998845,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 112,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "caves",
+        "minY": 32,
+        "maxY": 96,
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 386.52,
+        "warmMedianMs": 304.54,
+        "warmP95Ms": 323.23,
+        "payloadBytes": 639552,
+        "quads": 50562,
+        "peakRssMiB": 216.21,
+        "cpuMs": 4376,
+        "wallMs": 3601.47,
+        "lastPhases": {
+          "volumeMs": 204.78770000000077,
+          "meshMs": 86.36820000001171,
+          "allocatedMinY": 16,
+          "allocatedMaxY": 112,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 0,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 43.52,
+        "warmMedianMs": 12.24,
+        "warmP95Ms": 14.39,
+        "payloadBytes": 10404,
+        "quads": 181,
+        "peakRssMiB": 180.62,
+        "cpuMs": 406,
+        "wallMs": 290.02,
+        "lastPhases": {
+          "volumeMs": 2.2361000000091735,
+          "meshMs": 9.200599999996484,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 32,
+          "sectionHits": 720,
+          "sectionMisses": 72
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 1,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 137.88,
+        "warmMedianMs": 94.09,
+        "warmP95Ms": 102.22,
+        "payloadBytes": 35868,
+        "quads": 255,
+        "peakRssMiB": 196.86,
+        "cpuMs": 1686,
+        "wallMs": 1223.92,
+        "lastPhases": {
+          "volumeMs": 30.750899999999092,
+          "meshMs": 61.97409999999218,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 16,
+        "level": 2,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 110.73,
+        "warmMedianMs": 54.07,
+        "warmP95Ms": 59.15,
+        "payloadBytes": 43848,
+        "quads": 920,
+        "peakRssMiB": 161.91,
+        "cpuMs": 1203,
+        "wallMs": 786.35,
+        "lastPhases": {
+          "volumeMs": 38.51600000000326,
+          "meshMs": 13.78519999999844,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 32,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 0,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 62.47,
+        "warmMedianMs": 25.93,
+        "warmP95Ms": 28.72,
+        "payloadBytes": 37164,
+        "quads": 2411,
+        "peakRssMiB": 158.19,
+        "cpuMs": 657,
+        "wallMs": 455.67,
+        "lastPhases": {
+          "volumeMs": 2.6855999999970663,
+          "meshMs": 21.667300000000978,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 48,
+          "sectionHits": 970,
+          "sectionMisses": 97
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 1,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 168.72,
+        "warmMedianMs": 124.95,
+        "warmP95Ms": 131.47,
+        "payloadBytes": 54852,
+        "quads": 1837,
+        "peakRssMiB": 185.5,
+        "cpuMs": 2203,
+        "wallMs": 1556.45,
+        "lastPhases": {
+          "volumeMs": 38.41670000000158,
+          "meshMs": 82.81399999999849,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 32,
+        "level": 2,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 124.22,
+        "warmMedianMs": 68.3,
+        "warmP95Ms": 72.41,
+        "payloadBytes": 57108,
+        "quads": 2025,
+        "peakRssMiB": 175.61,
+        "cpuMs": 1235,
+        "wallMs": 949.49,
+        "lastPhases": {
+          "volumeMs": 49.474499999996624,
+          "meshMs": 20.811600000000908,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 48,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 0,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 71.93,
+        "warmMedianMs": 31.09,
+        "warmP95Ms": 33.07,
+        "payloadBytes": 107124,
+        "quads": 8241,
+        "peakRssMiB": 169.46,
+        "cpuMs": 718,
+        "wallMs": 511.63,
+        "lastPhases": {
+          "volumeMs": 3.925099999993108,
+          "meshMs": 25.320000000006985,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 80,
+          "sectionHits": 1170,
+          "sectionMisses": 117
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 1,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 187.75,
+        "warmMedianMs": 142.81,
+        "warmP95Ms": 145.35,
+        "payloadBytes": 284160,
+        "quads": 20946,
+        "peakRssMiB": 189.9,
+        "cpuMs": 2640,
+        "wallMs": 1748.43,
+        "lastPhases": {
+          "volumeMs": 41.48609999999462,
+          "meshMs": 96.92140000000654,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "nether",
+        "mode": "caves",
+        "minY": 0,
+        "maxY": 64,
+        "level": 2,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 142.49,
+        "warmMedianMs": 82,
+        "warmP95Ms": 86.88,
+        "payloadBytes": 146316,
+        "quads": 9459,
+        "peakRssMiB": 175.04,
+        "cpuMs": 1422,
+        "wallMs": 1096.82,
+        "lastPhases": {
+          "volumeMs": 49.09459999999672,
+          "meshMs": 26.558700000008685,
+          "allocatedMinY": 0,
+          "allocatedMaxY": 80,
+          "sectionHits": 0,
+          "sectionMisses": 0
+        }
+      },
+      {
+        "dimension": "overworld",
+        "mode": "default",
+        "level": 0,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 96.4,
+        "warmMedianMs": 30.95,
+        "warmP95Ms": 34.92,
+        "payloadBytes": 81480,
+        "quads": 6104,
+        "peakRssMiB": 185.18,
+        "cpuMs": 875,
+        "wallMs": 544.83
+      },
+      {
+        "dimension": "overworld",
+        "mode": "default",
+        "level": 1,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 266.69,
+        "warmMedianMs": 195.62,
+        "warmP95Ms": 205.22,
+        "payloadBytes": 383844,
+        "quads": 29253,
+        "peakRssMiB": 230.67,
+        "cpuMs": 3016,
+        "wallMs": 2390.84
+      },
+      {
+        "dimension": "overworld",
+        "mode": "default",
+        "level": 2,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 385.18,
+        "warmMedianMs": 309.72,
+        "warmP95Ms": 339.25,
+        "payloadBytes": 585228,
+        "quads": 46035,
+        "peakRssMiB": 197.55,
+        "cpuMs": 4453,
+        "wallMs": 3670.55
+      },
+      {
+        "dimension": "overworld",
+        "mode": "default",
+        "level": 3,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 641.09,
+        "warmMedianMs": 522.67,
+        "warmP95Ms": 552.89,
+        "payloadBytes": 415836,
+        "quads": 31919,
+        "peakRssMiB": 240.03,
+        "cpuMs": 6657,
+        "wallMs": 6059.95
+      },
+      {
+        "dimension": "overworld",
+        "mode": "default",
+        "level": 5,
+        "x": -1,
+        "z": 0,
+        "coldBuildMs": 660.21,
+        "warmMedianMs": 562.22,
+        "warmP95Ms": 573.24,
+        "payloadBytes": 55296,
+        "quads": 1874,
+        "peakRssMiB": 241.66,
+        "cpuMs": 7234,
+        "wallMs": 6455.27
+      },
+      {
+        "dimension": "nether",
+        "mode": "default",
+        "level": 0,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 77.57,
+        "warmMedianMs": 36.51,
+        "warmP95Ms": 41.19,
+        "payloadBytes": 107340,
+        "quads": 8259,
+        "peakRssMiB": 229.08,
+        "cpuMs": 1031,
+        "wallMs": 576.52
+      },
+      {
+        "dimension": "nether",
+        "mode": "default",
+        "level": 1,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 186.47,
+        "warmMedianMs": 136.66,
+        "warmP95Ms": 139.47,
+        "payloadBytes": 285192,
+        "quads": 21032,
+        "peakRssMiB": 232.17,
+        "cpuMs": 2234,
+        "wallMs": 1693.13
+      },
+      {
+        "dimension": "nether",
+        "mode": "default",
+        "level": 2,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 139.79,
+        "warmMedianMs": 81.97,
+        "warmP95Ms": 89.8,
+        "payloadBytes": 150336,
+        "quads": 9794,
+        "peakRssMiB": 231.06,
+        "cpuMs": 1499,
+        "wallMs": 1095.12
+      },
+      {
+        "dimension": "nether",
+        "mode": "default",
+        "level": 3,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 120.29,
+        "warmMedianMs": 56.88,
+        "warmP95Ms": 62.08,
+        "payloadBytes": 72888,
+        "quads": 3340,
+        "peakRssMiB": 223.62,
+        "cpuMs": 1109,
+        "wallMs": 834.71
+      },
+      {
+        "dimension": "nether",
+        "mode": "default",
+        "level": 5,
+        "x": 0,
+        "z": 0,
+        "coldBuildMs": 147.73,
+        "warmMedianMs": 86,
+        "warmP95Ms": 87.93,
+        "payloadBytes": 37440,
+        "quads": 386,
+        "peakRssMiB": 221.38,
+        "cpuMs": 1501,
+        "wallMs": 1137.85
+      }
+    ]
+  },
+  "concurrency": {
+    "method": "Independent M0 harness, shared priority queue and in-flight deduplication; no scene-server code modified; foreground jobs outrank queued prewarm jobs; active prewarm jobs are not interrupted",
+    "rows": [
+      {
+        "permits": 1,
+        "visitors": 1,
+        "requests": 4,
+        "withPrewarm": false,
+        "foregroundWallMs": 319.71,
+        "allWallMs": 319.81,
+        "latencyMedianMs": 254.69,
+        "latencyP95Ms": 319.46,
+        "cpuMs": 500,
+        "peakRssMiB": 132.14,
+        "peakQueue": 3,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 0,
+          "builds": 4,
+          "bytes": 133620
+        },
+        "warmStats": {
+          "hits": 4,
+          "coalesced": 0,
+          "builds": 4,
+          "bytes": 133620
+        },
+        "warmBatchMs": 0.06
+      },
+      {
+        "permits": 1,
+        "visitors": 1,
+        "requests": 4,
+        "withPrewarm": true,
+        "foregroundWallMs": 928.5,
+        "allWallMs": 1777.13,
+        "latencyMedianMs": 861.73,
+        "latencyP95Ms": 914.51,
+        "cpuMs": 2593,
+        "peakRssMiB": 224.98,
+        "peakQueue": 4,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 0,
+          "builds": 8,
+          "bytes": 1070076
+        },
+        "warmStats": {
+          "hits": 4,
+          "coalesced": 0,
+          "builds": 8,
+          "bytes": 1070076
+        },
+        "warmBatchMs": 0.03
+      },
+      {
+        "permits": 1,
+        "visitors": 5,
+        "requests": 20,
+        "withPrewarm": false,
+        "foregroundWallMs": 702.33,
+        "allWallMs": 702.39,
+        "latencyMedianMs": 370.26,
+        "latencyP95Ms": 669.62,
+        "cpuMs": 1140,
+        "peakRssMiB": 169.56,
+        "peakQueue": 15,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 4,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmStats": {
+          "hits": 20,
+          "coalesced": 4,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmBatchMs": 0.04
+      },
+      {
+        "permits": 1,
+        "visitors": 5,
+        "requests": 20,
+        "withPrewarm": true,
+        "foregroundWallMs": 1464.71,
+        "allWallMs": 2325.06,
+        "latencyMedianMs": 1119.4,
+        "latencyP95Ms": 1416.12,
+        "cpuMs": 2985,
+        "peakRssMiB": 281.2,
+        "peakQueue": 16,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 4,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmStats": {
+          "hits": 20,
+          "coalesced": 4,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmBatchMs": 0.04
+      },
+      {
+        "permits": 1,
+        "visitors": 20,
+        "requests": 80,
+        "withPrewarm": false,
+        "foregroundWallMs": 730.81,
+        "allWallMs": 730.94,
+        "latencyMedianMs": 460.61,
+        "latencyP95Ms": 730.53,
+        "cpuMs": 1077,
+        "peakRssMiB": 203.2,
+        "peakQueue": 15,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 64,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmStats": {
+          "hits": 80,
+          "coalesced": 64,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmBatchMs": 0.09
+      },
+      {
+        "permits": 1,
+        "visitors": 20,
+        "requests": 80,
+        "withPrewarm": true,
+        "foregroundWallMs": 1306.23,
+        "allWallMs": 2166.91,
+        "latencyMedianMs": 1025.3,
+        "latencyP95Ms": 1291.96,
+        "cpuMs": 2907,
+        "peakRssMiB": 270.06,
+        "peakQueue": 16,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 64,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmStats": {
+          "hits": 80,
+          "coalesced": 64,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmBatchMs": 0.09
+      },
+      {
+        "permits": 2,
+        "visitors": 20,
+        "requests": 80,
+        "withPrewarm": false,
+        "foregroundWallMs": 473.09,
+        "allWallMs": 473.18,
+        "latencyMedianMs": 319.61,
+        "latencyP95Ms": 472.93,
+        "cpuMs": 1640,
+        "peakRssMiB": 239.34,
+        "peakQueue": 14,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 64,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmStats": {
+          "hits": 80,
+          "coalesced": 64,
+          "builds": 16,
+          "bytes": 1584720
+        },
+        "warmBatchMs": 0.08
+      },
+      {
+        "permits": 2,
+        "visitors": 20,
+        "requests": 80,
+        "withPrewarm": true,
+        "foregroundWallMs": 774.23,
+        "allWallMs": 1779.44,
+        "latencyMedianMs": 475.38,
+        "latencyP95Ms": 759.91,
+        "cpuMs": 3391,
+        "peakRssMiB": 318.01,
+        "peakQueue": 15,
+        "coldStats": {
+          "hits": 0,
+          "coalesced": 64,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmStats": {
+          "hits": 80,
+          "coalesced": 64,
+          "builds": 20,
+          "bytes": 2521176
+        },
+        "warmBatchMs": 0.15
+      }
+    ]
+  },
+  "cacheGrowth": {
+    "rows": [
+      {
+        "generated": 12,
+        "elapsedMs": 688.54,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 12,
+          "diskBytes": 635160,
+          "memoryBytes": 635160,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 635160,
+          "peakMemory": 635160
+        },
+        "peakRssMiB": 236.95
+      },
+      {
+        "generated": 24,
+        "elapsedMs": 1295.87,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 24,
+          "diskBytes": 1695924,
+          "memoryBytes": 1695924,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 1695924,
+          "peakMemory": 1695924
+        },
+        "peakRssMiB": 256.88
+      },
+      {
+        "generated": 36,
+        "elapsedMs": 1777.65,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 36,
+          "diskBytes": 3291672,
+          "memoryBytes": 2054304,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 3291672,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 256.88
+      },
+      {
+        "generated": 48,
+        "elapsedMs": 2232.98,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 48,
+          "diskBytes": 4611720,
+          "memoryBytes": 2074680,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 4611720,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 257.43
+      },
+      {
+        "generated": 60,
+        "elapsedMs": 2676.74,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 60,
+          "diskBytes": 6132348,
+          "memoryBytes": 2036256,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 6132348,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 265.76
+      },
+      {
+        "generated": 72,
+        "elapsedMs": 3116.03,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 72,
+          "diskBytes": 7994556,
+          "memoryBytes": 1862208,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 7994556,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 265.76
+      },
+      {
+        "generated": 84,
+        "elapsedMs": 3511.56,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 62,
+          "diskBytes": 8273760,
+          "memoryBytes": 2074380,
+          "evicted": 22,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8374428,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 275.51
+      },
+      {
+        "generated": 96,
+        "elapsedMs": 5819.55,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 49,
+          "diskBytes": 8379300,
+          "memoryBytes": 1712244,
+          "evicted": 47,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8379300,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 345.69
+      },
+      {
+        "generated": 108,
+        "elapsedMs": 8730.26,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 26,
+          "diskBytes": 8330340,
+          "memoryBytes": 1806984,
+          "evicted": 82,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8385648,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 369.72
+      },
+      {
+        "generated": 120,
+        "elapsedMs": 11728.08,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 14,
+          "diskBytes": 7976040,
+          "memoryBytes": 1213860,
+          "evicted": 106,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8385648,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 375.11
+      },
+      {
+        "generated": 132,
+        "elapsedMs": 14792.92,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 13,
+          "diskBytes": 8218680,
+          "memoryBytes": 1291128,
+          "evicted": 119,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8385648,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 375.11
+      },
+      {
+        "generated": 144,
+        "elapsedMs": 17975.91,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 12,
+          "diskBytes": 7295520,
+          "memoryBytes": 1942608,
+          "evicted": 132,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8385648,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 375.11
+      },
+      {
+        "generated": 156,
+        "elapsedMs": 20889.65,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 13,
+          "diskBytes": 7912956,
+          "memoryBytes": 1943640,
+          "evicted": 143,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8385648,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 375.11
+      },
+      {
+        "generated": 168,
+        "elapsedMs": 23453.27,
+        "surface": {
+          "entries": 1,
+          "diskBytes": 81480,
+          "memoryBytes": 81480,
+          "evicted": 0,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 81480,
+          "peakMemory": 81480
+        },
+        "caves": {
+          "entries": 14,
+          "diskBytes": 7463484,
+          "memoryBytes": 1543656,
+          "evicted": 154,
+          "hits": 0,
+          "misses": 0,
+          "peakDisk": 8386560,
+          "peakMemory": 2096736
+        },
+        "peakRssMiB": 375.11
+      }
+    ],
+    "generated": 168,
+    "revisitRequests": 24,
+    "rebuilds": 12,
+    "surfaceSurvived": true,
+    "obsoleteRevision": {
+      "bytesBefore": 8180124,
+      "filesAfter": 0
+    },
+    "peakRssMiB": 375.11,
+    "cpuMs": 27345,
+    "wallMs": 23860.75
+  },
+  "engineLifecycle": [
+    {
+      "switches": 104,
+      "method": "One M0 worker, shared sequential budget; one builder per visited dimension retained (bounded at three); GC at equal End checkpoints; real snapshot End is empty",
+      "samples": [
+        {
+          "switches": 4,
+          "rssMiB": 131.77,
+          "workerHeapMiB": 13.08,
+          "workerArrayBuffersMiB": 44.26
+        },
+        {
+          "switches": 8,
+          "rssMiB": 142.38,
+          "workerHeapMiB": 13.06,
+          "workerArrayBuffersMiB": 48.86
+        },
+        {
+          "switches": 12,
+          "rssMiB": 129.8,
+          "workerHeapMiB": 11.69,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 16,
+          "rssMiB": 131.27,
+          "workerHeapMiB": 11.88,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 20,
+          "rssMiB": 130.42,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 24,
+          "rssMiB": 134.8,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 30.6
+        },
+        {
+          "switches": 28,
+          "rssMiB": 130.71,
+          "workerHeapMiB": 11.74,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 32,
+          "rssMiB": 139.05,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 36,
+          "rssMiB": 139.12,
+          "workerHeapMiB": 11.81,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 40,
+          "rssMiB": 139.35,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 44,
+          "rssMiB": 139.2,
+          "workerHeapMiB": 11.82,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 48,
+          "rssMiB": 139.47,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 52,
+          "rssMiB": 139.54,
+          "workerHeapMiB": 11.82,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 56,
+          "rssMiB": 139.17,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 60,
+          "rssMiB": 138.78,
+          "workerHeapMiB": 11.85,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 64,
+          "rssMiB": 139.59,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 68,
+          "rssMiB": 139.39,
+          "workerHeapMiB": 11.85,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 72,
+          "rssMiB": 139.46,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 76,
+          "rssMiB": 139.34,
+          "workerHeapMiB": 11.83,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 80,
+          "rssMiB": 149.16,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 84,
+          "rssMiB": 181.65,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 37.65
+        },
+        {
+          "switches": 88,
+          "rssMiB": 163.36,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 92,
+          "rssMiB": 184.09,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 39.65
+        },
+        {
+          "switches": 96,
+          "rssMiB": 164.51,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 100,
+          "rssMiB": 165.82,
+          "workerHeapMiB": 11.84,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 104,
+          "rssMiB": 169.48,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        }
+      ],
+      "cpuMs": 7141,
+      "wallMs": 4028.97
+    },
+    {
+      "switches": 1040,
+      "method": "One M0 worker, shared sequential budget; one builder per visited dimension retained (bounded at three); GC at equal End checkpoints; real snapshot End is empty",
+      "samples": [
+        {
+          "switches": 4,
+          "rssMiB": 129.44,
+          "workerHeapMiB": 13.1,
+          "workerArrayBuffersMiB": 43.06
+        },
+        {
+          "switches": 8,
+          "rssMiB": 136.47,
+          "workerHeapMiB": 13.08,
+          "workerArrayBuffersMiB": 37.36
+        },
+        {
+          "switches": 12,
+          "rssMiB": 135,
+          "workerHeapMiB": 11.8,
+          "workerArrayBuffersMiB": 33.6
+        },
+        {
+          "switches": 16,
+          "rssMiB": 137.64,
+          "workerHeapMiB": 11.83,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 20,
+          "rssMiB": 136.46,
+          "workerHeapMiB": 11.68,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 24,
+          "rssMiB": 140.37,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 28,
+          "rssMiB": 140.23,
+          "workerHeapMiB": 11.73,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 32,
+          "rssMiB": 142.36,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 36,
+          "rssMiB": 140.66,
+          "workerHeapMiB": 11.81,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 40,
+          "rssMiB": 144.04,
+          "workerHeapMiB": 11.99,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 44,
+          "rssMiB": 140.57,
+          "workerHeapMiB": 11.82,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 48,
+          "rssMiB": 141.68,
+          "workerHeapMiB": 12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 52,
+          "rssMiB": 140.6,
+          "workerHeapMiB": 11.84,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 56,
+          "rssMiB": 144.07,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 60,
+          "rssMiB": 140.29,
+          "workerHeapMiB": 11.88,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 64,
+          "rssMiB": 144.82,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 68,
+          "rssMiB": 140.66,
+          "workerHeapMiB": 11.85,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 72,
+          "rssMiB": 154.91,
+          "workerHeapMiB": 12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 76,
+          "rssMiB": 157.84,
+          "workerHeapMiB": 11.99,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 80,
+          "rssMiB": 202.03,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.29
+        },
+        {
+          "switches": 84,
+          "rssMiB": 181.42,
+          "workerHeapMiB": 11.83,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 88,
+          "rssMiB": 170.13,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 92,
+          "rssMiB": 169.89,
+          "workerHeapMiB": 11.84,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 96,
+          "rssMiB": 173.99,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 100,
+          "rssMiB": 170.14,
+          "workerHeapMiB": 11.84,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 104,
+          "rssMiB": 171.39,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 108,
+          "rssMiB": 199.02,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 112,
+          "rssMiB": 171.47,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 116,
+          "rssMiB": 200.16,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 120,
+          "rssMiB": 171.71,
+          "workerHeapMiB": 12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 124,
+          "rssMiB": 173.11,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 128,
+          "rssMiB": 200.16,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 132,
+          "rssMiB": 174.16,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 136,
+          "rssMiB": 201.37,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 140,
+          "rssMiB": 173.9,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 144,
+          "rssMiB": 173.05,
+          "workerHeapMiB": 11.83,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 148,
+          "rssMiB": 173.36,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 152,
+          "rssMiB": 177.5,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 156,
+          "rssMiB": 175.52,
+          "workerHeapMiB": 11.85,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 160,
+          "rssMiB": 178.79,
+          "workerHeapMiB": 12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 164,
+          "rssMiB": 205.84,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 168,
+          "rssMiB": 184.4,
+          "workerHeapMiB": 12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 172,
+          "rssMiB": 219.7,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 176,
+          "rssMiB": 185.21,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 180,
+          "rssMiB": 218.3,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 184,
+          "rssMiB": 183.03,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 188,
+          "rssMiB": 219.66,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 192,
+          "rssMiB": 182.78,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 196,
+          "rssMiB": 195.83,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 200,
+          "rssMiB": 195.88,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 204,
+          "rssMiB": 220.83,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.29
+        },
+        {
+          "switches": 208,
+          "rssMiB": 183.1,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 212,
+          "rssMiB": 219.4,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 216,
+          "rssMiB": 185.33,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 220,
+          "rssMiB": 219.79,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 224,
+          "rssMiB": 183.25,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 228,
+          "rssMiB": 219.92,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 232,
+          "rssMiB": 185.46,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 236,
+          "rssMiB": 219.82,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 240,
+          "rssMiB": 181.13,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 244,
+          "rssMiB": 195.54,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 248,
+          "rssMiB": 184.46,
+          "workerHeapMiB": 11.86,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 252,
+          "rssMiB": 189.75,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 256,
+          "rssMiB": 222.82,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 260,
+          "rssMiB": 196.79,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 264,
+          "rssMiB": 211.6,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 268,
+          "rssMiB": 189.46,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 272,
+          "rssMiB": 223.1,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 276,
+          "rssMiB": 196.81,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 280,
+          "rssMiB": 199.1,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 284,
+          "rssMiB": 224.15,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 288,
+          "rssMiB": 217.82,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 45.37
+        },
+        {
+          "switches": 292,
+          "rssMiB": 186.1,
+          "workerHeapMiB": 12.02,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 296,
+          "rssMiB": 190.26,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 300,
+          "rssMiB": 224.68,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 304,
+          "rssMiB": 197.98,
+          "workerHeapMiB": 12.01,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 308,
+          "rssMiB": 224.52,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 312,
+          "rssMiB": 187.86,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 316,
+          "rssMiB": 223.7,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 320,
+          "rssMiB": 190.94,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 324,
+          "rssMiB": 225.07,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 328,
+          "rssMiB": 190.5,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 332,
+          "rssMiB": 225.79,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 336,
+          "rssMiB": 190.95,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 340,
+          "rssMiB": 200.78,
+          "workerHeapMiB": 12.03,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 344,
+          "rssMiB": 222.14,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 348,
+          "rssMiB": 216.39,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 45.37
+        },
+        {
+          "switches": 352,
+          "rssMiB": 187.77,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 356,
+          "rssMiB": 201.04,
+          "workerHeapMiB": 11.86,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 360,
+          "rssMiB": 193.01,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 364,
+          "rssMiB": 199.41,
+          "workerHeapMiB": 11.86,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 368,
+          "rssMiB": 190.49,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 372,
+          "rssMiB": 225.5,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 67.29
+        },
+        {
+          "switches": 376,
+          "rssMiB": 190.43,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 380,
+          "rssMiB": 225.97,
+          "workerHeapMiB": 12.04,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 384,
+          "rssMiB": 190.55,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 388,
+          "rssMiB": 226.09,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 392,
+          "rssMiB": 193.77,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 396,
+          "rssMiB": 186.55,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 400,
+          "rssMiB": 190.64,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 404,
+          "rssMiB": 215.67,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 67.29
+        },
+        {
+          "switches": 408,
+          "rssMiB": 190.61,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 412,
+          "rssMiB": 187.8,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 416,
+          "rssMiB": 190.53,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 420,
+          "rssMiB": 216.13,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 424,
+          "rssMiB": 194.64,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 428,
+          "rssMiB": 214.26,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 432,
+          "rssMiB": 199.04,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 436,
+          "rssMiB": 186.91,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 440,
+          "rssMiB": 188.13,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 444,
+          "rssMiB": 225.32,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 448,
+          "rssMiB": 188.57,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 452,
+          "rssMiB": 201.48,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 456,
+          "rssMiB": 188.36,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 460,
+          "rssMiB": 225.2,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 464,
+          "rssMiB": 188.93,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 468,
+          "rssMiB": 201.45,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 472,
+          "rssMiB": 188.04,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 476,
+          "rssMiB": 201.46,
+          "workerHeapMiB": 11.87,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 480,
+          "rssMiB": 191.11,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 484,
+          "rssMiB": 187.13,
+          "workerHeapMiB": 11.89,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 488,
+          "rssMiB": 187.97,
+          "workerHeapMiB": 11.89,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 492,
+          "rssMiB": 198.71,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 496,
+          "rssMiB": 201.56,
+          "workerHeapMiB": 11.89,
+          "workerArrayBuffersMiB": 25.9
+        },
+        {
+          "switches": 500,
+          "rssMiB": 188.76,
+          "workerHeapMiB": 12.05,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 504,
+          "rssMiB": 226.57,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 508,
+          "rssMiB": 189.21,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 512,
+          "rssMiB": 201.45,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 516,
+          "rssMiB": 226.39,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 520,
+          "rssMiB": 218.76,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 45.37
+        },
+        {
+          "switches": 524,
+          "rssMiB": 190.8,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 528,
+          "rssMiB": 214.29,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 532,
+          "rssMiB": 190.62,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 536,
+          "rssMiB": 214.87,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 540,
+          "rssMiB": 190.64,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 544,
+          "rssMiB": 190.79,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 548,
+          "rssMiB": 190.5,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 552,
+          "rssMiB": 215.65,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 556,
+          "rssMiB": 190.57,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 560,
+          "rssMiB": 188.4,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 564,
+          "rssMiB": 191,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 568,
+          "rssMiB": 225.68,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 572,
+          "rssMiB": 189.1,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 576,
+          "rssMiB": 215.94,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 580,
+          "rssMiB": 188.53,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 584,
+          "rssMiB": 200.3,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 588,
+          "rssMiB": 188.27,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 592,
+          "rssMiB": 199.44,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 596,
+          "rssMiB": 197.09,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 600,
+          "rssMiB": 214.91,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 604,
+          "rssMiB": 191.37,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 608,
+          "rssMiB": 226.5,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.29
+        },
+        {
+          "switches": 612,
+          "rssMiB": 189.07,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 616,
+          "rssMiB": 225.76,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 620,
+          "rssMiB": 187.3,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 624,
+          "rssMiB": 191.64,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 628,
+          "rssMiB": 188.93,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 632,
+          "rssMiB": 199.07,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 636,
+          "rssMiB": 190.11,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 640,
+          "rssMiB": 191.89,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 644,
+          "rssMiB": 225.45,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 648,
+          "rssMiB": 191.19,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 652,
+          "rssMiB": 201.58,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 656,
+          "rssMiB": 189.31,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 660,
+          "rssMiB": 201.63,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 664,
+          "rssMiB": 191.77,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 668,
+          "rssMiB": 226.57,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 672,
+          "rssMiB": 189.01,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 676,
+          "rssMiB": 225.38,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 680,
+          "rssMiB": 191.98,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 684,
+          "rssMiB": 227.27,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 688,
+          "rssMiB": 192.67,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 692,
+          "rssMiB": 225.91,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 696,
+          "rssMiB": 199.35,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 700,
+          "rssMiB": 227.25,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 704,
+          "rssMiB": 199.25,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 708,
+          "rssMiB": 201.91,
+          "workerHeapMiB": 11.89,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 712,
+          "rssMiB": 189.74,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 716,
+          "rssMiB": 226.95,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 720,
+          "rssMiB": 192.31,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 724,
+          "rssMiB": 202.18,
+          "workerHeapMiB": 11.89,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 728,
+          "rssMiB": 192.98,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 732,
+          "rssMiB": 201.89,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 736,
+          "rssMiB": 192.55,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 740,
+          "rssMiB": 226.35,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 744,
+          "rssMiB": 194.48,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 748,
+          "rssMiB": 225.97,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 752,
+          "rssMiB": 192.04,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 756,
+          "rssMiB": 214.93,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 760,
+          "rssMiB": 198.73,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 764,
+          "rssMiB": 215.02,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 768,
+          "rssMiB": 192.07,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 772,
+          "rssMiB": 191.49,
+          "workerHeapMiB": 11.9,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 776,
+          "rssMiB": 192.09,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 780,
+          "rssMiB": 226.32,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 784,
+          "rssMiB": 199.91,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 788,
+          "rssMiB": 226.75,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 792,
+          "rssMiB": 190.31,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 796,
+          "rssMiB": 227.52,
+          "workerHeapMiB": 12.11,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 800,
+          "rssMiB": 192.53,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 804,
+          "rssMiB": 226.2,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 808,
+          "rssMiB": 193.98,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 812,
+          "rssMiB": 227.61,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 816,
+          "rssMiB": 192.2,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 820,
+          "rssMiB": 226.47,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 824,
+          "rssMiB": 189.93,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 828,
+          "rssMiB": 227.57,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 832,
+          "rssMiB": 192.94,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 836,
+          "rssMiB": 226.39,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 840,
+          "rssMiB": 194.5,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 844,
+          "rssMiB": 227.66,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 848,
+          "rssMiB": 192.37,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 852,
+          "rssMiB": 226.82,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 856,
+          "rssMiB": 192.61,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 860,
+          "rssMiB": 188.18,
+          "workerHeapMiB": 11.92,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 864,
+          "rssMiB": 199.18,
+          "workerHeapMiB": 12.07,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 868,
+          "rssMiB": 191.07,
+          "workerHeapMiB": 12.06,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 872,
+          "rssMiB": 199.27,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 876,
+          "rssMiB": 198.25,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 880,
+          "rssMiB": 187.39,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 884,
+          "rssMiB": 199.52,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 888,
+          "rssMiB": 188.84,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 892,
+          "rssMiB": 185.04,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 896,
+          "rssMiB": 189.1,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 900,
+          "rssMiB": 214.96,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 904,
+          "rssMiB": 186.86,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 908,
+          "rssMiB": 213.95,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 912,
+          "rssMiB": 185.1,
+          "workerHeapMiB": 12.12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 916,
+          "rssMiB": 213.72,
+          "workerHeapMiB": 12.11,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 920,
+          "rssMiB": 188.6,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 924,
+          "rssMiB": 213.64,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 928,
+          "rssMiB": 185.64,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 932,
+          "rssMiB": 214.03,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 936,
+          "rssMiB": 188.6,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 940,
+          "rssMiB": 213.86,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 944,
+          "rssMiB": 186.58,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 948,
+          "rssMiB": 212.82,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 952,
+          "rssMiB": 188.38,
+          "workerHeapMiB": 12.12,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 956,
+          "rssMiB": 213.28,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 960,
+          "rssMiB": 189.24,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 964,
+          "rssMiB": 212.52,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 968,
+          "rssMiB": 189.24,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 972,
+          "rssMiB": 211.86,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.39
+        },
+        {
+          "switches": 976,
+          "rssMiB": 187.72,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 980,
+          "rssMiB": 211.78,
+          "workerHeapMiB": 12.13,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 984,
+          "rssMiB": 189.14,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 988,
+          "rssMiB": 186.13,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.9
+        },
+        {
+          "switches": 992,
+          "rssMiB": 188.97,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 996,
+          "rssMiB": 223.63,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 1000,
+          "rssMiB": 189.2,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1004,
+          "rssMiB": 223.64,
+          "workerHeapMiB": 12.08,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 1008,
+          "rssMiB": 187.16,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1012,
+          "rssMiB": 211.61,
+          "workerHeapMiB": 12.09,
+          "workerArrayBuffersMiB": 67.6
+        },
+        {
+          "switches": 1016,
+          "rssMiB": 188.86,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1020,
+          "rssMiB": 186.35,
+          "workerHeapMiB": 11.91,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1024,
+          "rssMiB": 197.59,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1028,
+          "rssMiB": 200.55,
+          "workerHeapMiB": 11.92,
+          "workerArrayBuffersMiB": 25.9
+        },
+        {
+          "switches": 1032,
+          "rssMiB": 186.98,
+          "workerHeapMiB": 12.1,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1036,
+          "rssMiB": 200.24,
+          "workerHeapMiB": 11.92,
+          "workerArrayBuffersMiB": 25.89
+        },
+        {
+          "switches": 1040,
+          "rssMiB": 186.21,
+          "workerHeapMiB": 12.11,
+          "workerArrayBuffersMiB": 25.89
+        }
+      ],
+      "cpuMs": 59265,
+      "wallMs": 35653.67
+    }
+  ],
+  "lifecycleBaseline": [
+    {
+      "backend": "auto",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 10.072,
+        "last": 16.114,
+        "tailMin": 12.432,
+        "tailMax": 16.114
+      },
+      "uniforms": {
+        "first": 852,
+        "last": 4338
+      },
+      "textures": {
+        "first": 21,
+        "last": 21
+      },
+      "textureBytes": {
+        "first": 160839552,
+        "last": 160839552
+      },
+      "rendererBytes": {
+        "first": 162556026,
+        "last": 167931690
+      },
+      "pool": {},
+      "chromePrivateMiB": {
+        "first": 740.34,
+        "last": 1060.457,
+        "tailMin": 862.934,
+        "tailMax": 1060.457
+      },
+      "chromeWorkingSetMiB": {
+        "first": 656.086,
+        "last": 762.141
+      },
+      "disposed": {
+        "gpu": {
+          "buffers": 4,
+          "bufferBytes": 49968,
+          "textures": 21,
+          "textureBytes": 85604224,
+          "createdBuffers": 5486,
+          "destroyedBuffers": 5482,
+          "createdTextures": 23,
+          "destroyedTextures": 2
+        },
+        "canvases": 0,
+        "heap": {
+          "usedSize": 8475728,
+          "totalSize": 11968512,
+          "embedderHeapUsedSize": 1213544,
+          "backingStorageSize": 4108722
+        }
+      }
+    },
+    {
+      "backend": "webgl",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 10.038,
+        "last": 15.275,
+        "tailMin": 12.132,
+        "tailMax": 15.275
+      },
+      "uniforms": {
+        "first": 854,
+        "last": 4340
+      },
+      "textures": {
+        "first": 21,
+        "last": 21
+      },
+      "textureBytes": {
+        "first": 160839552,
+        "last": 160839552
+      },
+      "rendererBytes": {
+        "first": 162525820,
+        "last": 167935084
+      },
+      "pool": {},
+      "chromePrivateMiB": {
+        "first": 603.273,
+        "last": 760.973,
+        "tailMin": 661.578,
+        "tailMax": 760.973
+      },
+      "chromeWorkingSetMiB": {
+        "first": 616.645,
+        "last": 754.324
+      },
+      "disposed": {
+        "gpu": {
+          "buffers": 0,
+          "bufferBytes": 0,
+          "textures": 0,
+          "textureBytes": 0,
+          "createdBuffers": 0,
+          "destroyedBuffers": 0,
+          "createdTextures": 0,
+          "destroyedTextures": 0
+        },
+        "canvases": 0,
+        "heap": {
+          "usedSize": 8838440,
+          "totalSize": 11350016,
+          "embedderHeapUsedSize": 1475032,
+          "backingStorageSize": 4097974
+        }
+      }
+    }
+  ],
+  "lifecycleBoundedPool": [
+    {
+      "backend": "auto",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 8.239,
+        "last": 8.469,
+        "tailMin": 8.391,
+        "tailMax": 8.522
+      },
+      "uniforms": {
+        "first": 102,
+        "last": 102
+      },
+      "textures": {
+        "first": 18,
+        "last": 18
+      },
+      "textureBytes": {
+        "first": 153466752,
+        "last": 153466752
+      },
+      "rendererBytes": {
+        "first": 154026500,
+        "last": 154026500
+      },
+      "pool": {
+        "first": 7,
+        "last": 7
+      },
+      "chromePrivateMiB": {
+        "first": 637.66,
+        "last": 695.27,
+        "tailMin": 665.777,
+        "tailMax": 695.27
+      },
+      "chromeWorkingSetMiB": {
+        "first": 630.504,
+        "last": 694.191
+      },
+      "disposed": {
+        "gpu": {
+          "buffers": 0,
+          "bufferBytes": 0,
+          "textures": 0,
+          "textureBytes": 0,
+          "createdBuffers": 1256,
+          "destroyedBuffers": 1252,
+          "createdTextures": 20,
+          "destroyedTextures": 2,
+          "releasedWithDevice": {
+            "buffers": 4,
+            "bufferBytes": 49968,
+            "textures": 18,
+            "textureBytes": 56113024
+          },
+          "deviceDestroyed": true
+        },
+        "canvases": 0,
+        "heap": {
+          "usedSize": 7827828,
+          "totalSize": 9687040,
+          "embedderHeapUsedSize": 1350376,
+          "backingStorageSize": 4082254
+        }
+      }
+    },
+    {
+      "backend": "webgl",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 8.438,
+        "last": 8.739,
+        "tailMin": 8.632,
+        "tailMax": 8.739
+      },
+      "uniforms": {
+        "first": 104,
+        "last": 104
+      },
+      "textures": {
+        "first": 18,
+        "last": 18
+      },
+      "textureBytes": {
+        "first": 153466752,
+        "last": 153466752
+      },
+      "rendererBytes": {
+        "first": 153989320,
+        "last": 153989320
+      },
+      "pool": {
+        "first": 7,
+        "last": 7
+      },
+      "chromePrivateMiB": {
+        "first": 566.789,
+        "last": 644.75,
+        "tailMin": 596.293,
+        "tailMax": 644.75
+      },
+      "chromeWorkingSetMiB": {
+        "first": 592.242,
+        "last": 654.777
+      },
+      "disposed": {
+        "gpu": {
+          "buffers": 0,
+          "bufferBytes": 0,
+          "textures": 0,
+          "textureBytes": 0,
+          "createdBuffers": 0,
+          "destroyedBuffers": 0,
+          "createdTextures": 0,
+          "destroyedTextures": 0
+        },
+        "canvases": 0,
+        "heap": {
+          "usedSize": 8187508,
+          "totalSize": 9854976,
+          "embedderHeapUsedSize": 1395144,
+          "backingStorageSize": 4071446
+        }
+      }
+    }
+  ],
+  "lifecycleNoNetworkInspector": [
+    {
+      "backend": "auto",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 8.043,
+        "last": 8.277,
+        "tailMin": 8.204,
+        "tailMax": 8.277
+      },
+      "uniforms": {
+        "first": 102,
+        "last": 102
+      },
+      "textures": {
+        "first": 18,
+        "last": 18
+      },
+      "textureBytes": {
+        "first": 153466752,
+        "last": 153466752
+      },
+      "rendererBytes": {
+        "first": 154026500,
+        "last": 154026500
+      },
+      "pool": {
+        "first": 7,
+        "last": 7
+      },
+      "chromePrivateMiB": {
+        "first": 761.156,
+        "last": 695.426,
+        "tailMin": 695.426,
+        "tailMax": 706.676
+      },
+      "chromeWorkingSetMiB": {
+        "first": 828.273,
+        "last": 711
+      },
+      "disposed": {
+        "canvases": 0
+      },
+      "disposedHeap": {
+        "usedSize": 7389416,
+        "totalSize": 9162752,
+        "embedderHeapUsedSize": 401560,
+        "backingStorageSize": 4082192
+      }
+    },
+    {
+      "backend": "webgl",
+      "switches": 104,
+      "errors": 0,
+      "warmStartSwitch": 20,
+      "heapMiB": {
+        "first": 8.173,
+        "last": 8.496,
+        "tailMin": 8.34,
+        "tailMax": 8.496
+      },
+      "uniforms": {
+        "first": 104,
+        "last": 104
+      },
+      "textures": {
+        "first": 18,
+        "last": 18
+      },
+      "textureBytes": {
+        "first": 153466752,
+        "last": 153466752
+      },
+      "rendererBytes": {
+        "first": 153989320,
+        "last": 153989320
+      },
+      "pool": {
+        "first": 7,
+        "last": 7
+      },
+      "chromePrivateMiB": {
+        "first": 627.332,
+        "last": 585.844,
+        "tailMin": 575.898,
+        "tailMax": 588.59
+      },
+      "chromeWorkingSetMiB": {
+        "first": 719.762,
+        "last": 606.809
+      },
+      "disposed": {
+        "canvases": 0
+      },
+      "disposedHeap": {
+        "usedSize": 7739952,
+        "totalSize": 9330688,
+        "embedderHeapUsedSize": 633000,
+        "backingStorageSize": 4071384
+      }
+    }
+  ],
+  "snapshot": {
+    "files": 14,
+    "unchanged": true
+  },
+  "recommendations": {
+    "workers": 1,
+    "defaultThickness": 32,
+    "allowedInitialThicknesses": [16, 32],
+    "experimentalMaxThickness": 64,
+    "nearLods": [0, 1],
+    "caveViewDistance": 128,
+    "experimentalViewDistance": 256,
+    "caveEncodedMemoryMiB": 16,
+    "caveDiskMiB": 128,
+    "surfaceCache": "separate protected partition; existing snapshot cleanup retained",
+    "poolCapPerMaterial": 16,
+    "publicAccess": "all users; deployment policy and public throttling are out of scope"
+  },
+  "limitations": [
+    "p95 uses eight post-warm-up measurements per matrix case; descriptive sample, not production SLA",
+    "World has no End chunks; End lifecycle data comes from generated catalog",
+    "Prototype retains column-based tint sampling; full 3D cave-biome tinting remains Milestone 1",
+    "Concurrency/cache tests are an independent local simulation, not the scene server",
+    "Browser private bytes include browser/driver/OS caches, are not equal to JS heap or live GPU bytes",
+    "Object disposal, retained water-depth node and bounded mesh reuse are experimental harness changes, not applied to shipped viewer"
+  ]
+}

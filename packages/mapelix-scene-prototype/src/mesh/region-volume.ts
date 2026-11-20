@@ -1,6 +1,7 @@
 import type { DecodedSubchunk } from "@mapelix/prototype/bedrock";
 
 import { BASE_REGION_SPAN, WORLD_MAX_Y, WORLD_MIN_Y } from "../format.js";
+import { paddedBounds, type VerticalBounds } from "../dimensions.js";
 import type { ChunkSource, DecodedChunk } from "../world/chunk-source.js";
 import { BlockPalette, PALETTE_ID_MASK, Shape, WATERLOGGED } from "./block-palette.js";
 
@@ -23,6 +24,12 @@ export interface RegionVolume {
   readonly originX: number;
   readonly originZ: number;
   readonly cells: Uint16Array;
+  /** Allocation bounds; omitted by legacy synthetic volumes. */
+  readonly baseY?: number;
+  readonly limitY?: number;
+  /** Owner bounds, excluding the source halo. Present only for cave meshing. */
+  readonly window?: VerticalBounds;
+  readonly biomeAt?: (x: number, y: number, z: number) => number | undefined;
   /** Highest opaque cube in each column. Air below it is covered from the sky. */
   readonly topSolid: Int16Array;
   /** Highest block of any visible kind in each column. */
@@ -31,8 +38,8 @@ export interface RegionVolume {
   readonly biomes: Int16Array;
 }
 
-export function cellIndex(x: number, y: number, z: number): number {
-  return (y - WORLD_MIN_Y) * VOLUME_LAYER + z * VOLUME_SIZE + x;
+export function cellIndex(x: number, y: number, z: number, baseY = WORLD_MIN_Y): number {
+  return (y - baseY) * VOLUME_LAYER + z * VOLUME_SIZE + x;
 }
 
 /** Loads a region and its margin. Returns undefined when the region itself stores no chunk. */
@@ -41,23 +48,45 @@ export function buildRegionVolume(
   palette: BlockPalette,
   regionX: number,
   regionZ: number,
+  ceilingY = chunks.config.maxY,
+  window?: VerticalBounds,
 ): RegionVolume | undefined {
   const originX = regionX * BASE_REGION_SPAN - VOLUME_MARGIN;
   const originZ = regionZ * BASE_REGION_SPAN - VOLUME_MARGIN;
-  const cells = new Uint16Array(VOLUME_LAYER * VOLUME_HEIGHT);
+  const allocated =
+    window === undefined
+      ? { minY: WORLD_MIN_Y, maxY: WORLD_MAX_Y }
+      : paddedBounds(window, chunks.config.dimension);
+  const cells = new Uint16Array(VOLUME_LAYER * (allocated.maxY - allocated.minY));
   const loaded: Array<DecodedChunk | undefined> = [];
   let regionHasChunks = false;
 
   for (let row = 0; row < CHUNKS_PER_SIDE; row += 1) {
     for (let column = 0; column < CHUNKS_PER_SIDE; column += 1) {
-      const chunk = chunks.chunk(originX / 16 + column, originZ / 16 + row);
+      const chunkX = originX / 16 + column,
+        chunkZ = originZ / 16 + row;
+      const chunk =
+        window === undefined
+          ? chunks.chunk(chunkX, chunkZ)
+          : chunks.chunkRange(chunkX, chunkZ, allocated.minY, allocated.maxY);
       if (chunk === undefined) continue;
       const insideRegion =
         row > 0 && row < CHUNKS_PER_SIDE - 1 && column > 0 && column < CHUNKS_PER_SIDE - 1;
       regionHasChunks ||= insideRegion;
       loaded[row * CHUNKS_PER_SIDE + column] = chunk;
       for (const section of chunk.sections) {
-        writeSection(cells, palette, section, column * 16, row * 16);
+        if (section.y * 16 < (window === undefined ? ceilingY : allocated.maxY))
+          writeSection(
+            cells,
+            palette,
+            section,
+            column * 16,
+            row * 16,
+            chunk.bedColors.get(section.y),
+            allocated.minY,
+            allocated.maxY,
+            chunk.bannerColors.get(section.y),
+          );
       }
     }
   }
@@ -65,7 +94,18 @@ export function buildRegionVolume(
 
   const biomeAt = (x: number, y: number, z: number): number | undefined =>
     loaded[(z >> 4) * CHUNKS_PER_SIDE + (x >> 4)]?.biomes.at(x & 15, y, z & 15);
-  return describeVolume({ originX, originZ, cells }, palette, biomeAt);
+  return describeVolume(
+    {
+      originX,
+      originZ,
+      cells,
+      ...(window === undefined
+        ? {}
+        : { baseY: allocated.minY, limitY: allocated.maxY, window, biomeAt }),
+    },
+    palette,
+    biomeAt,
+  );
 }
 
 /**
@@ -73,7 +113,10 @@ export function buildRegionVolume(
  * with volume-local coordinates; columns without a stored chunk get no biome.
  */
 export function describeVolume(
-  filled: Pick<RegionVolume, "originX" | "originZ" | "cells">,
+  filled: Pick<
+    RegionVolume,
+    "originX" | "originZ" | "cells" | "baseY" | "limitY" | "window" | "biomeAt"
+  >,
   palette: BlockPalette,
   biomeAt: (x: number, y: number, z: number) => number | undefined,
 ): RegionVolume {
@@ -83,7 +126,15 @@ export function describeVolume(
   for (let z = 0; z < VOLUME_SIZE; z += 1) {
     for (let x = 0; x < VOLUME_SIZE; x += 1) {
       const column = z * VOLUME_SIZE + x;
-      scanColumn(filled.cells, palette, column, topSolid, topBlock);
+      scanColumn(
+        filled.cells,
+        palette,
+        column,
+        topSolid,
+        topBlock,
+        filled.baseY ?? WORLD_MIN_Y,
+        filled.limitY ?? WORLD_MAX_Y,
+      );
       const top = topBlock[column]!;
       biomes[column] = biomeAt(x, top === NO_BLOCK ? 64 : top, z) ?? -1;
     }
@@ -97,16 +148,20 @@ function writeSection(
   section: DecodedSubchunk,
   offsetX: number,
   offsetZ: number,
+  bedColors?: ReadonlyMap<number, number>,
+  minY = WORLD_MIN_Y,
+  maxY = WORLD_MAX_Y,
+  bannerColors?: ReadonlyMap<number, number>,
 ): void {
-  if (section.y < WORLD_MIN_Y / 16 || section.y >= WORLD_MAX_Y / 16) return;
-  const blocks = sectionCells(section, palette);
+  if (section.y < minY / 16 || section.y >= maxY / 16) return;
+  const blocks = sectionCells(section, palette, bedColors, bannerColors);
   const baseY = section.y * 16;
   for (let index = 0; index < 4096; index += 1) {
     const cell = blocks[index]!;
     if (cell === 0) continue;
     const x = offsetX + (index >> 8);
     const z = offsetZ + ((index >> 4) & 15);
-    cells[cellIndex(x, baseY + (index & 15), z)] = cell;
+    cells[cellIndex(x, baseY + (index & 15), z, minY)] = cell;
   }
 }
 
@@ -114,7 +169,12 @@ function writeSection(
  * The palette ids of a subchunk's blocks in Bedrock's order, `x * 256 + z * 16 + y`,
  * with `WATERLOGGED` set on blocks that hold water.
  */
-export function sectionCells(section: DecodedSubchunk, palette: BlockPalette): Uint16Array {
+export function sectionCells(
+  section: DecodedSubchunk,
+  palette: BlockPalette,
+  bedColors?: ReadonlyMap<number, number>,
+  bannerColors?: ReadonlyMap<number, number>,
+): Uint16Array {
   const storage = section.primary;
   const ids = Uint16Array.from(storage.palette, (name, index) =>
     palette.idFor(name, storage.states?.[index]),
@@ -128,6 +188,24 @@ export function sectionCells(section: DecodedSubchunk, palette: BlockPalette): U
       waterLayer !== undefined && waterIds?.[waterLayer.indexes[index]!] === true ? WATERLOGGED : 0;
     cells[index] = ids[storage.indexes[index]!]! | logged;
   }
+  if (bedColors !== undefined) {
+    for (const [index, color] of bedColors) {
+      const id = storage.indexes[index]!;
+      const name = storage.palette[id];
+      if (name !== "minecraft:bed" && name !== "bed") continue;
+      cells[index] =
+        palette.idFor(name, { ...storage.states?.[id], color }) | (cells[index]! & WATERLOGGED);
+    }
+  }
+  if (bannerColors !== undefined) {
+    for (const [index, color] of bannerColors) {
+      const id = storage.indexes[index]!;
+      const name = storage.palette[id];
+      if (name === undefined || !/^(?:minecraft:)?(?:standing|wall)_banner$/.test(name)) continue;
+      cells[index] =
+        palette.idFor(name, { ...storage.states?.[id], color }) | (cells[index]! & WATERLOGGED);
+    }
+  }
   return cells;
 }
 
@@ -137,14 +215,16 @@ function scanColumn(
   column: number,
   topSolid: Int16Array,
   topBlock: Int16Array,
+  minY: number,
+  maxY: number,
 ): void {
-  for (let y = WORLD_MAX_Y - 1; y >= WORLD_MIN_Y; y -= 1) {
-    const cell = cells[(y - WORLD_MIN_Y) * VOLUME_LAYER + column]!;
+  for (let y = maxY - 1; y >= minY; y -= 1) {
+    const cell = cells[(y - minY) * VOLUME_LAYER + column]!;
     const shape = palette.shape[cell & PALETTE_ID_MASK]!;
     if (topBlock[column] === NO_BLOCK && (shape !== Shape.Empty || cell & WATERLOGGED)) {
       topBlock[column] = y;
     }
-    if (shape === Shape.Cube) {
+    if (shape === Shape.Cube || shape === Shape.Lava) {
       topSolid[column] = y;
       return;
     }

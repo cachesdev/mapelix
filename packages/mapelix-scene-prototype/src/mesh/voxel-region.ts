@@ -3,6 +3,7 @@ import { regionCellSize, regionGridSize, regionSpan } from "../format.js";
 import { VoxelKind } from "./block-palette.js";
 import type { ChunkVoxelReader } from "./chunk-voxels.js";
 import { VoxelBox, isOpaqueKind } from "./voxel-box.js";
+import type { VerticalBounds } from "../dimensions.js";
 
 /** Rock under the part of a chunk that was read, where a cliff or the world edge shows it. */
 const DEEP_ROCK = rgb(118, 116, 112);
@@ -12,6 +13,7 @@ const DEEP_ROCK = rgb(118, 116, 112);
  * `voxelSize` blocks wide, and the region itself is `span` voxels across.
  */
 export interface VoxelRegion {
+  readonly window?: VerticalBounds;
   readonly level: number;
   readonly x: number;
   readonly z: number;
@@ -40,6 +42,9 @@ export function buildVoxelRegion(
   level: number,
   regionX: number,
   regionZ: number,
+  ceilingY?: number,
+  window?: VerticalBounds,
+  blockLight = true,
 ): VoxelRegion | undefined {
   const voxelSize = regionCellSize(level);
   const span = regionGridSize(level);
@@ -56,7 +61,14 @@ export function buildVoxelRegion(
   let regionHasChunks = false;
   for (let row = 0; row < chunksPerSide; row += 1) {
     for (let column = 0; column < chunksPerSide; column += 1) {
-      const chunk = reader.read(firstChunkX + column, firstChunkZ + row, voxelSize);
+      const chunk = reader.read(
+        firstChunkX + column,
+        firstChunkZ + row,
+        voxelSize,
+        ceilingY,
+        window,
+        level === 1 && blockLight,
+      );
       if (chunk === undefined) continue;
       regionHasChunks ||=
         row >= marginChunks &&
@@ -70,10 +82,15 @@ export function buildVoxelRegion(
 
   const low = Math.min(...placed.map((chunk) => chunk.low));
   const high = Math.max(...placed.map((chunk) => chunk.low + chunk.box.layers * voxelSize));
-  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize);
+  const box = new VoxelBox(span + margin * 2, (high - low) / voxelSize, level === 1 && blockLight);
   const explored = new Uint8Array(box.width * box.width);
   for (const chunk of placed) {
-    placeChunk(box, chunk, (chunk.low - low) / voxelSize);
+    placeChunk(
+      box,
+      chunk,
+      (chunk.low - low) / voxelSize,
+      window === undefined && reader.geometry === "surface",
+    );
     for (let z = 0; z < chunkVoxels; z += 1) {
       explored.fill(
         1,
@@ -82,22 +99,39 @@ export function buildVoxelRegion(
       );
     }
   }
-  return { level, x: regionX, z: regionZ, voxelSize, span, margin, low, box, explored };
+  return {
+    level,
+    x: regionX,
+    z: regionZ,
+    voxelSize,
+    span,
+    margin,
+    low,
+    box,
+    explored,
+    ...(window === undefined ? {} : { window }),
+  };
 }
 
 /** Copies a chunk into the region box, and fills the layers below it with its deepest voxels. */
-function placeChunk(box: VoxelBox, chunk: PlacedChunk, firstLayer: number): void {
+function placeChunk(
+  box: VoxelBox,
+  chunk: PlacedChunk,
+  firstLayer: number,
+  fillBelow: boolean,
+): void {
   const source = chunk.box;
   for (let z = 0; z < source.width; z += 1) {
     for (let x = 0; x < source.width; x += 1) {
       for (let layer = 0; layer < source.layers; layer += 1) {
         const from = source.index(x, layer, z);
-        if (source.kind[from] === VoxelKind.Air) continue;
+        if (source.kind[from] === VoxelKind.Air && !source.emission?.[from]) continue;
         box.copy(source, from, box.index(chunk.x + x, firstLayer + layer, chunk.z + z));
       }
 
       const deepest = source.index(x, 0, z);
       const solidBelow = isOpaqueKind(source.kind[deepest]!);
+      if (!fillBelow) continue;
       for (let layer = 0; layer < firstLayer; layer += 1) {
         const to = box.index(chunk.x + x, layer, chunk.z + z);
         if (solidBelow) {
@@ -108,6 +142,9 @@ function placeChunk(box: VoxelBox, chunk: PlacedChunk, firstLayer: number): void
           box.side[to] = DEEP_ROCK;
           box.fill[to] = 16;
         }
+        // The artificial rock below the read window is opaque, never a light source.
+        if (box.emission !== undefined) box.emission[to] = 0;
+        if (box.lightOpaque !== undefined) box.lightOpaque[to] = 1;
       }
     }
   }

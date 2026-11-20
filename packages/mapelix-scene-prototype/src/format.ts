@@ -8,10 +8,19 @@
  * region as one instanced quad and rebuild each corner in the vertex shader.
  *
  * Word 0: cell x (7) | cell z (7) << 7 | cell y + 64 (9) << 14 | face (3) << 23 |
- *         material (4) << 26 | covered soil (1) << 30
+ *         material (4) << 26 | covered soil (1) << 30 | optional model flag << 31
  * Word 1: width - 1 (7) | height - 1 (9) << 7 | box size - 1 (4) << 16 |
  *         box inset (3) << 20 | box anchored to top (1) << 23 | sprite (3) << 24
+ *         Non-plant extension: lava in bit 27 and its horizontal flow in bits 28-31.
+ *         Model quads (word 0 bit 31) hold their box instead, as `packModelBounds` packs it:
+ *         one cell, any box in sixteenths. See docs/block-models-and-lava.md.
  * Word 2: sRGB color (24) | corner occlusion (4 × 2) << 24
+ *
+ * A textured region (header byte 7, bit 0) follows the quads with one more `uint32` per quad,
+ * in the same order: the quad's atlas texture (`packQuadTexture` in `textures/atlas-format`),
+ * or 0 for a quad drawn with its color. An optional block-light plane (flag bit 1) follows
+ * all words: one byte (0..15) per quad, opaque then plants then translucent, in both modes.
+ * Regions without lit faces omit the plane. Geometry words and their alignment are unchanged.
  *
  * Width and height run along the face's two tangent axes. Boxes are measured in
  * sixteenths of a cell, so slabs, carpets, snow, and fence posts share one quad type.
@@ -19,9 +28,21 @@
  * the quad's color along its top edge.
  */
 
+import { packModelBounds, unpackModelBounds, type ModelBounds } from "./model-boxes.js";
+export { packModelBounds, unpackModelBounds, type ModelBounds } from "./model-boxes.js";
+
+/** Model quads: word 1 holds the quad's box in sixteenths of one cell. */
+export const QUAD_MODEL_FLAG = 0x8000_0000;
+/** Non-model emissive quads with this flag use the animated lava material. */
+export const QUAD_LAVA_FLAG = 1 << 27;
+
 export const REGION_MAGIC = 0x3153_584d; // "MXS1" in little-endian byte order.
-export const REGION_FORMAT_VERSION = 2;
+export const REGION_FORMAT_VERSION = 4;
 export const REGION_HEADER_BYTES = 40;
+/** Header byte 7: the region carries a texture word per quad. */
+export const REGION_FLAG_TEXTURED = 1;
+/** Header byte 7: a byte per quad of block light follows all geometry/texture words. */
+export const REGION_FLAG_BLOCK_LIGHT = 2;
 /** Height map value for a cell without any stored blocks. */
 export const EMPTY_HEIGHT = -32768;
 /** Lowest overworld block. Quads store their cell y minus `WORLD_MIN_Y` in nine bits. */
@@ -90,6 +111,10 @@ export interface Quad {
   readonly height: number;
   readonly box: QuadBox;
   readonly sprite: PlantSprite;
+  /** Optional cuboid bounds; absent in all regions written before the model extension. */
+  readonly modelBounds?: ModelBounds;
+  readonly lava?: boolean;
+  readonly lavaFlow?: number;
   /** Packed `0xRRGGBB` sRGB color. */
   readonly color: number;
   /** Four two-bit occlusion levels, corner 0 in the low bits. 3 is fully lit. */
@@ -131,6 +156,51 @@ export function packQuadWord2(color: number, occlusion: number): number {
   return ((color & 0xffffff) | (occlusion << 24)) >>> 0;
 }
 
+/** Word 1 of a model quad: its box, one cell wide and high. */
+export function packModelWord1(bounds: ModelBounds): number {
+  return packModelBounds(bounds);
+}
+
+export function isLavaQuad(word0: number, word1: number): boolean {
+  return (word0 & QUAD_MODEL_FLAG) === 0 && (word1 & QUAD_LAVA_FLAG) !== 0;
+}
+
+/**
+ * Groups lava at the end in place, so the viewer can draw two views without duplicating buffers.
+ * Texture words, one per quad, move with their quads.
+ */
+export function partitionLavaQuads(
+  words: Uint32Array,
+  textures?: Uint32Array,
+  blockLight?: Uint8Array,
+): Uint32Array {
+  let first = 0;
+  let last = words.length / 3 - 1;
+  while (first <= last) {
+    if (!isLavaQuad(words[first * 3]!, words[first * 3 + 1]!)) {
+      first++;
+      continue;
+    }
+    for (let word = 0; word < 3; word++) {
+      const saved = words[first * 3 + word]!;
+      words[first * 3 + word] = words[last * 3 + word]!;
+      words[last * 3 + word] = saved;
+    }
+    if (textures !== undefined) {
+      const saved = textures[first]!;
+      textures[first] = textures[last]!;
+      textures[last] = saved;
+    }
+    if (blockLight !== undefined) {
+      const saved = blockLight[first]!;
+      blockLight[first] = blockLight[last]!;
+      blockLight[last] = saved;
+    }
+    last--;
+  }
+  return words;
+}
+
 /** Reads a packed quad back into named fields. The viewer decodes the same bits in TSL. */
 export function unpackQuad(words: Uint32Array, index: number): Quad {
   const word0 = words[index * 3]!;
@@ -143,43 +213,118 @@ export function unpackQuad(words: Uint32Array, index: number): Quad {
     face: asFace((word0 >>> 23) & 0x7),
     material: asMaterial((word0 >>> 26) & 0xf),
     coveredSoil: ((word0 >>> 30) & 1) === 1,
-    width: (word1 & 0x7f) + 1,
-    height: ((word1 >>> 7) & 0x1ff) + 1,
-    box: {
-      size: ((word1 >>> 16) & 0xf) + 1,
-      inset: (word1 >>> 20) & 0x7,
-      anchoredTop: ((word1 >>> 23) & 1) === 1,
-    },
-    sprite: asSprite((word1 >>> 24) & 0x7),
+    ...((word0 & QUAD_MODEL_FLAG) !== 0
+      ? {
+          width: 1,
+          height: 1,
+          box: FULL_BOX,
+          sprite: PlantSprite.Grass,
+          modelBounds: unpackModelBounds(word1),
+        }
+      : {
+          width: (word1 & 0x7f) + 1,
+          height: ((word1 >>> 7) & 0x1ff) + 1,
+          box: {
+            size: ((word1 >>> 16) & 0xf) + 1,
+            inset: (word1 >>> 20) & 0x7,
+            anchoredTop: ((word1 >>> 23) & 1) === 1,
+          },
+          sprite: asSprite((word1 >>> 24) & 0x7),
+        }),
+    ...(isLavaQuad(word0, word1) ? { lava: true, lavaFlow: word1 >>> 28 } : {}),
     color: word2 & 0xffffff,
     occlusion: word2 >>> 24,
   };
 }
 
-/** A growable list of packed quads. */
+/** A growable list of packed quads, with a texture word per quad when `textured`. */
 export class QuadList {
   private words = new Uint32Array(3 * 256);
+  private textures: Uint32Array | undefined;
+  private blockLight: Uint8Array | undefined;
+  private lit = false;
   private length = 0;
+
+  constructor(textured = false) {
+    if (textured) this.textures = new Uint32Array(256);
+  }
 
   get count(): number {
     return this.length / 3;
   }
 
-  push(word0: number, word1: number, word2: number): void {
+  push(word0: number, word1: number, word2: number, texture = 0, light = 0): void {
+    if (light > 0 && this.blockLight === undefined)
+      this.blockLight = new Uint8Array(this.words.length / 3);
     if (this.length + 3 > this.words.length) {
       const grown = new Uint32Array(this.words.length * 2);
       grown.set(this.words);
       this.words = grown;
+      if (this.textures !== undefined) {
+        const textures = new Uint32Array(this.textures.length * 2);
+        textures.set(this.textures);
+        this.textures = textures;
+      }
+      if (this.blockLight !== undefined) {
+        const levels = new Uint8Array(this.blockLight.length * 2);
+        levels.set(this.blockLight);
+        this.blockLight = levels;
+      }
     }
     this.words[this.length] = word0;
     this.words[this.length + 1] = word1;
     this.words[this.length + 2] = word2;
+    if (this.textures !== undefined) this.textures[this.length / 3] = texture;
+    if (this.blockLight !== undefined) {
+      this.blockLight[this.length / 3] = light;
+      this.lit ||= light > 0;
+    }
     this.length += 3;
   }
 
   finish(): Uint32Array {
     return this.words.slice(0, this.length);
   }
+
+  /** The texture words, or undefined for an untextured list. */
+  finishTextures(): Uint32Array | undefined {
+    return this.textures?.slice(0, this.length / 3);
+  }
+
+  finishBlockLight(): Uint8Array | undefined {
+    return this.lit ? this.blockLight?.slice(0, this.count) : undefined;
+  }
+}
+
+/** Collects matching light arrays only when at least one face is lit. */
+export function finishBlockLight(
+  opaque: QuadList,
+  plants: QuadList,
+  translucent: QuadList,
+): RegionBlockLight | undefined {
+  const a = opaque.finishBlockLight();
+  const b = plants.finishBlockLight();
+  const c = translucent.finishBlockLight();
+  if (a === undefined && b === undefined && c === undefined) return undefined;
+  return {
+    opaque: a ?? new Uint8Array(opaque.count),
+    plants: b ?? new Uint8Array(plants.count),
+    translucent: c ?? new Uint8Array(translucent.count),
+  };
+}
+
+/** One block-light level (0..15) per quad, with or without textures. */
+export interface RegionBlockLight {
+  readonly opaque: Uint8Array;
+  readonly plants: Uint8Array;
+  readonly translucent: Uint8Array;
+}
+
+/** One texture word per quad of each array, for a textured region. */
+export interface RegionTextures {
+  readonly opaque: Uint32Array;
+  readonly plants: Uint32Array;
+  readonly translucent: Uint32Array;
 }
 
 /** Mesh output for one region before it is serialized. */
@@ -195,6 +340,10 @@ export interface SceneRegion {
   readonly opaque: Uint32Array;
   readonly plants: Uint32Array;
   readonly translucent: Uint32Array;
+  /** Present in a textured region only. */
+  readonly textures?: RegionTextures;
+  /** Absent when all faces receive zero block light or the region is a distant LOD. */
+  readonly blockLight?: RegionBlockLight;
 }
 
 /** A decoded region whose typed arrays view the original bytes without copying. */
@@ -223,11 +372,37 @@ export function regionGridSize(level: number): number {
 export function encodeSceneRegion(region: SceneRegion): Uint8Array {
   const gridSize = regionGridSize(region.level);
   const quadWords = region.opaque.length + region.plants.length + region.translucent.length;
-  const bytes = new Uint8Array(REGION_HEADER_BYTES + gridSize * gridSize * 2 + quadWords * 4);
+  const { textures, blockLight } = region;
+  if (
+    textures !== undefined &&
+    (textures.opaque.length * 3 !== region.opaque.length ||
+      textures.plants.length * 3 !== region.plants.length ||
+      textures.translucent.length * 3 !== region.translucent.length)
+  ) {
+    throw new RangeError("A textured region needs one texture word per quad");
+  }
+  const textureWords = textures === undefined ? 0 : quadWords / 3;
+  if (blockLight !== undefined) {
+    for (const layer of ["opaque", "plants", "translucent"] as const) {
+      if (blockLight[layer].length * 3 !== region[layer].length)
+        throw new RangeError("A lit region needs one block-light byte per quad");
+      if (blockLight[layer].some((level) => level > 15))
+        throw new RangeError("Block light must be in 0..15");
+    }
+  }
+  const lightBytes = blockLight === undefined ? 0 : quadWords / 3;
+  const bytes = new Uint8Array(
+    REGION_HEADER_BYTES + gridSize * gridSize * 2 + (quadWords + textureWords) * 4 + lightBytes,
+  );
   const view = new DataView(bytes.buffer);
   view.setUint32(0, REGION_MAGIC, true);
   view.setUint16(4, REGION_FORMAT_VERSION, true);
   view.setUint8(6, region.level);
+  view.setUint8(
+    7,
+    (textures === undefined ? 0 : REGION_FLAG_TEXTURED) |
+      (blockLight === undefined ? 0 : REGION_FLAG_BLOCK_LIGHT),
+  );
   view.setInt32(8, region.x, true);
   view.setInt32(12, region.z, true);
   view.setUint32(16, region.opaque.length / 3, true);
@@ -242,9 +417,17 @@ export function encodeSceneRegion(region: SceneRegion): Uint8Array {
     offset,
   );
   offset += gridSize * gridSize * 2;
-  for (const quads of [region.opaque, region.plants, region.translucent]) {
+  const arrays = [region.opaque, region.plants, region.translucent];
+  if (textures !== undefined) arrays.push(textures.opaque, textures.plants, textures.translucent);
+  for (const quads of arrays) {
     bytes.set(new Uint8Array(quads.buffer, quads.byteOffset, quads.byteLength), offset);
     offset += quads.byteLength;
+  }
+  if (blockLight !== undefined) {
+    for (const layer of [blockLight.opaque, blockLight.plants, blockLight.translucent]) {
+      bytes.set(layer, offset);
+      offset += layer.length;
+    }
   }
   return bytes;
 }
@@ -265,6 +448,11 @@ export function decodeSceneRegion(bytes: Uint8Array): DecodedSceneRegion {
   }
 
   const level = view.getUint8(6);
+  const flags = view.getUint8(7);
+  if ((flags & ~(REGION_FLAG_TEXTURED | REGION_FLAG_BLOCK_LIGHT)) !== 0)
+    throw new Error(`Unknown scene region flags ${flags}`);
+  const textured = (flags & REGION_FLAG_TEXTURED) !== 0;
+  const lit = (flags & REGION_FLAG_BLOCK_LIGHT) !== 0;
   const x = view.getInt32(8, true);
   const z = view.getInt32(12, true);
   const gridSize = regionGridSize(level);
@@ -272,7 +460,10 @@ export function decodeSceneRegion(bytes: Uint8Array): DecodedSceneRegion {
   const plantCount = view.getUint32(20, true);
   const translucentCount = view.getUint32(24, true);
   const quadCount = opaqueCount + plantCount + translucentCount;
-  const expected = REGION_HEADER_BYTES + gridSize * gridSize * 2 + quadCount * 12;
+  const expected =
+    REGION_HEADER_BYTES +
+    gridSize * gridSize * 2 +
+    quadCount * ((textured ? 16 : 12) + (lit ? 1 : 0));
   if (bytes.byteLength !== expected) {
     throw new Error(`Scene region has ${bytes.byteLength} bytes, expected ${expected}`);
   }
@@ -288,6 +479,31 @@ export function decodeSceneRegion(bytes: Uint8Array): DecodedSceneRegion {
   const opaque = takeQuads(opaqueCount);
   const plants = takeQuads(plantCount);
   const translucent = takeQuads(translucentCount);
+  const takeTextures = (count: number): Uint32Array => {
+    const words = new Uint32Array(bytes.buffer, offset, count);
+    offset += count * 4;
+    return words;
+  };
+  const textures = textured
+    ? {
+        opaque: takeTextures(opaqueCount),
+        plants: takeTextures(plantCount),
+        translucent: takeTextures(translucentCount),
+      }
+    : undefined;
+  const takeLight = (count: number): Uint8Array => {
+    const levels = new Uint8Array(bytes.buffer, offset, count);
+    offset += count;
+    if (levels.some((level) => level > 15)) throw new Error("Invalid block-light level");
+    return levels;
+  };
+  const blockLight = lit
+    ? {
+        opaque: takeLight(opaqueCount),
+        plants: takeLight(plantCount),
+        translucent: takeLight(translucentCount),
+      }
+    : undefined;
 
   return {
     level,
@@ -303,6 +519,8 @@ export function decodeSceneRegion(bytes: Uint8Array): DecodedSceneRegion {
     opaque,
     plants,
     translucent,
+    ...(textures === undefined ? {} : { textures }),
+    ...(blockLight === undefined ? {} : { blockLight }),
   };
 }
 

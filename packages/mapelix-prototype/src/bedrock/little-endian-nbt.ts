@@ -1,4 +1,4 @@
-/** The NBT tag types used by Bedrock's little-endian network storage. */
+/** The NBT tag types used by Bedrock's little-endian disk storage. */
 export const LittleEndianNbtTag = {
   End: 0,
   Byte: 1,
@@ -161,10 +161,10 @@ function readValue(reader: Reader, type: number, depth: number): LittleEndianNbt
       return reader.readString();
     case LittleEndianNbtTag.List: {
       const itemType = reader.readUint8() as LittleEndianNbtTag;
-      if (itemType === LittleEndianNbtTag.End) {
+      const length = reader.readLength();
+      if (itemType === LittleEndianNbtTag.End && length !== 0) {
         throw new Error("Malformed little-endian NBT: list cannot contain end tags");
       }
-      const length = reader.readLength();
       const result: LittleEndianNbtValue[] = [];
       for (let index = 0; index < length; index += 1) {
         result.push(readValue(reader, itemType, depth + 1));
@@ -212,7 +212,7 @@ function readCompoundValue(
 }
 
 /**
- * Reads one complete, unnamed little-endian NBT compound from a palette.
+ * Reads one complete little-endian NBT root compound, including palette and block-entity data.
  */
 export function readLittleEndianNbtCompound(
   bytes: Uint8Array,
@@ -227,7 +227,7 @@ export function readLittleEndianNbtCompound(
   if (type !== LittleEndianNbtTag.Compound) {
     throw new Error(`Malformed little-endian NBT: expected compound root, got tag type ${type}`);
   }
-  reader.readString(); // Palette roots are unnamed, but NBT still stores the name.
+  reader.readString(); // NBT stores a root name even when it is empty.
 
   return { value: readCompoundValue(reader, 0), nextOffset: reader.offset };
 }

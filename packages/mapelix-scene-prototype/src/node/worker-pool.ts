@@ -1,7 +1,9 @@
 import { Worker } from "node:worker_threads";
+import type { BlockRequest } from "./worker-protocol.js";
 
 import type { RegionBuilderOptions, RegionRequest } from "./region-builder.js";
-import type { WorkerReply } from "./worker-protocol.js";
+import type { WorkerReply, WorkerPayload } from "./worker-protocol.js";
+import type { DiscoveryRequest } from "../discoveries.js";
 
 export interface BuiltRegion {
   readonly bytes: Uint8Array;
@@ -11,15 +13,19 @@ export interface BuiltRegion {
 
 interface PendingBuild {
   readonly id: number;
-  readonly region: RegionRequest;
+  readonly payload: WorkerPayload;
   readonly signal: AbortSignal | undefined;
   readonly resolve: (region: BuiltRegion) => void;
   readonly reject: (cause: Error) => void;
+  readonly unsubscribe: () => void;
+  cancelled: boolean;
 }
 
 interface WorkerSlot {
   readonly worker: Worker;
   active: PendingBuild | undefined;
+  /** The texture index this worker holds, sent with its first textured build. */
+  textures: string | undefined;
 }
 
 /**
@@ -40,12 +46,35 @@ export class RegionWorkerPool {
   }
 
   build(region: RegionRequest, signal?: AbortSignal): Promise<BuiltRegion> {
+    return this.enqueue({ region }, signal);
+  }
+
+  discoveries(discoveries: DiscoveryRequest, signal?: AbortSignal): Promise<BuiltRegion> {
+    return this.enqueue({ discoveries }, signal);
+  }
+
+  block(block: BlockRequest, signal?: AbortSignal): Promise<BuiltRegion> {
+    return this.enqueue({ block }, signal);
+  }
+
+  private enqueue(payload: WorkerPayload, signal?: AbortSignal): Promise<BuiltRegion> {
     if (this.closed) return Promise.reject(new Error("The region worker pool is closed"));
     if (signal?.aborted === true) return Promise.reject(abortError());
     return new Promise((resolve, reject) => {
-      const pending: PendingBuild = { id: this.nextId++, region, signal, resolve, reject };
-      signal?.addEventListener("abort", () => this.cancel(pending), { once: true });
-      this.queue.push(pending);
+      const abort = () => this.cancel(pending);
+      const pending: PendingBuild = {
+        id: this.nextId++,
+        payload,
+        signal,
+        resolve,
+        reject,
+        cancelled: false,
+        unsubscribe: () => signal?.removeEventListener("abort", abort),
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      const firstDiscovery = this.queue.findIndex((job) => "discoveries" in job.payload);
+      if ("region" in payload && firstDiscovery >= 0) this.queue.splice(firstDiscovery, 0, pending);
+      else this.queue.push(pending);
       this.dispatch();
     });
   }
@@ -57,15 +86,22 @@ export class RegionWorkerPool {
 
   async close(): Promise<void> {
     this.closed = true;
-    for (const pending of this.queue) pending.reject(new Error("The region worker pool closed"));
+    for (const pending of [
+      ...this.queue,
+      ...this.slots.flatMap((slot) => (slot.active ? [slot.active] : [])),
+    ]) {
+      pending.unsubscribe();
+      pending.reject(new Error("The region worker pool closed"));
+    }
     this.queue = [];
     await Promise.all(this.slots.map((slot) => slot.worker.terminate()));
   }
 
   private cancel(pending: PendingBuild): void {
     const index = this.queue.indexOf(pending);
-    if (index < 0) return;
-    this.queue.splice(index, 1);
+    if (index >= 0) this.queue.splice(index, 1);
+    pending.cancelled = true;
+    pending.unsubscribe();
     pending.reject(abortError());
   }
 
@@ -73,7 +109,7 @@ export class RegionWorkerPool {
     const worker = new Worker(new URL("./region-worker.js", import.meta.url), {
       workerData: this.options,
     });
-    const slot: WorkerSlot = { worker, active: undefined };
+    const slot: WorkerSlot = { worker, active: undefined, textures: undefined };
     worker.unref();
     worker.on("message", (reply: WorkerReply) => this.complete(slot, reply));
     worker.on("error", (cause) => this.fail(slot, cause));
@@ -91,7 +127,22 @@ export class RegionWorkerPool {
       if (pending === undefined) return;
       slot.active = pending;
       slot.worker.ref();
-      slot.worker.postMessage({ id: pending.id, region: pending.region });
+      let { payload } = pending;
+      const textures = "region" in payload ? payload.region.textures : undefined;
+      if (typeof textures === "object") {
+        // The index is large: each worker receives it once, then its fingerprint.
+        if (slot.textures === textures.fingerprint) {
+          payload = {
+            region: {
+              ...(payload as { region: RegionRequest }).region,
+              textures: textures.fingerprint,
+            },
+          };
+        } else {
+          slot.textures = textures.fingerprint;
+        }
+      }
+      slot.worker.postMessage({ id: pending.id, ...payload });
     }
   }
 
@@ -99,7 +150,12 @@ export class RegionWorkerPool {
     const pending = slot.active;
     if (pending === undefined || pending.id !== reply.id) return;
     slot.active = undefined;
+    pending.unsubscribe();
     slot.worker.unref();
+    if (pending.cancelled) {
+      this.dispatch();
+      return;
+    }
     if (reply.kind === "built") {
       pending.resolve({ bytes: reply.bytes, milliseconds: reply.milliseconds });
     } else {
@@ -112,6 +168,7 @@ export class RegionWorkerPool {
     const index = this.slots.indexOf(slot);
     if (index < 0) return;
     this.slots.splice(index, 1);
+    slot.active?.unsubscribe();
     slot.active?.reject(cause);
     if (!this.closed) {
       this.slots.push(this.createSlot());

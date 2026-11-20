@@ -1,11 +1,15 @@
 import { MAX_REGION_LEVEL } from "./format.js";
+import type { BlockRequest } from "./node/worker-protocol.js";
 import type { RegionRequest } from "./node/region-builder.js";
 import { RegionWorkerPool, type BuiltRegion } from "./node/worker-pool.js";
 import type { Dimension } from "./world/chunk-source.js";
 import { readLevelInfo, type LevelInfo } from "./world/level-info.js";
+import { CAVE_LIMITS, parseDimension, sceneContext } from "./dimensions.js";
+import { assertDiscoveryRequest, type DiscoveryRequest } from "./discoveries.js";
 
 export type { BuiltRegion } from "./node/worker-pool.js";
 export type { RegionRequest } from "./node/region-builder.js";
+export type { PaletteTextures } from "./mesh/block-palette.js";
 export type { Dimension } from "./world/chunk-source.js";
 export type { LevelInfo } from "./world/level-info.js";
 
@@ -21,6 +25,10 @@ export interface SceneWorld {
   readonly info: LevelInfo;
   /** Builds one serialized region. See `@mapelix/scene-prototype/format` for the layout. */
   buildRegion(request: RegionRequest, signal?: AbortSignal): Promise<BuiltRegion>;
+  /** Encodes all-height source discoveries; adapters namespace by snapshot and detector schema. */
+  buildDiscoveries(request: DiscoveryRequest, signal?: AbortSignal): Promise<BuiltRegion>;
+  /** The block at one position as JSON `{ name, states }`; `name` is null where nothing loads. */
+  readBlock(request: BlockRequest, signal?: AbortSignal): Promise<BuiltRegion>;
   close(): Promise<void>;
 }
 
@@ -34,17 +42,29 @@ export async function openSceneWorld(options: SceneWorldOptions): Promise<SceneW
     throw new RangeError(`workers must be a positive integer, received ${workers}`);
   }
   const info = await readLevelInfo(options.directory);
-  const pool = new RegionWorkerPool(
-    { directory: options.directory, dimension: options.dimension ?? "overworld" },
-    workers,
-  );
+  const dimension = parseDimension(options.dimension);
+  const pool = new RegionWorkerPool({ directory: options.directory, dimension }, workers);
   return {
     info,
     buildRegion(request, signal) {
       assertRegionRequest(request);
+      const context = sceneContext(dimension, request);
+      if (context.mode === "caves" && request.level > CAVE_LIMITS.maxLevel) {
+        throw new RangeError(`Caves support LOD 0 through ${CAVE_LIMITS.maxLevel}`);
+      }
       return pool.build(request, signal);
     },
     close: () => pool.close(),
+    readBlock(request, signal) {
+      const { x, y, z } = request;
+      if (![x, y, z].every(Number.isSafeInteger))
+        throw new RangeError(`Block coordinates must be integers, received ${x}, ${y}, ${z}`);
+      return pool.block(request, signal);
+    },
+    buildDiscoveries(request, signal) {
+      assertDiscoveryRequest(request);
+      return pool.discoveries(request, signal);
+    },
   };
 }
 

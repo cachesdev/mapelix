@@ -1,0 +1,120 @@
+{
+  "baseline": "855d98f",
+  "node": "v24.14.1",
+  "workers": 0,
+  "method": "in-process RegionBuilder, alternating 7 builds, discard 2, median 5",
+  "rows": [
+    {
+      "dimension": "overworld",
+      "level": 0,
+      "bytes": [71616, 81480],
+      "quads": [5282, 6104],
+      "warmMedianMs": [34.16, 35.56],
+      "changePercent": 4.1,
+      "models": 791,
+      "lava": 0,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "overworld",
+      "level": 1,
+      "bytes": [383952, 383844],
+      "quads": [29262, 29253],
+      "warmMedianMs": [224.4, 235.82],
+      "changePercent": 5.1,
+      "models": 0,
+      "lava": 0,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "overworld",
+      "level": 3,
+      "bytes": [415836, 415836],
+      "quads": [31919, 31919],
+      "warmMedianMs": [630.03, 701.25],
+      "changePercent": 11.3,
+      "models": 0,
+      "lava": 1,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "overworld",
+      "level": 5,
+      "bytes": [55296, 55296],
+      "quads": [1874, 1874],
+      "warmMedianMs": [712.6, 729.28],
+      "changePercent": 2.3,
+      "models": 0,
+      "lava": 0,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "nether",
+      "level": 0,
+      "bytes": [86664, 107340],
+      "quads": [6536, 8259],
+      "warmMedianMs": [36.22, 43.83],
+      "changePercent": 21,
+      "models": 0,
+      "lava": 205,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "nether",
+      "level": 1,
+      "bytes": [286428, 285192],
+      "quads": [21135, 21032],
+      "warmMedianMs": [148.41, 147.2],
+      "changePercent": -0.8,
+      "models": 0,
+      "lava": 445,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "nether",
+      "level": 3,
+      "bytes": [72300, 72888],
+      "quads": [3291, 3340],
+      "warmMedianMs": [61.35, 66.91],
+      "changePercent": 9.1,
+      "models": 0,
+      "lava": 512,
+      "oldReaderAccepted": true
+    },
+    {
+      "dimension": "nether",
+      "level": 5,
+      "bytes": [37428, 37440],
+      "quads": [385, 386],
+      "warmMedianMs": [85.51, 90.98],
+      "changePercent": 6.4,
+      "models": 0,
+      "lava": 111,
+      "oldReaderAccepted": true
+    }
+  ],
+  "date": "2026-11-13",
+  "coordinates": {
+    "overworld": {
+      "x": -1,
+      "z": 0
+    },
+    "nether": {
+      "x": 0,
+      "z": 0,
+      "ceilingY": 96
+    }
+  },
+  "columns": ["baseline 855d98f", "candidate"],
+  "validation": {
+    "unitTests": 327,
+    "fixtureBrowserTests": 6,
+    "realSnapshotBrowserTests": 4,
+    "snapshotFilesUnchanged": 14,
+    "realEndAvailable": false,
+    "modelBounds": 180,
+    "formatVersion": 2,
+    "prototypeMeshRevision": 23,
+    "catalogRegenerationByteIdentical": true
+  }
+}

@@ -1,6 +1,11 @@
 {
   "extends": ["//"],
   "tasks": {
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "env": ["MAPELIX_TEST_BROWSER", "MAPELIX_E2E_WORLD_DIRECTORY"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["build/**", ".svelte-kit/**", "!.svelte-kit/cache/**"],

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { Face, unpackQuad, type Quad, type SceneRegion } from "../format.js";
-import { BlockPalette } from "./block-palette.js";
+import { BlockPalette, TintCode } from "./block-palette.js";
+import { biomeTints } from "./biome-tints.js";
 import {
   VOLUME_HEIGHT,
   VOLUME_LAYER,
@@ -44,6 +45,35 @@ function floor(place: Place, y = 60): void {
 }
 
 describe("voxel mesher", () => {
+  it("samples cave biome tints at each negative block altitude", () => {
+    const palette = new BlockPalette();
+    const cells = new Uint16Array(VOLUME_LAYER * 64);
+    const leaf = palette.idFor("minecraft:oak_leaves", {});
+    for (const y of [-50, -34]) cells[cellIndex(24, y, 24)] = leaf;
+    const biomeAt = (_x: number, y: number, _z: number) => (y < -48 ? 6 : 2);
+    const volume = describeVolume(
+      {
+        originX: -16,
+        originZ: -16,
+        cells,
+        baseY: -64,
+        limitY: 0,
+        window: { minY: -64, maxY: -32 },
+        biomeAt,
+      },
+      palette,
+      biomeAt,
+    );
+    const faces = quadsOf(meshRegionVolume(volume, palette, 0, 0, "interior"));
+    for (const [y, biome] of [
+      [-50, 6],
+      [-34, 2],
+    ] as const) {
+      const top = faces.find((q) => q.y === y && q.face === Face.PositiveY);
+      expect(top?.color).toBe(biomeTints(biome)[TintCode.Foliage]);
+    }
+    expect(biomeTints(6)[TintCode.Foliage]).not.toBe(biomeTints(2)[TintCode.Foliage]);
+  });
   it("merges a flat floor into one top face and hides the rest", () => {
     const quads = mesh((place) => floor(place));
 

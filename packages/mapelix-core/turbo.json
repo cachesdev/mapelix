@@ -1,0 +1,25 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "check": {
+      "dependsOn": ["^build", "transit"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^build", "transit"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build", "transit"],
+      "outputs": []
+    },
+    "test:unit": {
+      "dependsOn": ["build", "transit"],
+      "outputs": []
+    }
+  }
+}

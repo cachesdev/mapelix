@@ -6,7 +6,7 @@ export default defineConfig({
   ssr: {
     // The scene package starts worker threads from files next to its built module.
     // Keeping it external preserves those relative URLs in adapter-node builds.
-    external: ["@mapelix/scene-prototype"],
+    external: ["@mapelix/scene-prototype", "@mapelix/viewer"],
   },
   plugins: [
     sveltekit({

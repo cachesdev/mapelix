@@ -3,6 +3,8 @@ import {
   EMPTY_HEIGHT,
   Face,
   FULLY_LIT,
+  QUAD_LAVA_FLAG,
+  QUAD_MODEL_FLAG,
   QuadList,
   QuadMaterial,
   WORLD_MAX_Y,
@@ -10,14 +12,22 @@ import {
   packQuadWord0,
   packQuadWord1,
   packQuadWord2,
+  packModelWord1,
+  partitionLavaQuads,
+  finishBlockLight,
   type PlantSprite,
   type SceneRegion,
 } from "../format.js";
+import { blockModelParts, type ModelBounds } from "../blocks/block-models.js";
+import { lavaFlowDirection } from "./lava-flow.js";
+import { buildBlockLight } from "./block-light.js";
 import { blendColumnTints } from "./biome-tints.js";
+import type { GeometryMode } from "../dimensions.js";
 import { BlockPalette, PALETTE_ID_MASK, Shape, TintCode, WATERLOGGED } from "./block-palette.js";
+import { QUAD_CUTOUT } from "../textures/atlas-format.js";
+import { sheetFaceWord } from "../textures/sheet-faces.js";
 import {
   NO_BLOCK,
-  VOLUME_HEIGHT,
   VOLUME_LAYER,
   VOLUME_MARGIN,
   VOLUME_SIZE,
@@ -27,6 +37,8 @@ import {
 import {
   COVER_DEPTH,
   KEY_COVERED,
+  KEY_LAVA,
+  KEY_BLOCK_LIGHT_SHIFT,
   NORMAL_LAYER,
   cornerOcclusion,
   faceOf,
@@ -50,41 +62,82 @@ const NEIGHBOR_COLUMNS = [1, -1, VOLUME_SIZE, -VOLUME_SIZE];
 const WATER_SURFACE_SIZE = 14;
 
 /**
- * Turns a level 0 volume into packed quads. Only faces that touch air reachable
- * from the sky are kept, so cave walls and sealed interiors cost nothing.
+ * Turns a level 0 volume into packed quads. Surface mode culls sealed interiors;
+ * dimension modes keep internal faces for enclosed Nether caves and End islands. With a
+ * textured palette, thin blocks with holes (`BlockPalette.cutout`, like leaf litter) hide
+ * nothing; with `cutout`, cubes with holes like leaves hide nothing either: the faces behind
+ * and between them are drawn, as Minecraft's fancy leaves are.
  */
 export function meshRegionVolume(
   volume: RegionVolume,
   palette: BlockPalette,
   regionX: number,
   regionZ: number,
+  geometry: GeometryMode = "surface",
+  cutout = false,
+  blockLight = true,
 ): SceneRegion {
-  return new VoxelMesher(volume, palette).mesh(regionX, regionZ);
+  return new VoxelMesher(volume, palette, geometry, cutout, blockLight).mesh(regionX, regionZ);
 }
 
 class VoxelMesher {
+  private readonly geometry: GeometryMode;
   private readonly volume: RegionVolume;
   private readonly palette: BlockPalette;
   private readonly cells: Uint16Array;
+  private light: Uint8Array | undefined;
+  private readonly baseY: number;
+  private readonly limitY: number;
+  private readonly caveTints = new Map<number, Uint32Array[]>();
   /** Covered air cells that connect to the sky. Open air above `topSolid` is implied. */
   private reached: Uint8Array = new Uint8Array(0);
   /** Lowest open cell of each volume column, in layers above `WORLD_MIN_Y`. */
   private lowestOpen: Int16Array = new Int16Array(0);
   private readonly tints: Uint32Array[];
-  private readonly opaque = new QuadList();
-  private readonly plants = new QuadList();
-  private readonly translucent = new QuadList();
+  private readonly opaque: QuadList;
+  private readonly plants: QuadList;
+  private readonly translucent: QuadList;
+  /** A textured palette's face texture words, or undefined for a plain mesh. */
+  private readonly textureWords: Uint32Array | undefined;
+  /** The texture word of each face in the slice masks being written. */
+  private maskTextures: Uint32Array | undefined;
   /** Lowest block per region column that can own a visible face. */
   private readonly columnLow = new Int16Array(SPAN * SPAN);
   private low = WORLD_MAX_Y;
   private high = NO_BLOCK;
   private minY = WORLD_MAX_Y;
   private maxY = WORLD_MIN_Y;
+  private hasModels = false;
+  /** Blocks with holes, see `BlockPalette.cutout`; textured palettes only. */
+  private readonly cutout: Uint8Array | undefined;
+  /** Whether cubes with holes are seen through too, see `meshRegionVolume`. */
+  private readonly cutoutCubes: boolean;
+  /** Whether faces take the light of the blocks around them; off builds lighter regions. */
+  private readonly blockLight: boolean;
 
-  constructor(volume: RegionVolume, palette: BlockPalette) {
+  constructor(
+    volume: RegionVolume,
+    palette: BlockPalette,
+    geometry: GeometryMode,
+    cutout: boolean,
+    blockLight: boolean,
+  ) {
+    this.blockLight = blockLight;
+    this.geometry = geometry;
+    this.cutout = palette.textures !== undefined ? palette.cutout : undefined;
+    this.cutoutCubes = cutout;
     this.volume = volume;
     this.palette = palette;
+    const textured = palette.textures !== undefined;
+    this.textureWords = textured ? palette.textureWords : undefined;
     this.cells = volume.cells;
+    this.baseY = volume.baseY ?? WORLD_MIN_Y;
+    this.limitY = volume.limitY ?? WORLD_MAX_Y;
+    this.opaque = new QuadList(textured);
+    this.plants = new QuadList(textured);
+    this.translucent = new QuadList(textured);
+    this.low = this.minY = this.limitY;
+    this.maxY = this.baseY;
     this.tints = blendColumnTints(
       { biomes: volume.biomes, stride: VOLUME_SIZE },
       VOLUME_MARGIN,
@@ -97,29 +150,59 @@ class VoxelMesher {
     this.findOpenAir();
     this.findColumnRanges();
     if (this.high >= this.low) {
+      this.light = this.blockLight
+        ? buildBlockLight({
+            width: VOLUME_SIZE,
+            layers: this.limitY - this.baseY,
+            minLayer: this.low - this.baseY - 15,
+            maxLayer: this.high - this.baseY + 16,
+            emission: (index) => this.palette.emission[this.cells[index]! & PALETTE_ID_MASK]!,
+            opaque: (index) => this.palette.isOpaque(this.cells[index]! & PALETTE_ID_MASK),
+          })
+        : undefined;
       for (let face = 0; face < 6; face += 1) this.meshFace(face);
       this.meshPlants();
+      if (this.hasModels) this.meshModels();
     }
-    return {
+    const opaqueTextures = this.opaque.finishTextures();
+    const blockLight = finishBlockLight(this.opaque, this.plants, this.translucent);
+    const region: SceneRegion = {
       level: 0,
       x: regionX,
       z: regionZ,
       heights: this.heights(),
-      minY: Math.min(this.minY, this.maxY),
-      maxY: this.maxY,
-      opaque: this.opaque.finish(),
+      minY: this.minY === this.limitY ? 0 : this.minY,
+      maxY: this.minY === this.limitY ? 0 : this.maxY,
+      opaque: partitionLavaQuads(this.opaque.finish(), opaqueTextures, blockLight?.opaque),
       plants: this.plants.finish(),
       translucent: this.translucent.finish(),
+      ...(blockLight === undefined ? {} : { blockLight }),
+    };
+    if (opaqueTextures === undefined) return region;
+    return {
+      ...region,
+      textures: {
+        opaque: opaqueTextures,
+        plants: this.plants.finishTextures()!,
+        translucent: this.translucent.finishTextures()!,
+      },
     };
   }
 
   /** Finds the air under overhangs, eaves, canopies, and platforms that the open sky reaches. */
   private findOpenAir(): void {
+    if (this.geometry !== "surface") {
+      // Legacy dimension floors stay unchanged; caves also keep enclosed negative-Y faces.
+      this.lowestOpen = new Int16Array(VOLUME_LAYER).fill(
+        this.volume.window === undefined ? 1 - this.baseY : 1,
+      );
+      return;
+    }
     const open = findOpenAir(
       {
         size: VOLUME_SIZE,
-        layers: VOLUME_HEIGHT,
-        roof: this.volume.topSolid.map((y) => y - WORLD_MIN_Y),
+        layers: this.limitY - this.baseY,
+        roof: this.volume.topSolid.map((y) => y - this.baseY),
         isOpaque: (index) => this.isOpaque(index),
       },
       COVER_DEPTH,
@@ -133,7 +216,6 @@ class VoxelMesher {
    * cell around a column bounds the blocks worth testing there.
    */
   private findColumnRanges(): void {
-    const { topBlock } = this.volume;
     for (let z = 0; z < SPAN; z += 1) {
       for (let x = 0; x < SPAN; x += 1) {
         const column = (z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN;
@@ -141,9 +223,9 @@ class VoxelMesher {
         for (const step of NEIGHBOR_COLUMNS) {
           lowest = Math.min(lowest, this.lowestOpen[column + step]!);
         }
-        const low = Math.max(WORLD_MIN_Y, lowest + WORLD_MIN_Y - 1);
+        const low = Math.max(this.volume.window?.minY ?? this.baseY, lowest + this.baseY - 1);
         this.columnLow[z * SPAN + x] = low;
-        const top = topBlock[column]!;
+        const top = this.columnTop(column);
         if (top === NO_BLOCK) continue;
         this.low = Math.min(this.low, low);
         this.high = Math.max(this.high, top);
@@ -156,16 +238,19 @@ class VoxelMesher {
     const layout = sliceLayout(face, SPAN, this.high - this.low + 1);
     const keys = new Uint32Array(layout.slices * layout.area);
     const colors = new Uint32Array(layout.slices * layout.area);
+    const textures =
+      this.textureWords === undefined ? undefined : new Uint32Array(layout.slices * layout.area);
+    this.maskTextures = textures;
     const used = new Uint8Array(layout.slices);
 
     for (let z = 0; z < SPAN; z += 1) {
       for (let x = 0; x < SPAN; x += 1) {
         const column = (z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN;
-        const top = this.volume.topBlock[column]!;
+        const top = this.columnTop(column);
         for (let y = this.columnLow[z * SPAN + x]!; y <= top; y += 1) {
           const slice = maskSlice(face, x, y - this.low, z);
           const mask = slice * layout.area + maskOffset(face, SPAN, x, y - this.low, z);
-          const index = cellIndex(x + VOLUME_MARGIN, y, z + VOLUME_MARGIN);
+          const index = cellIndex(x + VOLUME_MARGIN, y, z + VOLUME_MARGIN, this.baseY);
           if (this.writeFace(face, index, y, column, keys, colors, mask)) used[slice] = 1;
         }
       }
@@ -179,9 +264,10 @@ class VoxelMesher {
         keys.subarray(start, start + layout.area),
         colors.subarray(start, start + layout.area),
         layout,
-        (key, color, u, v, width, height) => {
-          this.emit(key, color, face, slice, u, v, width, height);
+        (key, color, u, v, width, height, texture) => {
+          this.emit(key, color, face, slice, u, v, width, height, texture);
         },
+        textures?.subarray(start, start + layout.area),
       );
     }
   }
@@ -202,6 +288,11 @@ class VoxelMesher {
     const cell = this.cells[index]!;
     const id = cell & PALETTE_ID_MASK;
     const shape = this.palette.shape[id]!;
+    if (shape === Shape.Model) {
+      this.hasModels = true;
+      return false;
+    }
+    if (shape === Shape.Lava) return this.writeLavaFace(face, index, y, column, keys, colors, mask);
     // Waterlogged plants and gaps render as water. Waterlogged stairs and slabs keep their shape.
     const passable = shape === Shape.Empty || shape === Shape.Plant;
     if (shape === Shape.Water || (passable && (cell & WATERLOGGED) !== 0)) {
@@ -217,12 +308,16 @@ class VoxelMesher {
     const neighborY = y + NORMAL_LAYER[face]!;
     const neighborColumn = column + STEPS.column[face]!;
     if (boundary) {
-      if (neighborY < WORLD_MIN_Y) return false;
-      if (neighborY < WORLD_MAX_Y) {
+      if (neighborY < this.baseY) return false;
+      if (neighborY < this.limitY && !this.seesThrough(this.cells[neighbor]!)) {
         if (this.hides(this.cells[neighbor]!, face, id)) return false;
         if (!this.isOpen(neighbor, neighborY, neighborColumn)) return false;
       }
-    } else if (!this.isOpen(index, y, column)) {
+    } else if (
+      !this.isOpen(index, y, column) &&
+      !(neighborY < this.limitY && this.seesThrough(this.cells[neighbor]!))
+    ) {
+      // A lower block such as a path under leaf litter shows through the litter's holes.
       return false;
     }
 
@@ -231,11 +326,30 @@ class VoxelMesher {
       : this.occlusion(face, index, y);
     // Grass sides carry the tinted top color; the shader draws soil below its strip.
     const covered = this.palette.covered[id] === 1 && !isFlatFace(face);
-    const color = this.colorOf(id, covered ? Face.PositiveY : face, column);
-    const key = mergeKey(this.palette.material[id]!, size, inset, anchoredTop, face);
-    keys[mask] = covered ? (key | KEY_COVERED) >>> 0 : key;
+    const color = this.colorOf(id, covered ? Face.PositiveY : face, column, y);
+    const material = this.palette.material[id]!;
+    const key = mergeKey(material, size, inset, anchoredTop, face);
+    // Self-lit materials do not read local fill; its variation must not split their faces.
+    const light =
+      material === QuadMaterial.Emissive
+        ? 0
+        : this.lightAt(boundary ? neighbor : index, boundary ? neighborY : y);
+    keys[mask] = ((covered ? key | KEY_COVERED : key) | (light << KEY_BLOCK_LIGHT_SHIFT)) >>> 0;
     colors[mask] = packQuadWord2(color, occlusion);
+    if (this.maskTextures !== undefined) {
+      const word = this.textureWords![id * 6 + face]!;
+      this.maskTextures[mask] =
+        word !== 0 && this.cutoutCubes && this.cutout?.[id] === 1
+          ? (word | QUAD_CUTOUT) >>> 0
+          : word;
+    }
     return true;
+  }
+
+  /** Whether a neighbor's holes show this face, so it never hides it. */
+  private seesThrough(cell: number): boolean {
+    const kind = this.cutout?.[cell & PALETTE_ID_MASK];
+    return kind === 2 || (kind === 1 && this.cutoutCubes);
   }
 
   /** Water surfaces sit two sixteenths below the block top, like Minecraft's still water. */
@@ -248,14 +362,14 @@ class VoxelMesher {
     colors: Uint32Array,
     mask: number,
   ): boolean {
-    const surface = y + 1 >= WORLD_MAX_Y || !this.isWater(this.cells[index + VOLUME_LAYER]!);
+    const surface = y + 1 >= this.limitY || !this.isWater(this.cells[index + VOLUME_LAYER]!);
     const size = surface ? WATER_SURFACE_SIZE : 16;
     if (face === Face.PositiveY && surface) {
       if (!this.isOpen(index, y, column)) return false;
     } else {
       const neighborY = y + NORMAL_LAYER[face]!;
-      if (neighborY < WORLD_MIN_Y) return false;
-      if (neighborY < WORLD_MAX_Y) {
+      if (neighborY < this.baseY) return false;
+      if (neighborY < this.limitY) {
         const neighbor = index + STEPS.normal[face]!;
         const neighborCell = this.cells[neighbor]!;
         const neighborShape = this.palette.shape[neighborCell & PALETTE_ID_MASK]!;
@@ -263,9 +377,72 @@ class VoxelMesher {
         if (!this.isOpen(neighbor, neighborY, column + STEPS.column[face]!)) return false;
       }
     }
-    keys[mask] = mergeKey(QuadMaterial.Water, size, 0, false, face);
-    colors[mask] = packQuadWord2(this.tintOf(TintCode.Water, column), FULLY_LIT);
+    const inner = face === Face.PositiveY && surface;
+    keys[mask] =
+      (mergeKey(QuadMaterial.Water, size, 0, false, face) |
+        (this.lightAt(
+          inner ? index : index + STEPS.normal[face]!,
+          inner ? y : y + NORMAL_LAYER[face]!,
+        ) <<
+          KEY_BLOCK_LIGHT_SHIFT)) >>>
+      0;
+    colors[mask] = packQuadWord2(this.tintOf(TintCode.Water, column, y), FULLY_LIT);
+    if (this.maskTextures !== undefined) this.maskTextures[mask] = this.palette.waterWord;
     return true;
+  }
+
+  private writeLavaFace(
+    face: number,
+    index: number,
+    y: number,
+    column: number,
+    keys: Uint32Array,
+    colors: Uint32Array,
+    mask: number,
+  ): boolean {
+    const id = this.cells[index]! & PALETTE_ID_MASK;
+    const above =
+      y + 1 < this.limitY &&
+      this.palette.shape[this.cells[index + VOLUME_LAYER]! & PALETTE_ID_MASK] === Shape.Lava;
+    const fill = above ? 16 : this.palette.boxSize[id]!;
+    const neighborY = y + NORMAL_LAYER[face]!;
+    if (neighborY < this.baseY) return false;
+    if (face === Face.PositiveY && fill < 16) {
+      if (!this.isOpen(index, y, column)) return false;
+    } else if (neighborY < this.limitY) {
+      const neighbor = index + STEPS.normal[face]!;
+      const neighborId = this.cells[neighbor]! & PALETTE_ID_MASK;
+      const neighborShape = this.palette.shape[neighborId]!;
+      if (neighborShape === Shape.Cube) return false;
+      if (
+        neighborShape === Shape.Lava &&
+        (isFlatFace(face) || this.lavaHeight(neighbor, fill) >= fill)
+      )
+        return false;
+      if (!this.isOpen(neighbor, neighborY, column + STEPS.column[face]!)) return false;
+    }
+    const flow = lavaFlowDirection(
+      this.lavaHeight(index + 1, fill),
+      this.lavaHeight(index - 1, fill),
+      this.lavaHeight(index + VOLUME_SIZE, fill),
+      this.lavaHeight(index - VOLUME_SIZE, fill),
+    );
+    keys[mask] =
+      (mergeKey(QuadMaterial.Emissive, fill, 0, false, face) | KEY_LAVA | (flow << 12)) >>> 0;
+    colors[mask] = packQuadWord2(this.colorOf(id, face, column, y), FULLY_LIT);
+    if (this.maskTextures !== undefined)
+      this.maskTextures[mask] = this.textureWords![id * 6 + face]!;
+    return true;
+  }
+
+  private lavaHeight(index: number, blockedFill: number): number {
+    const id = this.cells[index]! & PALETTE_ID_MASK;
+    if (this.palette.shape[id] === Shape.Cube) return blockedFill;
+    if (this.palette.shape[id] !== Shape.Lava) return 0;
+    return this.palette.shape[(this.cells[index + VOLUME_LAYER] ?? 0) & PALETTE_ID_MASK] ===
+      Shape.Lava
+      ? 16
+      : this.palette.boxSize[id]!;
   }
 
   private emit(
@@ -277,6 +454,7 @@ class VoxelMesher {
     v: number,
     width: number,
     height: number,
+    texture: number,
   ): void {
     const [x, y, z] = slicePosition(face, slice, u, v, this.low);
     const material = keyMaterial(key);
@@ -284,8 +462,11 @@ class VoxelMesher {
     const translucent = material === QuadMaterial.Water || material === QuadMaterial.Glass;
     (translucent ? this.translucent : this.opaque).push(
       packQuadWord0(x, y, z, faceOf(face), material, (key & KEY_COVERED) !== 0),
-      packQuadWord1(width, height, box, 0),
+      packQuadWord1(width, height, box, 0) |
+        ((key & KEY_LAVA) !== 0 ? QUAD_LAVA_FLAG | (((key >>> 12) & 15) << 28) : 0),
       color,
+      texture,
+      (key >>> KEY_BLOCK_LIGHT_SHIFT) & 15,
     );
     this.minY = Math.min(this.minY, y);
     this.maxY = Math.max(this.maxY, y + (isFlatFace(face) ? 1 : height));
@@ -297,9 +478,9 @@ class VoxelMesher {
     for (let z = 0; z < SPAN; z += 1) {
       for (let x = 0; x < SPAN; x += 1) {
         const column = (z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN;
-        const top = this.volume.topBlock[column]!;
+        const top = this.columnTop(column);
         for (let y = this.columnLow[z * SPAN + x]!; y <= top; y += 1) {
-          const index = cellIndex(x + VOLUME_MARGIN, y, z + VOLUME_MARGIN);
+          const index = cellIndex(x + VOLUME_MARGIN, y, z + VOLUME_MARGIN, this.baseY);
           const id = this.cells[index]! & PALETTE_ID_MASK;
           if (palette.shape[id] !== Shape.Plant || !this.isOpen(index, y, column)) continue;
           const box = {
@@ -308,23 +489,130 @@ class VoxelMesher {
             anchoredTop: false,
           };
           const word1 = packQuadWord1(1, 1, box, spriteOf(palette.sprite[id]!));
-          const word2 = packQuadWord2(this.colorOf(id, Face.PositiveY, column), FULLY_LIT);
-          this.plants.push(packQuadWord0(x, y, z, Face.CrossA, QuadMaterial.Plant), word1, word2);
-          this.plants.push(packQuadWord0(x, y, z, Face.CrossB, QuadMaterial.Plant), word1, word2);
+          const word2 = packQuadWord2(this.colorOf(id, Face.PositiveY, column, y), FULLY_LIT);
+          const texture = this.textureWords === undefined ? 0 : palette.crossWords[id]!;
+          this.plants.push(
+            packQuadWord0(x, y, z, Face.CrossA, QuadMaterial.Plant),
+            word1,
+            word2,
+            texture,
+            this.lightAt(index, y),
+          );
+          this.plants.push(
+            packQuadWord0(x, y, z, Face.CrossB, QuadMaterial.Plant),
+            word1,
+            word2,
+            texture,
+            this.lightAt(index, y),
+          );
+          if (this.geometry !== "surface") {
+            this.minY = Math.min(this.minY, y);
+            this.maxY = Math.max(this.maxY, y + box.size / 16);
+          }
         }
       }
     }
+  }
+
+  /** Detailed models occupy the existing opaque/glass streams; all faces remain 12 bytes. */
+  private meshModels(): void {
+    const { palette } = this;
+    for (let z = 0; z < SPAN; z++)
+      for (let x = 0; x < SPAN; x++) {
+        const column = (z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN;
+        for (let y = this.columnLow[z * SPAN + x]!; y <= this.columnTop(column); y++) {
+          const index = cellIndex(x + VOLUME_MARGIN, y, z + VOLUME_MARGIN, this.baseY);
+          const id = this.cells[index]! & PALETTE_ID_MASK;
+          const model = palette.models[id];
+          if (model === undefined || !this.isOpen(index, y, column)) continue;
+          const parts = blockModelParts(model, (dx, dy, dz) => {
+            if (y + dy < this.baseY || y + dy >= this.limitY) return { opaque: false };
+            const other =
+              this.cells[index + dx + dy * VOLUME_LAYER + dz * VOLUME_SIZE]! & PALETTE_ID_MASK;
+            return {
+              opaque: palette.shape[other] === Shape.Cube,
+              glass: palette.shape[other] === Shape.Glass,
+              model: palette.models[other],
+            };
+          });
+          const material = palette.material[id]! as QuadMaterial;
+          const list = material === QuadMaterial.Glass ? this.translucent : this.opaque;
+          for (const [partIndex, part] of parts.entries())
+            for (let face = 0; face < 6; face++) {
+              if (
+                parts.some(
+                  (other, otherIndex) =>
+                    otherIndex !== partIndex && coversModelFace(part.bounds, other.bounds, face),
+                )
+              )
+                continue;
+              const axis = face >> 1;
+              // Flat parts, as a stonecutter blade, draw only their two broad faces.
+              const b = part.bounds;
+              if ([0, 1, 2].some((other) => other !== axis && b[other] === b[other + 3])) continue;
+              const plane = part.bounds[axis + ((face & 1) === 0 ? 3 : 0)]!;
+              const boundary = plane === ((face & 1) === 0 ? 16 : 0);
+              const neighborY = y + NORMAL_LAYER[face]!;
+              if (boundary && neighborY >= this.baseY && neighborY < this.limitY) {
+                const neighbor = index + STEPS.normal[face]!;
+                if (
+                  this.hides(this.cells[neighbor]!, face, id) ||
+                  !this.isOpen(neighbor, neighborY, column + STEPS.column[face]!)
+                )
+                  continue;
+              }
+              const color = part.color ?? this.colorOf(id, face, column, y);
+              const occlusion =
+                material === QuadMaterial.Emissive
+                  ? FULLY_LIT
+                  : this.occlusion(
+                      face,
+                      boundary ? index + STEPS.normal[face]! : index,
+                      boundary ? neighborY : y,
+                    );
+              list.push(
+                packQuadWord0(x, y, z, faceOf(face), material) | QUAD_MODEL_FLAG,
+                packModelWord1(part.bounds),
+                packQuadWord2(color, occlusion),
+                this.textureWords === undefined ||
+                  (part.color !== undefined && part.textured !== true)
+                  ? 0
+                  : part.sheet === undefined
+                    ? this.textureWords[id * 6 + (part.faces?.[face] ?? face)]!
+                    : sheetFaceWord(
+                        this.textureWords[id * 6 + (part.faces?.[face] ?? face)]!,
+                        part.bounds,
+                        face,
+                        part.sheet,
+                      ),
+                material === QuadMaterial.Emissive
+                  ? 0
+                  : this.lightAt(
+                      boundary ? index + STEPS.normal[face]! : index,
+                      boundary ? neighborY : y,
+                    ),
+              );
+
+              this.minY = Math.min(this.minY, y);
+              this.maxY = Math.max(this.maxY, y + 1);
+            }
+        }
+      }
   }
 
   private heights(): Int16Array {
     const heights = new Int16Array(SPAN * SPAN);
     for (let z = 0; z < SPAN; z += 1) {
       for (let x = 0; x < SPAN; x += 1) {
-        const top = this.volume.topBlock[(z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN]!;
+        const top = this.columnTop((z + VOLUME_MARGIN) * VOLUME_SIZE + x + VOLUME_MARGIN);
         heights[z * SPAN + x] = top === NO_BLOCK ? EMPTY_HEIGHT : top + 1;
       }
     }
     return heights;
+  }
+
+  private lightAt(index: number, y: number): number {
+    return y < this.baseY || y >= this.limitY ? 0 : (this.light?.[index] ?? 0);
   }
 
   /** Four corner occlusion levels from the opaque cubes around the cell in front of a face. */
@@ -348,31 +636,76 @@ class VoxelMesher {
 
   /** A cell is open when the sky reaches it directly or through covered air. */
   private isOpen(index: number, y: number, column: number): boolean {
-    return y > this.volume.topSolid[column]! || this.reached[index] === 1;
+    if (
+      this.geometry !== "surface" ||
+      y > this.volume.topSolid[column]! ||
+      this.reached[index] === 1
+    )
+      return true;
+    // A partial lava surface has open room above it, but remains opaque to sky tracing below.
+    return (
+      this.palette.shape[this.cells[index]! & PALETTE_ID_MASK] === Shape.Lava &&
+      (y + 1 > this.volume.topSolid[column]! || this.reached[index + VOLUME_LAYER] === 1)
+    );
   }
 
   private isSolidAt(index: number, y: number): boolean {
-    return y >= WORLD_MIN_Y && y < WORLD_MAX_Y && this.isOpaque(index);
+    return y >= this.baseY && y < this.limitY && this.isOpaque(index);
   }
 
   private isOpaque(index: number): boolean {
-    return this.palette.shape[this.cells[index]! & PALETTE_ID_MASK] === Shape.Cube;
+    return this.palette.isOpaque(this.cells[index]! & PALETTE_ID_MASK);
   }
 
   private isWater(cell: number): boolean {
     return (cell & WATERLOGGED) !== 0 || this.palette.shape[cell & PALETTE_ID_MASK] === Shape.Water;
   }
 
-  private colorOf(id: number, face: number, column: number): number {
-    const tint = this.palette.tints[id * 6 + face]!;
-    return tint === TintCode.None ? this.palette.colors[id * 6 + face]! : this.tintOf(tint, column);
+  private columnTop(column: number): number {
+    return Math.min(this.volume.topBlock[column]!, (this.volume.window?.maxY ?? this.limitY) - 1);
   }
 
-  private tintOf(tint: number, column: number): number {
+  private colorOf(id: number, face: number, column: number, y: number): number {
+    const tint = this.palette.tints[id * 6 + face]!;
+    return tint === TintCode.None
+      ? this.palette.colors[id * 6 + face]!
+      : this.tintOf(tint, column, y);
+  }
+
+  private tintOf(tint: number, column: number, y: number): number {
     const x = (column % VOLUME_SIZE) - VOLUME_MARGIN;
     const z = Math.floor(column / VOLUME_SIZE) - VOLUME_MARGIN;
-    return this.tints[tint]![z * SPAN + x]!;
+    let tints = this.tints;
+    if (this.volume.window !== undefined && this.volume.biomeAt !== undefined) {
+      const cached = this.caveTints.get(y);
+      if (cached !== undefined) tints = cached;
+      else {
+        const biomes = new Int16Array(VOLUME_LAYER);
+        for (let bz = 0; bz < VOLUME_SIZE; bz++)
+          for (let bx = 0; bx < VOLUME_SIZE; bx++)
+            biomes[bz * VOLUME_SIZE + bx] = this.volume.biomeAt(bx, y, bz) ?? -1;
+        tints = blendColumnTints({ biomes, stride: VOLUME_SIZE }, VOLUME_MARGIN, SPAN, TINT_RADIUS);
+        this.caveTints.set(y, tints);
+      }
+    }
+    return tints[tint]![z * SPAN + x]!;
   }
+}
+
+/** Drops internal faces fully covered by another part, without creating new bounds variants. */
+function coversModelFace(a: ModelBounds, b: ModelBounds, face: number): boolean {
+  const axis = face >> 1;
+  const positive = (face & 1) === 0;
+  const plane = a[axis + (positive ? 3 : 0)]!;
+  if (
+    positive ? b[axis]! > plane || b[axis + 3]! <= plane : b[axis]! >= plane || b[axis + 3]! < plane
+  )
+    return false;
+  for (let tangent = 0; tangent < 3; tangent++) {
+    if (tangent !== axis && (b[tangent]! > a[tangent]! || b[tangent + 3]! < a[tangent + 3]!))
+      return false;
+  }
+  return true;
 }
 
 /** Faces on the cell boundary can be hidden by neighbors; inner box faces only by the sky. */

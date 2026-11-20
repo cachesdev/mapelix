@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-14",
+  "base": "cf1082bd768e76360db7a00a13507c93d5c08249",
+  "branch": "feature/cave-navigation",
+  "contracts": {
+    "embed": 3,
+    "http": 3,
+    "regionFormat": 2,
+    "discoverySchema": 1,
+    "engineOrServerChanged": false,
+    "cacheIdentityChanged": false
+  },
+  "tests": {
+    "viewer": 64,
+    "engine": 182,
+    "engineTestsCached": true,
+    "buildTypeLintPassed": true,
+    "browser": {
+      "startTime": "2026-11-13T23:38:24.082Z",
+      "duration": 344092.212,
+      "expected": 54,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "lifecycleWeatherMode": "thunderstorm"
+  },
+  "lifecycle": [
+    {
+      "backend": "WebGPU",
+      "switches": 104,
+      "uniformBuffers": [77, 72],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [154639641, 154583605],
+      "collectedHeapBytes": [10342004, 11517408],
+      "final36SwitchHeapGrowthBytes": 322096,
+      "errors": []
+    },
+    {
+      "backend": "WebGL 2",
+      "switches": 104,
+      "uniformBuffers": [79, 74],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [154600614, 154550331],
+      "collectedHeapBytes": [10450632, 11732308],
+      "final36SwitchHeapGrowthBytes": 368452,
+      "errors": []
+    }
+  ],
+  "budgets": {
+    "cloudInstances": 2304,
+    "cloudAttributesBytes": 156672,
+    "rainStreaks": 1024,
+    "rainAttributesBytes": 65536,
+    "lowQualityStreaks": 256,
+    "reduceBelowFps": 32,
+    "pauseBelowFps": 18,
+    "measurementWindowSeconds": 2,
+    "recoveryAboveFps": 48,
+    "recoveryStageSeconds": 8,
+    "extraPostProcessingPasses": 0
+  },
+  "limitations": [
+    "Generated disposable worlds and desktop Chrome; production server and mobile frame rates are not measured.",
+    "Renderer counters and collected JS heap measure logical allocations, not physical GPU residency or process RSS.",
+    "Weather is cosmetic and independently selected; roof shelter uses loaded terrain height approximations."
+  ]
+}

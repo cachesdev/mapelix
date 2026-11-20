@@ -1,10 +1,13 @@
 import { defaultBlockStyle, type BlockStyleResolver, type RgbaColor } from "./block-style.js";
 import { canonicalBiomeId, legacyBiomeStyle, type BiomeStyle } from "./biome-style.js";
 import { sampleShadowPixels } from "./shadow-sampling.js";
+import { surfaceBlockStyle, type SurfaceStyle, type SurfaceBlockStyle } from "./surface-style.js";
 import { TILE_SIZE, type SurfaceColorLayer, type SurfaceSamples } from "./tile.js";
 
 export interface RenderSurfaceOptions {
   readonly resolveBlockStyle?: BlockStyleResolver;
+  /** Declarative fixed colors and ground-cover classification; archived defaults when omitted. */
+  readonly surfaceStyle?: SurfaceStyle;
   /** Optional artistic extension. The uNmINeD-compatible default is no spatial biome blend. */
   readonly biomeBlendRadius?: number;
   /** Enables the uNmINeD-compatible 3D-opacity cast-shadow pass. Defaults to true. */
@@ -38,6 +41,8 @@ interface BiomeTintField {
   readonly valid: Uint8Array;
 }
 
+type StyledColorResolver = (name: string, style: SurfaceBlockStyle | undefined) => RgbaColor;
+
 export function renderSurface(
   samples: SurfaceSamples,
   options: RenderSurfaceOptions = {},
@@ -55,7 +60,12 @@ export function renderSurface(
     );
   }
 
+  const style = options.surfaceStyle;
   const resolveBlockStyle = options.resolveBlockStyle ?? memoizeBlockStyle(defaultBlockStyle);
+  const resolveStyledColor: StyledColorResolver = (name, material) =>
+    options.resolveBlockStyle === undefined && material !== undefined
+      ? material.color
+      : resolveBlockStyle(name);
   const biomeBlendRadius = options.biomeBlendRadius ?? 0;
   const castShadows = options.shadows ?? true;
   const correctReferenceBugs = options.correctReferenceBugs ?? false;
@@ -66,7 +76,7 @@ export function renderSurface(
   const biomeTints =
     biomeBlendRadius === 0
       ? undefined
-      : createBiomeTintField(samples, context, sampleSize, biomeBlendRadius);
+      : createBiomeTintField(samples, context, sampleSize, biomeBlendRadius, style);
   const maximumHeight = context.maximumHeight ?? maximumTerrainHeight(samples);
 
   for (let z = 0; z < sampleSize; z += 1) {
@@ -77,13 +87,13 @@ export function renderSurface(
         continue;
       }
 
-      const biome = usesBiomeTint(sample)
+      const biome = usesBiomeTint(sample, style)
         ? biomeBlendRadius === 0
           ? legacyBiomeStyle(sample.biomeId!)
           : biomeStyleAt(biomeTints, index)
         : undefined;
       const base = applyElevationGradient(
-        resolveSurfaceColor(sample, resolveBlockStyle, biome),
+        resolveSurfaceColor(sample, resolveStyledColor, biome, style),
         sample,
       );
       writeSurfaceBlock(
@@ -409,8 +419,9 @@ function surfaceSampleAt(
 
 function resolveSurfaceColor(
   sample: SurfaceSamples[number],
-  resolve: BlockStyleResolver,
+  resolve: StyledColorResolver,
   biome: BiomeStyle | undefined,
+  style: SurfaceStyle | undefined,
 ): RgbaColor {
   if (sample === undefined) {
     return { red: 0, green: 0, blue: 0, alpha: 0 };
@@ -419,21 +430,26 @@ function resolveSurfaceColor(
     let result: RgbaColor | undefined;
     for (let index = sample.colorLayers.length - 1; index >= 0; index -= 1) {
       const layer = sample.colorLayers[index]!;
-      const foreground = resolveColorLayer(layer, resolve, biome);
+      const foreground = resolveColorLayer(layer, resolve, biome, style);
       result = result === undefined ? foreground : compositeRgba(result, foreground);
     }
     if (result !== undefined) return result;
   }
-  return resolveColorLayer(sample, resolve, biome);
+  return resolveColorLayer(sample, resolve, biome, style);
 }
 
 function resolveColorLayer(
-  layer: Pick<SurfaceColorLayer, "name" | "fluidDepth" | "underwaterName">,
-  resolve: BlockStyleResolver,
+  layer: Pick<
+    SurfaceColorLayer,
+    "name" | "fluidDepth" | "underwaterName" | "style" | "underwaterStyle"
+  >,
+  resolve: StyledColorResolver,
   biome: BiomeStyle | undefined,
+  style: SurfaceStyle | undefined,
 ): RgbaColor {
+  const material = layer.style ?? surfaceBlockStyle(style, layer.name);
   if (isWater(layer.name)) {
-    const water = biome?.water ?? resolve(layer.name);
+    const water = biome?.water ?? resolve(layer.name, material);
     const depth = layer.fluidDepth ?? 1;
     const visibleDepth = Math.min(depth, 12);
     const alpha = depth > 12 ? 255 : Math.floor(179 + (Math.min(depth - 1, 12) / 12) * 76);
@@ -442,10 +458,16 @@ function resolveColorLayer(
     if (layer.underwaterName === undefined) {
       return { ...shadedWater, alpha };
     }
-    const floor = tintBiome(resolve(layer.underwaterName), layer.underwaterName, biome);
+    const floorStyle = layer.underwaterStyle ?? surfaceBlockStyle(style, layer.underwaterName);
+    const floor = tintBiome(
+      resolve(layer.underwaterName, floorStyle),
+      layer.underwaterName,
+      biome,
+      floorStyle,
+    );
     return compositeBytes(floor, shadedWater, alpha);
   }
-  return tintBiome(resolve(layer.name), layer.name, biome);
+  return tintBiome(resolve(layer.name, material), layer.name, biome, material);
 }
 
 function createBiomeTintField(
@@ -453,8 +475,10 @@ function createBiomeTintField(
   context: RenderSurfaceContext,
   sampleSize: number,
   blendRadius: number,
+  style: SurfaceStyle | undefined,
 ): BiomeTintField | undefined {
-  if (!samples.some((sample) => sample !== undefined && usesBiomeTint(sample))) return undefined;
+  if (!samples.some((sample) => sample !== undefined && usesBiomeTint(sample, style)))
+    return undefined;
   const extendedSize = sampleSize + blendRadius * 2;
   const stride = extendedSize + 1;
   const integral = new Uint32Array(stride * stride * BIOME_CHANNELS);
@@ -612,8 +636,23 @@ function tintBiome(
   base: RgbaColor,
   name: string,
   biome: ReturnType<typeof legacyBiomeStyle> | undefined,
+  material: SurfaceBlockStyle | undefined,
 ): RgbaColor {
   if (biome === undefined) return base;
+  if (material !== undefined) {
+    const tint = material.biomeTint ?? "none";
+    const color =
+      tint === "ground"
+        ? biome.groundGrass
+        : tint === "grass"
+          ? biome.grass
+          : tint === "foliage"
+            ? biome.foliage
+            : tint === "water"
+              ? biome.water
+              : undefined;
+    return color === undefined ? base : { ...color, alpha: base.alpha };
+  }
   if (/grass_block/.test(name)) return { ...biome.groundGrass, alpha: base.alpha };
   if (/(?:^|:)(?:grass|short_grass|tall_grass|tallgrass|fern|large_fern|bush)$/.test(name)) {
     return { ...biome.grass, alpha: base.alpha };
@@ -692,18 +731,26 @@ function usesGroundElevationColor(sample: NonNullable<SurfaceSamples[number]>): 
   return ![5, 6, 19, 29, 30, 31, 32, 33, 35, 36, 191].includes(biomeId);
 }
 
-function usesBiomeTint(sample: NonNullable<SurfaceSamples[number]>): boolean {
+function usesBiomeTint(
+  sample: NonNullable<SurfaceSamples[number]>,
+  style: SurfaceStyle | undefined,
+): boolean {
   if (sample.biomeId === undefined) return false;
-  const names = sample.colorLayers?.map((layer) => layer.name) ?? [sample.name];
-  return names.some(
-    (name) =>
+  const layers = sample.colorLayers ?? [sample];
+  return layers.some((layer) => {
+    const name = layer.name;
+    const material = layer.style ?? surfaceBlockStyle(style, name);
+    if (material !== undefined)
+      return material.biomeTint !== undefined && material.biomeTint !== "none";
+    return (
       !isDirtPath(name) &&
       name !== "minecraft:cherry_leaves" &&
       (isWater(name) ||
         /grass_block|(?:^|:)(?:grass|short_grass|tall_grass|tallgrass|fern|large_fern|bush)$|leaves|vine/.test(
           name,
-        )),
-  );
+        ))
+    );
+  });
 }
 
 function isElevationStyledGround(name: string): boolean {

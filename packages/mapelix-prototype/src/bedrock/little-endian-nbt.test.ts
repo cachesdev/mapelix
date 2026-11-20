@@ -43,4 +43,14 @@ describe("readLittleEndianNbtCompound", () => {
       "expected compound root",
     );
   });
+
+  it("accepts empty End-typed lists used in block entities", () => {
+    const bytes = new Uint8Array([10, 0, 0, 9, 1, 0, 76, 0, 0, 0, 0, 0, 0]);
+    expect(readLittleEndianNbtCompound(bytes)).toEqual({
+      value: { L: [] },
+      nextOffset: bytes.length,
+    });
+    bytes[8] = 1;
+    expect(() => readLittleEndianNbtCompound(bytes)).toThrow("list cannot contain end tags");
+  });
 });

@@ -11,15 +11,11 @@ import {
 } from "@mapelix/prototype/bedrock";
 
 import type { LiveRecord, WorldDatabase } from "../leveldb/world-database.js";
+import { DIMENSIONS, parseDimension, type Dimension, type DimensionConfig } from "../dimensions.js";
 import { Data3DBiomes } from "./data-3d-biomes.js";
+import { isBlockEntityKey, readBedColors, readBannerColors, type BedColors } from "./bed-colors.js";
 
-export type Dimension = "overworld" | "nether" | "the-end";
-
-const DIMENSION_IDS: Readonly<Record<Dimension, number>> = {
-  overworld: 0,
-  nether: 1,
-  "the-end": 2,
-};
+export type { Dimension } from "../dimensions.js";
 
 /** Stored records for one chunk column, before any subchunk is decoded. */
 export interface ChunkRecords {
@@ -28,6 +24,8 @@ export interface ChunkRecords {
   /** Subchunk records sorted from the top of the world down. */
   readonly sections: readonly SectionRecord[];
   readonly biomes: ChunkBiomes;
+  readonly bedColors: BedColors;
+  readonly bannerColors: BedColors;
 }
 
 export interface SectionRecord {
@@ -41,6 +39,8 @@ export interface DecodedChunk {
   readonly z: number;
   readonly sections: readonly DecodedSubchunk[];
   readonly biomes: ChunkBiomes;
+  readonly bedColors: BedColors;
+  readonly bannerColors: BedColors;
 }
 
 /**
@@ -66,14 +66,22 @@ export class ChunkBiomes {
 
 /** Loads chunk columns from a seekable world database, with a small decoded-chunk cache. */
 export class ChunkSource {
-  private readonly database: WorldDatabase;
+  readonly config: DimensionConfig;
+  private readonly database: Pick<WorldDatabase, "readPrefix">;
   private readonly dimension: number;
   private readonly decoded = new Map<string, DecodedChunk | undefined>();
   private readonly maxDecodedChunks: number;
+  /** Shared across cave depths: bounded by source section, never by window variants. */
+  private readonly decodedSections = new Map<string, DecodedSubchunk | undefined>();
 
-  constructor(database: WorldDatabase, dimension: Dimension, maxDecodedChunks = 128) {
+  constructor(
+    database: Pick<WorldDatabase, "readPrefix">,
+    dimension: Dimension,
+    maxDecodedChunks = 128,
+  ) {
     this.database = database;
-    this.dimension = DIMENSION_IDS[dimension];
+    this.config = DIMENSIONS[parseDimension(dimension)];
+    this.dimension = this.config.storageId;
     this.maxDecodedChunks = maxDecodedChunks;
   }
 
@@ -82,17 +90,39 @@ export class ChunkSource {
     const sections: SectionRecord[] = [];
     let data3D: Data3DBiomes | undefined;
     let data2D: DecodedData2D | undefined;
+    let blockEntities: Uint8Array | undefined;
     for (const record of this.database.readPrefix(this.prefix(chunkX, chunkZ))) {
+      if (isBlockEntityKey(record.key, this.dimension)) {
+        blockEntities = record.value;
+        continue;
+      }
       const key = classifyMapRecordKey(record.key);
       if (key === undefined || key.dimension !== this.dimension) continue;
-      if (key.tag === SUBCHUNK_TAG) sections.push({ y: key.y, record });
-      else if (key.tag === DATA_3D_TAG) data3D = new Data3DBiomes(record.value);
+      if (key.tag === SUBCHUNK_TAG) {
+        if (key.y >= this.config.minY / 16 && key.y < this.config.maxY / 16) {
+          sections.push({ y: key.y, record });
+        }
+      } else if (key.tag === DATA_3D_TAG)
+        data3D = new Data3DBiomes(record.value, this.config.minY, this.config.maxY);
       else if (key.tag === DATA_2D_TAG) data2D = decodeData2D(record.key, record.value);
     }
     if (sections.length === 0) return undefined;
 
     sections.sort((left, right) => right.y - left.y);
-    return { x: chunkX, z: chunkZ, sections, biomes: new ChunkBiomes(data3D, data2D) };
+    return {
+      x: chunkX,
+      z: chunkZ,
+      sections,
+      biomes: new ChunkBiomes(data3D, data2D),
+      bedColors: readBedColors(blockEntities, chunkX, chunkZ, this.config.minY, this.config.maxY),
+      bannerColors: readBannerColors(
+        blockEntities,
+        chunkX,
+        chunkZ,
+        this.config.minY,
+        this.config.maxY,
+      ),
+    };
   }
 
   /** Decodes every subchunk of a chunk, including palette states for block shapes. */
@@ -113,9 +143,16 @@ export class ChunkSource {
             x: chunkX,
             z: chunkZ,
             biomes: records.biomes,
+            bedColors: records.bedColors,
+            bannerColors: records.bannerColors,
             sections: records.sections
               .map((section) => decodeSection(section))
-              .filter((section) => section !== undefined)
+              .filter(
+                (section): section is DecodedSubchunk =>
+                  section !== undefined &&
+                  section.y >= this.config.minY / 16 &&
+                  section.y < this.config.maxY / 16,
+              )
               .sort((left, right) => left.y - right.y),
           };
     this.decoded.set(id, chunk);
@@ -124,6 +161,27 @@ export class ChunkSource {
       if (oldest !== undefined) this.decoded.delete(oldest);
     }
     return chunk;
+  }
+
+  /** Decodes only source sections touching a padded cave window. The world is a fixed snapshot. */
+  chunkRange(chunkX: number, chunkZ: number, minY: number, maxY: number): DecodedChunk | undefined {
+    const records = this.records(chunkX, chunkZ);
+    if (records === undefined) return undefined;
+    const sections: DecodedSubchunk[] = [];
+    for (const record of records.sections) {
+      if (record.y * 16 < minY || record.y * 16 >= maxY) continue;
+      const key = `${chunkX},${chunkZ},${record.y}`;
+      let section = this.decodedSections.get(key);
+      if (!this.decodedSections.has(key)) section = decodeSection(record);
+      this.decodedSections.delete(key);
+      this.decodedSections.set(key, section);
+      if (this.decodedSections.size > 256) {
+        this.decodedSections.delete(this.decodedSections.keys().next().value!);
+      }
+      if (section !== undefined) sections.push(section);
+    }
+    sections.sort((a, b) => a.y - b.y);
+    return { ...records, sections };
   }
 
   private prefix(chunkX: number, chunkZ: number): Uint8Array {

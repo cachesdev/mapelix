@@ -121,6 +121,10 @@ const KEY_STACKS = 1 << 29;
 const KEY_NARROW = 1 << 28;
 /** Set on keys of covered-soil sides. */
 export const KEY_COVERED = 1 << 27;
+/** Keeps lava from merging with other emissive faces, even when their colors match. */
+export const KEY_LAVA = 1 << 26;
+/** Bits 16..19 are free in merge keys (lava flow uses 12..15, flags start at 26). */
+export const KEY_BLOCK_LIGHT_SHIFT = 16;
 
 /**
  * Everything but position and size, so equal keys can merge into one quad. An inset
@@ -169,15 +173,20 @@ export type EmitRectangle = (
   v: number,
   width: number,
   height: number,
+  texture: number,
 ) => void;
 
-/** Merges equal neighboring faces of one slice mask into rectangles, clearing the mask. */
+/**
+ * Merges equal neighboring faces of one slice mask into rectangles, clearing the mask. With
+ * `textures`, faces merge only when their texture words are equal too.
+ */
 export function mergeSlice(
   face: number,
   keys: Uint32Array,
   colors: Uint32Array,
   layout: SliceLayout,
   emit: EmitRectangle,
+  textures?: Uint32Array,
 ): void {
   const { uSize, vSize } = layout;
   const flat = isFlatFace(face);
@@ -187,6 +196,7 @@ export function mergeSlice(
       const key = keys[start]!;
       if (key === 0) continue;
       const color = colors[start]!;
+      const texture = textures === undefined ? 0 : textures[start]!;
 
       let width = 1;
       let height = 1;
@@ -196,7 +206,8 @@ export function mergeSlice(
           widens &&
           u + width < uSize &&
           keys[start + width] === key &&
-          colors[start + width] === color
+          colors[start + width] === color &&
+          (textures === undefined || textures[start + width] === texture)
         ) {
           width += 1;
         }
@@ -204,7 +215,11 @@ export function mergeSlice(
         while (
           stacks &&
           v + height < vSize &&
-          rowMatches(keys, colors, (v + height) * uSize + u, width, key, color)
+          rowMatches(keys, colors, (v + height) * uSize + u, width, key, color) &&
+          (textures === undefined ||
+            textures
+              .subarray((v + height) * uSize + u, (v + height) * uSize + u + width)
+              .every((word) => word === texture))
         ) {
           height += 1;
         }
@@ -212,7 +227,7 @@ export function mergeSlice(
       for (let row = 0; row < height; row += 1) {
         keys.fill(0, (v + row) * uSize + u, (v + row) * uSize + u + width);
       }
-      emit(key, color, u, v, width, height);
+      emit(key, color, u, v, width, height, texture);
     }
   }
 }

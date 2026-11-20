@@ -1,12 +1,18 @@
 <script lang="ts">
+  import type { ViewProjection } from "@mapelix/viewer/three";
+
   interface Props {
     /** Camera heading in radians clockwise from north. */
     heading: number;
     onnorth: () => void;
     onzoom: (factor: number) => void;
+    /** The projection picked now; the button switches to the other one. */
+    projection: ViewProjection;
+    onprojection: (projection: ViewProjection) => void;
   }
 
-  let { heading, onnorth, onzoom }: Props = $props();
+  let { heading, onnorth, onzoom, projection, onprojection }: Props = $props();
+  const isometric = $derived(projection === "isometric");
 </script>
 
 <div class="glass controls">
@@ -17,6 +23,34 @@
       <text x="16" y="3.6" text-anchor="middle">N</text>
     </svg>
     <span class="label">Face north</span>
+  </button>
+  <button
+    class="icon-button"
+    type="button"
+    aria-pressed={isometric}
+    onclick={() => onprojection(isometric ? "perspective" : "isometric")}
+    title={isometric ? "Switch to perspective view" : "Switch to isometric view"}
+  >
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      {#if isometric}
+        <path
+          d="M8 2 14 5.5v5L8 14 2 10.5v-5zM2 5.5 8 9l6-3.5M8 9v5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linejoin="round"
+        />
+      {:else}
+        <path
+          d="M5 3h6l3 10H2zM2 13l6-4 6 4M8 9V3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linejoin="round"
+        />
+      {/if}
+    </svg>
+    <span class="label">Isometric view</span>
   </button>
   <span class="divider" aria-hidden="true"></span>
   <button class="icon-button" type="button" onclick={() => onzoom(0.7)} title="Zoom in">

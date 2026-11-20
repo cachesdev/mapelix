@@ -1,0 +1,767 @@
+{
+  "version": "1.26.60.5",
+  "total": 1466,
+  "sampled": 1276,
+  "unresolved": [
+    {
+      "block": "air",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "chemical_heat",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "colored_torch_blue",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "colored_torch_green",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "colored_torch_purple",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "colored_torch_red",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "compound_creator",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "disc_press",
+      "reason": "Registry-only identifier: no block definition or visual asset in samples 1.26.60.5."
+    },
+    {
+      "block": "element_0",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_1",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_10",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_100",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_101",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_102",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_103",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_104",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_105",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_106",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_107",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_108",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_109",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_11",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_110",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_111",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_112",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_113",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_114",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_115",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_116",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_117",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_118",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_12",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_13",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_14",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_15",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_16",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_17",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_18",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_19",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_2",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_20",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_21",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_22",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_23",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_24",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_25",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_26",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_27",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_28",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_29",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_3",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_30",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_31",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_32",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_33",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_34",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_35",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_36",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_37",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_38",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_39",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_4",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_40",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_41",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_42",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_43",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_44",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_45",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_46",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_47",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_48",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_49",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_5",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_50",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_51",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_52",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_53",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_54",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_55",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_56",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_57",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_58",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_59",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_6",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_60",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_61",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_62",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_63",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_64",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_65",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_66",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_67",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_68",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_69",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_7",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_70",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_71",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_72",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_73",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_74",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_75",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_76",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_77",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_78",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_79",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_8",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_80",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_81",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_82",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_83",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_84",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_85",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_86",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_87",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_88",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_89",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_9",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_90",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_91",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_92",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_93",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_94",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_95",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_96",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_97",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_98",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_99",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "element_constructor",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "grass_block",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_black_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_black_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_blue_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_blue_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_brown_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_brown_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_cyan_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_cyan_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_gray_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_gray_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_green_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_green_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_light_blue_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_light_blue_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_light_gray_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_light_gray_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_lime_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_lime_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_magenta_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_magenta_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_orange_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_orange_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_pink_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_pink_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_purple_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_purple_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_red_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_red_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_white_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_white_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_yellow_stained_glass",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "hard_yellow_stained_glass_pane",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "ice_crystal",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "icicle",
+      "reason": "Registry-only identifier: no block definition or visual asset in samples 1.26.60.5."
+    },
+    {
+      "block": "lab_table",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_0",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_1",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_10",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_11",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_12",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_13",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_14",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_15",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_2",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_3",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_4",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_5",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_6",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_7",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_8",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "light_block_9",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "material_reducer",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "piston_arm_collision",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "sea_lantern",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "sticky_piston_arm_collision",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "trip_wire",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "underwater_tnt",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "underwater_torch",
+      "reason": "No resource texture binding"
+    },
+    {
+      "block": "unknown",
+      "reason": "Engine placeholder, not a vanilla gameplay block."
+    }
+  ]
+}

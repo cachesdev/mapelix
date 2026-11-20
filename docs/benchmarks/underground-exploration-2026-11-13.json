@@ -1,0 +1,2058 @@
+{
+  "base": "67a354035e6f39a8a4fd68e32962ed7bdd8473a9",
+  "date": "2026-11-13",
+  "method": "Windows desktop, Node 24.14.1; individual all-height source tiles over 64-block-radius rectangles; application-cache-cold tiles, OS cache not purged; 8 post-warm-up grouping samples; not a production server benchmark",
+  "results": [
+    {
+      "dimension": "overworld",
+      "tiles": 25,
+      "indexWallMs": 203.53500000000003,
+      "cpuMs": 406,
+      "payloadBytes": 132948,
+      "indexedBlocks": 33037,
+      "queryMedianMs": 45.2088,
+      "queryMaxMs": 50.547000000000025,
+      "cooperativeGrouping": {
+        "slices": 21,
+        "maxSliceMs": 2.4892000000000962,
+        "totalMs": 44.551700000000096
+      },
+      "matchingBlocks": 33037,
+      "visibleGroups": 128,
+      "limited": true,
+      "kindCounts": [
+        {
+          "id": "coal",
+          "count": 7291
+        },
+        {
+          "id": "iron",
+          "count": 8312
+        },
+        {
+          "id": "copper",
+          "count": 7572
+        },
+        {
+          "id": "gold",
+          "count": 2385
+        },
+        {
+          "id": "redstone",
+          "count": 3365
+        },
+        {
+          "id": "lapis",
+          "count": 2214
+        },
+        {
+          "id": "diamond",
+          "count": 1693
+        },
+        {
+          "id": "spawner",
+          "count": 1
+        },
+        {
+          "id": "trial_spawner",
+          "count": 21
+        },
+        {
+          "id": "chest",
+          "count": 13
+        },
+        {
+          "id": "barrel",
+          "count": 24
+        },
+        {
+          "id": "decorated_pot",
+          "count": 40
+        },
+        {
+          "id": "vault",
+          "count": 20
+        },
+        {
+          "id": "budding_amethyst",
+          "count": 55
+        },
+        {
+          "id": "amethyst",
+          "count": 31
+        }
+      ],
+      "rows": [
+        {
+          "x": -2,
+          "z": 0,
+          "bytes": 5384,
+          "blocks": 1338,
+          "milliseconds": 26.456199999999995
+        },
+        {
+          "x": -1,
+          "z": 0,
+          "bytes": 5752,
+          "blocks": 1430,
+          "milliseconds": 12.75630000000001
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "bytes": 6424,
+          "blocks": 1598,
+          "milliseconds": 10.323599999999999
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "bytes": 6020,
+          "blocks": 1497,
+          "milliseconds": 8.412499999999994
+        },
+        {
+          "x": 2,
+          "z": 0,
+          "bytes": 6392,
+          "blocks": 1590,
+          "milliseconds": 8.379099999999994
+        },
+        {
+          "x": -2,
+          "z": 1,
+          "bytes": 5304,
+          "blocks": 1318,
+          "milliseconds": 8.424599999999998
+        },
+        {
+          "x": -1,
+          "z": 1,
+          "bytes": 5984,
+          "blocks": 1488,
+          "milliseconds": 6.977900000000005
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "bytes": 5668,
+          "blocks": 1409,
+          "milliseconds": 9.013000000000005
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "bytes": 6460,
+          "blocks": 1607,
+          "milliseconds": 8.735700000000008
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "bytes": 5688,
+          "blocks": 1414,
+          "milliseconds": 7.6661
+        },
+        {
+          "x": -2,
+          "z": 2,
+          "bytes": 4536,
+          "blocks": 1126,
+          "milliseconds": 6.647600000000011
+        },
+        {
+          "x": -1,
+          "z": 2,
+          "bytes": 4004,
+          "blocks": 993,
+          "milliseconds": 8.197000000000003
+        },
+        {
+          "x": 0,
+          "z": 2,
+          "bytes": 4284,
+          "blocks": 1063,
+          "milliseconds": 5.831099999999992
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "bytes": 5732,
+          "blocks": 1425,
+          "milliseconds": 8.268700000000024
+        },
+        {
+          "x": 2,
+          "z": 2,
+          "bytes": 4568,
+          "blocks": 1134,
+          "milliseconds": 5.6995000000000005
+        },
+        {
+          "x": -2,
+          "z": 3,
+          "bytes": 3476,
+          "blocks": 861,
+          "milliseconds": 6.571899999999971
+        },
+        {
+          "x": -1,
+          "z": 3,
+          "bytes": 5428,
+          "blocks": 1349,
+          "milliseconds": 6.117599999999982
+        },
+        {
+          "x": 0,
+          "z": 3,
+          "bytes": 5332,
+          "blocks": 1325,
+          "milliseconds": 5.5972000000000435
+        },
+        {
+          "x": 1,
+          "z": 3,
+          "bytes": 4708,
+          "blocks": 1169,
+          "milliseconds": 6.9898000000000025
+        },
+        {
+          "x": 2,
+          "z": 3,
+          "bytes": 5508,
+          "blocks": 1369,
+          "milliseconds": 6.135400000000004
+        },
+        {
+          "x": -2,
+          "z": 4,
+          "bytes": 5716,
+          "blocks": 1421,
+          "milliseconds": 6.809100000000001
+        },
+        {
+          "x": -1,
+          "z": 4,
+          "bytes": 6188,
+          "blocks": 1539,
+          "milliseconds": 6.870299999999986
+        },
+        {
+          "x": 0,
+          "z": 4,
+          "bytes": 5908,
+          "blocks": 1469,
+          "milliseconds": 6.1264999999999645
+        },
+        {
+          "x": 1,
+          "z": 4,
+          "bytes": 5424,
+          "blocks": 1348,
+          "milliseconds": 6.43670000000003
+        },
+        {
+          "x": 2,
+          "z": 4,
+          "bytes": 3060,
+          "blocks": 757,
+          "milliseconds": 4.0417999999999665
+        }
+      ]
+    },
+    {
+      "dimension": "nether",
+      "tiles": 25,
+      "indexWallMs": 72.18939999999998,
+      "cpuMs": 93,
+      "payloadBytes": 45684,
+      "indexedBlocks": 11221,
+      "queryMedianMs": 6.80740000000003,
+      "queryMaxMs": 6.961900000000014,
+      "cooperativeGrouping": {
+        "slices": 4,
+        "maxSliceMs": 2.121199999999817,
+        "totalMs": 6.663199999999506
+      },
+      "matchingBlocks": 11221,
+      "visibleGroups": 128,
+      "limited": true,
+      "kindCounts": [
+        {
+          "id": "gold",
+          "count": 2814
+        },
+        {
+          "id": "quartz",
+          "count": 8059
+        },
+        {
+          "id": "ancient_debris",
+          "count": 342
+        },
+        {
+          "id": "nether_portal",
+          "count": 6
+        }
+      ],
+      "rows": [
+        {
+          "x": -2,
+          "z": -2,
+          "bytes": 4648,
+          "blocks": 1154,
+          "milliseconds": 11.030499999999961
+        },
+        {
+          "x": -1,
+          "z": -2,
+          "bytes": 2948,
+          "blocks": 729,
+          "milliseconds": 3.9645000000000437
+        },
+        {
+          "x": 0,
+          "z": -2,
+          "bytes": 1520,
+          "blocks": 372,
+          "milliseconds": 3.762299999999982
+        },
+        {
+          "x": 1,
+          "z": -2,
+          "bytes": 1380,
+          "blocks": 337,
+          "milliseconds": 3.2930999999999813
+        },
+        {
+          "x": 2,
+          "z": -2,
+          "bytes": 1624,
+          "blocks": 398,
+          "milliseconds": 2.9162000000000035
+        },
+        {
+          "x": -2,
+          "z": -1,
+          "bytes": 4404,
+          "blocks": 1093,
+          "milliseconds": 6.1363999999999805
+        },
+        {
+          "x": -1,
+          "z": -1,
+          "bytes": 2496,
+          "blocks": 616,
+          "milliseconds": 3.0594999999999573
+        },
+        {
+          "x": 0,
+          "z": -1,
+          "bytes": 1316,
+          "blocks": 321,
+          "milliseconds": 2.037900000000036
+        },
+        {
+          "x": 1,
+          "z": -1,
+          "bytes": 1364,
+          "blocks": 333,
+          "milliseconds": 2.1117000000000417
+        },
+        {
+          "x": 2,
+          "z": -1,
+          "bytes": 1264,
+          "blocks": 308,
+          "milliseconds": 2.4162000000000035
+        },
+        {
+          "x": -2,
+          "z": 0,
+          "bytes": 2980,
+          "blocks": 737,
+          "milliseconds": 3.5763999999999214
+        },
+        {
+          "x": -1,
+          "z": 0,
+          "bytes": 1620,
+          "blocks": 397,
+          "milliseconds": 1.8786999999999807
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "bytes": 1272,
+          "blocks": 310,
+          "milliseconds": 1.9569999999999936
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "bytes": 1256,
+          "blocks": 306,
+          "milliseconds": 1.8547999999999547
+        },
+        {
+          "x": 2,
+          "z": 0,
+          "bytes": 1052,
+          "blocks": 255,
+          "milliseconds": 1.4313000000000784
+        },
+        {
+          "x": -2,
+          "z": 1,
+          "bytes": 1836,
+          "blocks": 451,
+          "milliseconds": 3.1113000000000284
+        },
+        {
+          "x": -1,
+          "z": 1,
+          "bytes": 1444,
+          "blocks": 353,
+          "milliseconds": 1.7572999999999865
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "bytes": 1096,
+          "blocks": 266,
+          "milliseconds": 1.585800000000063
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "bytes": 1996,
+          "blocks": 491,
+          "milliseconds": 2.54099999999994
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "bytes": 1564,
+          "blocks": 383,
+          "milliseconds": 2.546699999999987
+        },
+        {
+          "x": -2,
+          "z": 2,
+          "bytes": 1448,
+          "blocks": 354,
+          "milliseconds": 2.563199999999938
+        },
+        {
+          "x": -1,
+          "z": 2,
+          "bytes": 1092,
+          "blocks": 265,
+          "milliseconds": 1.877299999999991
+        },
+        {
+          "x": 0,
+          "z": 2,
+          "bytes": 1204,
+          "blocks": 293,
+          "milliseconds": 1.5190999999999804
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "bytes": 1576,
+          "blocks": 386,
+          "milliseconds": 1.8062999999999647
+        },
+        {
+          "x": 2,
+          "z": 2,
+          "bytes": 1284,
+          "blocks": 313,
+          "milliseconds": 1.4150999999999385
+        }
+      ]
+    }
+  ],
+  "mixed": {
+    "method": "one shared worker, four queued Surface prewarm jobs, three simultaneous visitors requesting a cave region and a source index; generic queue, not production scheduler",
+    "jobs": 10,
+    "wallMs": 643.3127000000002,
+    "cpuMs": 1063,
+    "workerBuildMs": [
+      99.21620000000007, 77.2018999999998, 58.50829999999996, 67.92169999999987,
+      7.9978000000000975, 80.24360000000001, 6.015300000000025,
+      58.690000000000055, 6.95939999999996, 61.29160000000002
+    ],
+    "payloadBytes": 984784
+  },
+  "sourceVariants": [
+    {
+      "dimension": "overworld",
+      "savedChunks": 1697,
+      "occupiedSourceTiles": 487,
+      "allVerticalFilterVariantsPerTile": 1
+    },
+    {
+      "dimension": "nether",
+      "savedChunks": 747,
+      "occupiedSourceTiles": 222,
+      "allVerticalFilterVariantsPerTile": 1
+    }
+  ],
+  "generationMemory": {
+    "rssMiB": 182.39453125,
+    "maxRssMiB": 251.22265625,
+    "heapMiB": 10.977485656738281
+  },
+  "inventoryMemoryNote": "Final RSS/heap below includes a separate full source-key inventory; generationMemory was captured before that inventory",
+  "sourceFilesUnchanged": 14,
+  "rssMiB": 302.57421875,
+  "maxRssMiB": 310.16015625,
+  "heapMiB": 52.89991760253906,
+  "branch": "feature/underground-rendering",
+  "unit": {
+    "engine": 182,
+    "viewer": 18
+  },
+  "browser": {
+    "expected": 22,
+    "unexpected": 0,
+    "skipped": 0,
+    "flaky": 0
+  },
+  "finalPreferenceChecks": {
+    "expected": 4,
+    "unexpected": 0,
+    "scope": "Preserve 16-block slices, zoom, hidden filters and reloads; both backends"
+  },
+  "lifecycle": [
+    {
+      "backend": "WebGPU",
+      "project": "auto",
+      "switches": 104,
+      "samples": [
+        {
+          "index": 3,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 8858572
+        },
+        {
+          "index": 7,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 8968928
+        },
+        {
+          "index": 11,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9135396
+        },
+        {
+          "index": 15,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9085864
+        },
+        {
+          "index": 19,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9218016
+        },
+        {
+          "index": 23,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9308220
+        },
+        {
+          "index": 27,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9436544
+        },
+        {
+          "index": 31,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9501436
+        },
+        {
+          "index": 35,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9542476
+        },
+        {
+          "index": 39,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9683168
+        },
+        {
+          "index": 43,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9716080
+        },
+        {
+          "index": 47,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9758592
+        },
+        {
+          "index": 51,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 35,
+            "programsSize": 329585,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 75,
+            "uniformBuffersSize": 90192,
+            "total": 153955841
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9773648
+        },
+        {
+          "index": 55,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10100824
+        },
+        {
+          "index": 59,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10327564
+        },
+        {
+          "index": 63,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10508820
+        },
+        {
+          "index": 67,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10597900
+        },
+        {
+          "index": 71,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10688768
+        },
+        {
+          "index": 75,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10750156
+        },
+        {
+          "index": 79,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10783288
+        },
+        {
+          "index": 83,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10809724
+        },
+        {
+          "index": 87,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10822812
+        },
+        {
+          "index": 91,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10845260
+        },
+        {
+          "index": 95,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10871424
+        },
+        {
+          "index": 99,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10914200
+        },
+        {
+          "index": 103,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 23832,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 31,
+            "programsSize": 281377,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 70,
+            "uniformBuffersSize": 83728,
+            "total": 153901169
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10932404
+        }
+      ],
+      "errors": [],
+      "summary": {
+        "firstSwitch": 20,
+        "lastSwitch": 104,
+        "uniformBuffers": [75, 70],
+        "textures": [18, 18],
+        "rendererBytes": [153955841, 153901169],
+        "heapMiB": [8.790985107421875, 10.425952911376953],
+        "unpooledTailHeapDeltaKiB": 326.6640625
+      }
+    },
+    {
+      "backend": "WebGL 2",
+      "project": "webgl",
+      "switches": 104,
+      "samples": [
+        {
+          "index": 3,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9093872
+        },
+        {
+          "index": 7,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9252088
+        },
+        {
+          "index": 11,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9398448
+        },
+        {
+          "index": 15,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9418004
+        },
+        {
+          "index": 19,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9478540
+        },
+        {
+          "index": 23,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9585260
+        },
+        {
+          "index": 27,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9700860
+        },
+        {
+          "index": 31,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9762592
+        },
+        {
+          "index": 35,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9787620
+        },
+        {
+          "index": 39,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9986556
+        },
+        {
+          "index": 43,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 9962244
+        },
+        {
+          "index": 47,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10004524
+        },
+        {
+          "index": 51,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 36,
+            "programsSize": 303545,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 77,
+            "uniformBuffersSize": 91232,
+            "total": 153918925
+          },
+          "pooled": 1,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10013876
+        },
+        {
+          "index": 55,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10324056
+        },
+        {
+          "index": 59,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10576328
+        },
+        {
+          "index": 63,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10695000
+        },
+        {
+          "index": 67,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10846312
+        },
+        {
+          "index": 71,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10870780
+        },
+        {
+          "index": 75,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 10978264
+        },
+        {
+          "index": 79,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11023472
+        },
+        {
+          "index": 83,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11007756
+        },
+        {
+          "index": 87,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11075268
+        },
+        {
+          "index": 91,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11067724
+        },
+        {
+          "index": 95,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11089968
+        },
+        {
+          "index": 99,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11167916
+        },
+        {
+          "index": 103,
+          "memory": {
+            "attributes": 15,
+            "attributesSize": 45480,
+            "geometries": 12,
+            "indexAttributes": 2,
+            "indexAttributesSize": 11916,
+            "indirectStorageAttributes": 0,
+            "indirectStorageAttributesSize": 0,
+            "programs": 32,
+            "programsSize": 260896,
+            "readbackBuffers": 0,
+            "readbackBuffersSize": 0,
+            "renderTargets": 13,
+            "storageAttributes": 0,
+            "storageAttributesSize": 0,
+            "textures": 18,
+            "texturesSize": 153466752,
+            "uniformBuffers": 72,
+            "uniformBuffersSize": 84736,
+            "total": 153869780
+          },
+          "pooled": 0,
+          "discoveryBytes": 0,
+          "markers": 0,
+          "heap": 11182872
+        }
+      ],
+      "errors": [],
+      "summary": {
+        "firstSwitch": 20,
+        "lastSwitch": 104,
+        "uniformBuffers": [77, 72],
+        "textures": [18, 18],
+        "rendererBytes": [153918925, 153869780],
+        "heapMiB": [9.039440155029297, 10.664817810058594],
+        "unpooledTailHeapDeltaKiB": 328.671875
+      }
+    }
+  ],
+  "manualPreview": {
+    "results": [
+      {
+        "name": "overworld-discoveries",
+        "backend": "WebGPU",
+        "status": "Nearby search complete\n      · 141 blocks in 128 groups",
+        "markers": 128,
+        "url": "http://127.0.0.1:5200/?x=7&y=-16&z=72&distance=60&heading=56&pitch=60&dimension=overworld&mode=caves&minY=-32&maxY=0&discover=spawners%2Ccontainers%2Cvaults%2Camethyst%2Csculk%2Clandmarks&ores=coal%2Ciron%2Ccopper%2Cgold%2Credstone%2Clapis%2Cdiamond%2Cemerald%2Cquartz%2Cancient_debris%2Cother_ore&exposure=all&allY=0&hour=15.5",
+        "errors": []
+      },
+      {
+        "name": "buried-diamonds",
+        "backend": "WebGPU",
+        "status": "Nearby search complete\n      · 1687 blocks in 128 groups",
+        "markers": 128,
+        "url": "http://127.0.0.1:5200/?x=7&y=-16&z=72&distance=60&heading=56&pitch=60&dimension=overworld&mode=caves&minY=-32&maxY=0&discover=ores&ores=diamond&exposure=buried&allY=1&hour=15.5",
+        "errors": []
+      },
+      {
+        "name": "nether-debris",
+        "backend": "WebGPU",
+        "status": "Nearby search complete\n      · 342 blocks in 128 groups",
+        "markers": 128,
+        "url": "http://127.0.0.1:5200/?x=0&y=32&z=0&distance=80&heading=35&pitch=60&dimension=nether&mode=caves&minY=16&maxY=48&discover=ores&ores=ancient_debris&exposure=buried&allY=1&hour=15.5",
+        "errors": []
+      }
+    ],
+    "errors": []
+  },
+  "limitations": [
+    "Real snapshot has no End chunks; generated End covers regressions",
+    "Logical renderer counters are not physical VRAM",
+    "Desktop measurements do not establish production server headroom",
+    "Source grouping is limited to loaded saved chunks and selected filters; markers are capped at the nearest 128",
+    "Container contents and live entities are not indexed",
+    "Production server, host controls, bounded disk caching and deployment are out of scope"
+  ]
+}

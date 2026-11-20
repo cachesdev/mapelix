@@ -15,8 +15,13 @@ export interface DecodedBiomeStorage {
 export interface DecodedData3D {
   readonly key: BedrockData3DKey;
   readonly heights: Int16Array;
-  /** Biome storages in the same ascending order as the chunk's existing block sections. */
+  /** Ascending biome storages; repeat slots are retained when explicitly requested. */
   readonly storages: readonly DecodedBiomeStorage[];
+}
+
+export interface DecodeData3DOptions {
+  /** Expand 0xff as a repeat of the previous storage, preserving fixed dimension slots. */
+  readonly repeatBelow?: boolean;
 }
 
 function malformed(message: string): Error {
@@ -91,10 +96,11 @@ function decodeStorage(
   };
 }
 
-/** Decodes the modern overworld Data3D heightmap and sequential biome storages. */
+/** Decodes Data3D storages, preserving the archived stop-at-repeat behavior by default. */
 export function decodeData3D(
   keyBytes: Uint8Array,
   valueBytes: Uint8Array,
+  options: DecodeData3DOptions = {},
 ): DecodedData3D | undefined {
   const key = classifyData3DKey(keyBytes);
   if (key === undefined) return undefined;
@@ -112,6 +118,13 @@ export function decodeData3D(
   let offset = heightBytes;
   while (offset < valueBytes.byteLength && storages.length < overworldSectionCount) {
     const header = valueBytes[offset];
+    if (header === 0xff && options.repeatBelow === true) {
+      const below = storages.at(-1);
+      if (below === undefined) break;
+      storages.push(below);
+      offset += 1;
+      continue;
+    }
     if (header === 0xff || header === undefined || (header & 1) === 0) break;
     const decoded = decodeStorage(valueBytes, offset);
     storages.push(decoded.storage);

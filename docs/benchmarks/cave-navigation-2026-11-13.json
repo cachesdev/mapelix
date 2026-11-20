@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-13",
+  "branch": "feature/cave-navigation",
+  "base": "92351d9ea1c972f1205a25d1fa9882f2e1324828",
+  "contracts": {
+    "httpApi": 3,
+    "embedApi": 3,
+    "regionFormat": 2,
+    "discoverySchema": 1,
+    "serverChanged": false,
+    "engineChanged": false,
+    "cacheIdentityChanged": false
+  },
+  "limits": {
+    "thicknesses": [16, 32],
+    "lods": [0, 1],
+    "viewDistanceBlocks": 128,
+    "stepBlocks": 16,
+    "verticalBlocksPerSecond": 12,
+    "intentDebounceMs": 250,
+    "defaultMetadataIntervalMs": 2000,
+    "minimumMetadataIntervalMs": 1000,
+    "pendingMetadata": 1,
+    "sharedCaveDiscoveryDownloads": 2,
+    "retainedRetryKeys": 256
+  },
+  "validation": {
+    "engineTests": 182,
+    "engineTestsReusedFromTurboCache": true,
+    "viewerTests": 33,
+    "fullBrowserTests": 28,
+    "additionalFinalBrowserChecks": 4,
+    "failures": 0,
+    "retries": 0,
+    "skips": 0,
+    "mobileViewportWidths": [320, 430]
+  },
+  "lifecycle": [
+    {
+      "backend": "WebGPU",
+      "switches": 104,
+      "firstWarmSwitch": 20,
+      "uniformBuffers": [75, 70],
+      "textures": [18, 18],
+      "collectedHeapBytes": [9918704, 11181688],
+      "rendererAllocationChangeBytes": -54672,
+      "final36SwitchHeapChangeBytes": 401432,
+      "browserErrors": []
+    },
+    {
+      "backend": "WebGL 2",
+      "switches": 104,
+      "firstWarmSwitch": 20,
+      "uniformBuffers": [77, 72],
+      "textures": [18, 18],
+      "collectedHeapBytes": [10025472, 11373428],
+      "rendererAllocationChangeBytes": -49145,
+      "final36SwitchHeapChangeBytes": 414108,
+      "browserErrors": []
+    }
+  ],
+  "realSnapshot": {
+    "backend": "WebGPU",
+    "sourceFilesHashedBeforeAndAfter": 1895,
+    "sourceFilesChanged": 0,
+    "discoveriesEnabled": true,
+    "cameraDistanceAndAnglesPreserved": true,
+    "visits": [
+      {
+        "dimension": "overworld",
+        "oldBounds": [-32, 0],
+        "newBounds": [-16, 16],
+        "peakDownloads": 2
+      },
+      {
+        "dimension": "nether",
+        "oldBounds": [16, 48],
+        "newBounds": [32, 64],
+        "peakDownloads": 2
+      }
+    ],
+    "browserErrors": [],
+    "endUsesGeneratedFixtures": true
+  },
+  "limitations": [
+    "Renderer counters are logical allocations, not physical GPU residency.",
+    "Collected heap includes additional shader/JS warm-up after unpooled disposal begins.",
+    "Production server and public proxy validation are out of scope."
+  ]
+}

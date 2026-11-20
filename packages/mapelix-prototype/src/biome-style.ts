@@ -11,6 +11,7 @@ export interface BiomeStyle {
 const DEFAULT_STYLE = style("#8eb971", "#71a74d", "#3f76e4", 1);
 const PLAINS_STYLE = style("#91bd59", "#77ab2f", "#44aff5", 1);
 const RESOLVED_STYLES = new Map<number, BiomeStyle>();
+const EXPLICIT_WATER_BIOMES = new Set([48, 49, 193, 194, 195]);
 
 /**
  * Resolves legacy numeric biome IDs used by Bedrock Data2D records.
@@ -23,7 +24,9 @@ export function legacyBiomeStyle(biomeId: number): BiomeStyle {
   const cached = RESOLVED_STYLES.get(baseId);
   if (cached !== undefined) return cached;
   const selected = CLASSIC_STYLES.get(baseId) ?? BIOME_STYLES.get(baseId) ?? DEFAULT_STYLE;
-  const resolved = { ...selected, water: classicWaterColor(baseId), waterOpacity: 1 };
+  // New client-biome definitions provide explicit water colors, outside the classic families.
+  const water = EXPLICIT_WATER_BIOMES.has(baseId) ? selected.water : classicWaterColor(baseId);
+  const resolved = { ...selected, water, waterOpacity: 1 };
   RESOLVED_STYLES.set(baseId, resolved);
   return resolved;
 }
@@ -82,6 +85,9 @@ const BIOME_STYLES = new Map<number, BiomeStyle>([
   [5, style("#86b783", "#689d71", "#287082", 0.58)],
   [6, style("#6a7039", "#6a7039", "#4c6559", 0.72)],
   [7, style("#91bd59", "#77ab2f", "#0084ff", 0.5)],
+  // Dimension lighting is separate; retain the existing neutral tint for these biomes.
+  [8, DEFAULT_STYLE],
+  [9, DEFAULT_STYLE],
   [10, style("#80b497", "#70a58b", "#2570b5", 0.58)],
   [11, style("#80b497", "#70a58b", "#185390", 0.58)],
   [12, style("#80b497", "#70a58b", "#14559b", 0.58)],
@@ -120,6 +126,9 @@ const BIOME_STYLES = new Map<number, BiomeStyle>([
   [45, style("#80b497", "#70a58b", "#2080c9", 0.65)],
   [46, style("#80b497", "#70a58b", "#2570b5", 0.58)],
   [47, style("#80b497", "#70a58b", "#2570b5", 0.68)],
+  // Both bamboo biomes use jungle climate; water comes from their client definitions.
+  [48, style("#59c93c", "#30b421", "#14a2c5", 1)],
+  [49, style("#59c93c", "#30b421", "#1b9ed8", 1)],
   [178, style("#bfb755", "#aea42a", "#905957", 1)],
   [179, style("#bfb755", "#aea42a", "#905957", 1)],
   [180, style("#bfb755", "#aea42a", "#905957", 1)],
@@ -135,6 +144,12 @@ const BIOME_STYLES = new Map<number, BiomeStyle>([
   [190, style("#91bd59", "#77ab2f", "#44aff5", 1)],
   [191, style("#6a7039", "#8db127", "#3a7a6a", 1)],
   [192, style("#b6db61", "#b6db61", "#5db7ef", 1)],
+  // Explicit grass/foliage/water from Bedrock samples 1.26.60.5 client biomes.
+  [193, style("#778272", "#878d76", "#76889d", 1)],
+  [194, style("#aba64f", "#71a74d", "#34bf89", 1)],
+  [195, style("#df6827", "#e68e30", "#375154", 1)],
+  // Registry-only in this sample release: an explicit snowy-tundra family fallback.
+  [196, style("#80b497", "#70a58b", "#14559b", 1)],
 ]);
 
 function style(grass: string, foliage: string, water: string, waterOpacity: number): BiomeStyle {

@@ -1,0 +1,417 @@
+{
+  "source": {
+    "version": "1.26.60.5",
+    "archive": "bedrock-samples-v1.26.60.5-full.zip"
+  },
+  "overrides": {
+    "barrel": {
+      "textures": {
+        "up": "barrel_top",
+        "side": "barrel_side",
+        "down": "barrel_bottom"
+      }
+    },
+    "cauldron": {
+      "textures": {
+        "up": "cauldron_top",
+        "side": "cauldron_side",
+        "down": "cauldron_bottom"
+      }
+    },
+    "decorated_pot": {
+      "textures": {
+        "up": {
+          "key": "decorated_pot",
+          "index": 1
+        },
+        "side": "decorated_pot",
+        "down": {
+          "key": "decorated_pot",
+          "index": 1
+        }
+      }
+    },
+    "iron_chain": {
+      "textures": ["chain1", "chain2"]
+    },
+    "red_shrub": {
+      "textures": "red_shrub"
+    },
+    "shelf_mushroom": {
+      "textures": "shelf_mushroom_small",
+      "variants": [
+        {
+          "states": {
+            "growth": 1
+          },
+          "textures": "shelf_mushroom_large"
+        }
+      ]
+    },
+    "waxed_copper_bulb": {
+      "variants": [
+        {
+          "states": {
+            "lit": 1,
+            "powered_bit": 1
+          },
+          "textureIndex": 3
+        },
+        {
+          "states": {
+            "lit": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "powered_bit": 1
+          },
+          "textureIndex": 2
+        }
+      ]
+    },
+    "waxed_exposed_copper_bulb": {
+      "variants": [
+        {
+          "states": {
+            "lit": 1,
+            "powered_bit": 1
+          },
+          "textureIndex": 3
+        },
+        {
+          "states": {
+            "lit": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "powered_bit": 1
+          },
+          "textureIndex": 2
+        }
+      ]
+    },
+    "waxed_oxidized_copper_bulb": {
+      "variants": [
+        {
+          "states": {
+            "lit": 1,
+            "powered_bit": 1
+          },
+          "textureIndex": 3
+        },
+        {
+          "states": {
+            "lit": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "powered_bit": 1
+          },
+          "textureIndex": 2
+        }
+      ]
+    },
+    "waxed_weathered_copper_bulb": {
+      "variants": [
+        {
+          "states": {
+            "lit": 1,
+            "powered_bit": 1
+          },
+          "textureIndex": 3
+        },
+        {
+          "states": {
+            "lit": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "powered_bit": 1
+          },
+          "textureIndex": 2
+        }
+      ]
+    },
+    "trial_spawner": {
+      "variants": [
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 0
+          },
+          "textureIndex": 6
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 1
+          },
+          "textureIndex": 7
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 2
+          },
+          "textureIndex": 8
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 3
+          },
+          "textureIndex": 9
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 4
+          },
+          "textureIndex": 10
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "trial_spawner_state": 5
+          },
+          "textureIndex": 11
+        },
+        {
+          "states": {
+            "trial_spawner_state": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "trial_spawner_state": 2
+          },
+          "textureIndex": 2
+        },
+        {
+          "states": {
+            "trial_spawner_state": 3
+          },
+          "textureIndex": 3
+        },
+        {
+          "states": {
+            "trial_spawner_state": 4
+          },
+          "textureIndex": 4
+        },
+        {
+          "states": {
+            "trial_spawner_state": 5
+          },
+          "textureIndex": 5
+        }
+      ]
+    },
+    "vault": {
+      "variants": [
+        {
+          "states": {
+            "ominous": 1,
+            "vault_state": "inactive"
+          },
+          "textureIndex": 4
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "vault_state": "active"
+          },
+          "textureIndex": 5
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "vault_state": "unlocking"
+          },
+          "textureIndex": 6
+        },
+        {
+          "states": {
+            "ominous": 1,
+            "vault_state": "ejecting"
+          },
+          "textureIndex": 7
+        },
+        {
+          "states": {
+            "vault_state": "active"
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "vault_state": "unlocking"
+          },
+          "textureIndex": 2
+        },
+        {
+          "states": {
+            "vault_state": "ejecting"
+          },
+          "textureIndex": 3
+        }
+      ]
+    },
+    "straw_bed": {
+      "textures": "straw_bed"
+    },
+    "bed": {
+      "textures": {
+        "up": {
+          "path": "textures/entity/bed/white",
+          "regions": [
+            [6, 6, 16, 16],
+            [6, 28, 16, 16]
+          ]
+        },
+        "side": {
+          "path": "textures/entity/bed/white",
+          "regions": [
+            [6, 6, 16, 16],
+            [6, 28, 16, 16]
+          ]
+        },
+        "down": "bed_bottom"
+      },
+      "variants": [
+        {
+          "states": {
+            "color": 0
+          },
+          "path": "textures/entity/bed/white"
+        },
+        {
+          "states": {
+            "color": 1
+          },
+          "path": "textures/entity/bed/orange"
+        },
+        {
+          "states": {
+            "color": 2
+          },
+          "path": "textures/entity/bed/magenta"
+        },
+        {
+          "states": {
+            "color": 3
+          },
+          "path": "textures/entity/bed/light_blue"
+        },
+        {
+          "states": {
+            "color": 4
+          },
+          "path": "textures/entity/bed/yellow"
+        },
+        {
+          "states": {
+            "color": 5
+          },
+          "path": "textures/entity/bed/lime"
+        },
+        {
+          "states": {
+            "color": 6
+          },
+          "path": "textures/entity/bed/pink"
+        },
+        {
+          "states": {
+            "color": 7
+          },
+          "path": "textures/entity/bed/gray"
+        },
+        {
+          "states": {
+            "color": 8
+          },
+          "path": "textures/entity/bed/silver"
+        },
+        {
+          "states": {
+            "color": 9
+          },
+          "path": "textures/entity/bed/cyan"
+        },
+        {
+          "states": {
+            "color": 10
+          },
+          "path": "textures/entity/bed/purple"
+        },
+        {
+          "states": {
+            "color": 11
+          },
+          "path": "textures/entity/bed/blue"
+        },
+        {
+          "states": {
+            "color": 12
+          },
+          "path": "textures/entity/bed/brown"
+        },
+        {
+          "states": {
+            "color": 13
+          },
+          "path": "textures/entity/bed/green"
+        },
+        {
+          "states": {
+            "color": 14
+          },
+          "path": "textures/entity/bed/red"
+        },
+        {
+          "states": {
+            "color": 15
+          },
+          "path": "textures/entity/bed/black"
+        }
+      ]
+    },
+    "nether_wart": {
+      "variants": [
+        {
+          "states": {
+            "age": 1
+          },
+          "textureIndex": 1
+        },
+        {
+          "states": {
+            "age": 2
+          },
+          "textureIndex": 2
+        },
+        {
+          "states": {
+            "age": 3
+          },
+          "textureIndex": 3
+        }
+      ]
+    }
+  },
+  "exclusions": {
+    "disc_press": "Registry-only identifier: no block definition or visual asset in samples 1.26.60.5.",
+    "icicle": "Registry-only identifier: no block definition or visual asset in samples 1.26.60.5.",
+    "unknown": "Engine placeholder, not a vanilla gameplay block."
+  }
+}

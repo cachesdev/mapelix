@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-13",
+  "base": "974f71511e071eff53b53c4012e91f72c830bd8b",
+  "branch": "feature/cave-navigation",
+  "contracts": {
+    "embed": 3,
+    "http": 3,
+    "regionFormat": 2,
+    "discoverySchema": 1,
+    "engineOrServerChanged": false,
+    "cacheIdentityChanged": false
+  },
+  "tests": {
+    "engineTests": 182,
+    "engineTestsCached": true,
+    "viewerTests": 39,
+    "fullBrowser": {
+      "startTime": "2026-11-13T17:38:50.3Z",
+      "duration": 308213.422,
+      "expected": 34,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "finalFocusedBrowser": {
+      "startTime": "2026-11-13T18:04:22.081Z",
+      "duration": 24414.333000000002,
+      "expected": 6,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "lifecycle": [
+    {
+      "backend": "WebGPU",
+      "switches": 104,
+      "uniformBuffers": [75, 70],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [153955841, 153901169],
+      "collectedHeapBytes": [9934768, 11197004],
+      "final36SwitchHeapGrowthBytes": 319168,
+      "errors": []
+    },
+    {
+      "backend": "WebGL 2",
+      "switches": 104,
+      "uniformBuffers": [77, 72],
+      "textures": [18, 18],
+      "rendererAllocationBytes": [153918925, 153869780],
+      "collectedHeapBytes": [10081796, 11401488],
+      "final36SwitchHeapGrowthBytes": 384116,
+      "errors": []
+    }
+  ],
+  "policy": {
+    "surfaceDepthBlocks": 8,
+    "surfaceReturnFromCaves": false,
+    "sourceIndexReuse": true,
+    "groupingBudgetMs": 2,
+    "cooperativeScanBatch": 256,
+    "nativeCards": 1,
+    "defaultPointDistanceCap": 24,
+    "nominalGroupDistanceRange": [18, 40],
+    "sharedCaveDiscoveryRequests": 2
+  },
+  "limitations": [
+    "Depth proximity uses loaded column tops, including foliage/roofs and coarse LODs.",
+    "Unknown column heights retain Surface discoveries rather than guessing buried depth.",
+    "Lifecycle counters are logical renderer allocations and collected JS heap, not physical GPU residency or process RSS.",
+    "All browser cases use generated disposable worlds."
+  ]
+}
